@@ -1,0 +1,484 @@
+# lang,native_word_or_phrase,english_name
+# ── Malayalam (ml) ────────────────────────────────────────────────────────────
+# Groceries
+ml,അരി,Rice
+ml,ഗോതമ്പ്,Wheat
+ml,മാവ്,Flour
+ml,പഞ്ചസാര,Sugar
+ml,ഉപ്പ്,Salt
+ml,ചായപ്പൊടി,Tea Powder
+ml,കാപ്പിപ്പൊടി,Coffee Powder
+ml,പാൽ,Milk
+ml,തൈര്,Curd
+ml,നെയ്യ്,Ghee
+ml,എണ്ണ,Oil
+ml,വെളിച്ചെണ്ണ,Coconut Oil
+ml,കടലെണ്ണ,Groundnut Oil
+ml,സൂര്യകാന്തി എണ്ണ,Sunflower Oil
+ml,കടുകെണ്ണ,Mustard Oil
+ml,എള്ളെണ്ണ,Sesame Oil
+ml,മഞ്ഞൾപ്പൊടി,Turmeric Powder
+ml,മുളകുപ്പൊടി,Chilli Powder
+ml,മല്ലിപ്പൊടി,Coriander Powder
+ml,ഗരംമസാല,Garam Masala
+ml,കടുക്,Mustard Seeds
+ml,ജീരകം,Cumin Seeds
+ml,കുരുമുളക്,Black Pepper
+ml,പുളി,Tamarind
+ml,വെളുത്തുള്ളി,Garlic
+ml,ഇഞ്ചി,Ginger
+ml,കറിവേപ്പില,Curry Leaves
+ml,മല്ലിയില,Coriander Leaves
+ml,ശർക്കര,Jaggery
+ml,തേൻ,Honey
+# Dals & Legumes
+ml,ചെറുപയർ,Green Gram
+ml,ഉഴുന്ന്,Black Gram
+ml,കടലപരിപ്പ്,Chana Dal
+ml,തുവരപ്പരിപ്പ്,Toor Dal
+ml,മസൂർ പരിപ്പ്,Masoor Dal
+ml,കടല,Chickpeas
+ml,നിലക്കടല,Groundnut
+ml,സോയാബീൻ,Soya Beans
+# Vegetables
+ml,ഉള്ളി,Onion
+ml,തക്കാളി,Tomato
+ml,ഉരുളക്കിഴങ്ങ്,Potato
+ml,വഴുതന,Brinjal
+ml,പാവയ്ക്ക,Bitter Gourd
+ml,ചുരക്ക,Bottle Gourd
+ml,പടവലം,Snake Gourd
+ml,വെണ്ടക്ക,Okra
+ml,കൊയ്ത്ത്,Cluster Beans
+ml,മുരിങ്ങക്ക,Drumstick
+ml,കാരറ്റ്,Carrot
+ml,മുള്ളങ്കി,Radish
+ml,കാബേജ്,Cabbage
+ml,കോളിഫ്ലവർ,Cauliflower
+ml,ബീൻസ്,Beans
+ml,കക്ക,Raw Banana
+ml,ചേന,Yam
+ml,ചേമ്പ്,Colocasia
+# Fruits
+ml,നേന്ത്രക്കായ,Banana
+ml,മാങ്ങ,Mango
+ml,ആപ്പിൾ,Apple
+ml,മുന്തിരി,Grapes
+ml,ഓറഞ്ച്,Orange
+ml,തണ്ണിമത്തൻ,Watermelon
+ml,പപ്പായ,Papaya
+ml,അനാനാസ്,Pineapple
+ml,സ്ട്രോബെറി,Strawberry
+ml,ചക്ക,Jackfruit
+ml,നാരങ്ങ,Lemon
+ml,തക്ക,Guava
+ml,കൊക്കോ,Coconut
+# Rice & Grains
+ml,ബസ്മതി അരി,Basmati Rice
+ml,കുക്കൻ അരി,Parboiled Rice
+ml,ഇഡ്ഡലി അരി,Idli Rice
+ml,റവ,Rava (Semolina)
+ml,സൂജി,Sooji (Semolina)
+ml,ഗോതമ്പ് മാവ്,Wheat Flour
+ml,ഇടിയരി,Rice Flour
+ml,കടലമാവ്,Chickpea Flour (Besan)
+# Dairy
+ml,വെണ്ണ,Butter
+ml,ചീസ്,Cheese
+ml,പനീർ,Paneer
+# Cosmetics & Personal Care
+ml,ബിസ്കറ്റ്,Biscuit
+ml,സോപ്പ്,Soap
+ml,ഷാംപൂ,Shampoo
+ml,കണ്ടീഷണർ,Conditioner
+ml,പല്ലുതേപ്പ്,Toothpaste
+ml,ടൂത്ത് ബ്രഷ്,Toothbrush
+ml,ഫേസ് വാഷ്,Face Wash
+ml,ക്രീം,Cream
+ml,ലോഷൻ,Lotion
+ml,ഡിയോഡറന്റ്,Deodorant
+ml,ഷേവിംഗ് ക്രീം,Shaving Cream
+ml,നഖം മുറിക്കുന്ന ആള,Nail Cutter
+ml,ചീർപ്പ്,Comb
+ml,അലക്കുപൊടി,Detergent Powder
+ml,ഡിഷ് വാഷ്,Dish Wash Liquid
+# Household & Electronics
+ml,ഫാൻ,Fan
+ml,ലൈറ്റ്,Light
+ml,ബൾബ്,Bulb
+ml,ട്യൂബ് ലൈറ്റ്,Tube Light
+ml,സ്വിച്ച്,Switch
+ml,പ്ലഗ്,Plug
+ml,സോക്കറ്റ്,Socket
+ml,വയർ,Wire
+ml,എക്സ്റ്റൻഷൻ ബോർഡ്,Extension Board
+ml,ബാറ്ററി,Battery
+ml,ഇൻവർട്ടർ,Inverter
+ml,ചാർജർ,Charger
+ml,മൊബൈൽ ഫോൺ,Mobile Phone
+ml,ടെലിവിഷൻ,Television
+ml,റിമോട്ട്,Remote
+ml,ഫ്രിഡ്ജ്,Refrigerator
+ml,വാഷിങ് മെഷീൻ,Washing Machine
+ml,മിക്സി,Mixer Grinder
+ml,ഇസ്തിരിപ്പെട്ടി,Iron Box
+ml,വാട്ടർ ഹീറ്റർ,Water Heater
+ml,എയർ കണ്ടീഷണർ,Air Conditioner
+ml,എയർ കൂളർ,Air Cooler
+ml,കമ്പ്യൂട്ടർ,Computer
+ml,ലാപ്‌ടോപ്പ്,Laptop
+ml,കീബോർഡ്,Keyboard
+ml,മൗസ്,Mouse
+ml,പ്രിന്റർ,Printer
+ml,സ്പീക്കർ,Speaker
+ml,ഹെഡ്‌ഫോൺ,Headphone
+ml,ഇയർഫോൺ,Earphone
+ml,മൈക്രോഫോൺ,Microphone
+ml,ക്യാമറ,Camera
+ml,പവർ ബാങ്ക്,Power Bank
+ml,ജനറേറ്റർ,Generator
+ml,ഇലക്ട്രിക് സ്റ്റൗ,Electric Stove
+ml,ഇൻഡക്ഷൻ സ്റ്റൗ,Induction Stove
+ml,വാക്വം ക്ലീനർ,Vacuum Cleaner
+ml,ഇലക്ട്രിക് കെറ്റിൽ,Electric Kettle
+ml,കലണ്ടർ,Calendar
+ml,പത്രം,Newspaper
+ml,ബക്കറ്റ്,Bucket
+ml,ചൂൽ,Broom
+ml,മോപ്പ്,Mop
+ml,ടബ്ബ്,Tub
+ml,കത്തി,Knife
+ml,കോരി,Ladle
+ml,അടുക്കള,Kitchen
+ml,ഗ്ലാസ്,Glass
+ml,പ്ലേറ്റ്,Plate
+ml,കപ്പ്,Cup
+ml,ബൗൾ,Bowl
+# ── Telugu (te) ───────────────────────────────────────────────────────────────
+# Groceries
+te,అరిసె,Rice Flour
+te,బియ్యం,Rice
+te,గోధుమలు,Wheat
+te,మైదా,Maida (All-Purpose Flour)
+te,బెల్లం,Jaggery
+te,పంచదార,Sugar
+te,ఉప్పు,Salt
+te,చింతపండు,Tamarind
+te,తేనె,Honey
+te,ఉల్లిపాయ,Onion
+te,వెల్లుల్లి,Garlic
+te,అల్లం,Ginger
+te,టమాటా,Tomato
+te,పసుపు,Turmeric
+te,మిరపకాయ,Red Chilli
+te,పచ్చిమిర్చి,Green Chilli
+te,కరివేపాకు,Curry Leaves
+te,కొత్తిమీర,Coriander Leaves
+te,జీలకర్ర,Cumin Seeds
+te,ధనియాలు,Coriander Seeds
+te,మెంతులు,Fenugreek Seeds
+te,ఆవాలు,Mustard Seeds
+te,నువ్వులు,Sesame Seeds
+te,వేరుశనగలు,Groundnuts
+# Dals
+te,కందిపప్పు,Toor Dal
+te,మినప పప్పు,Urad Dal
+te,పెసర పప్పు,Moong Dal
+te,సెనగ పప్పు,Chana Dal
+te,మసూర్ పప్పు,Masoor Dal
+te,పెసలు,Green Gram (Whole)
+te,మినుములు,Urad (Whole)
+te,అలసందలు,Black-eyed Peas
+te,కందులు,Pigeon Peas (Whole)
+# Oils
+te,కొబ్బరి నూనె,Coconut Oil
+te,వేరుశెనగ నూనె,Groundnut Oil
+te,నువ్వుల నూనె,Sesame Oil
+te,పొద్దుతిరుగుడు నూనె,Sunflower Oil
+te,ఆవాల నూనె,Mustard Oil
+te,పామాయిల్,Palm Oil
+# Vegetables
+te,వంకాయ,Brinjal
+te,బెండకాయ,Okra
+te,కాకరకాయ,Bitter Gourd
+te,సొరకాయ,Bottle Gourd
+te,పొట్లకాయ,Snake Gourd
+te,చిక్కుడు,Cluster Beans
+te,మునగకాయ,Drumstick
+te,అరటికాయ,Raw Banana
+te,ముల్లంగి,Radish
+te,క్యారెట్,Carrot
+te,బంగాళాదుంప,Potato
+te,క్యాబేజీ,Cabbage
+te,కాలీఫ్లవర్,Cauliflower
+te,దోసకాయ,Cucumber
+te,గుమ్మడికాయ,Pumpkin
+te,చేమదుంప,Colocasia (Arbi)
+te,అల్లం,Ginger
+# Fruits
+te,అరటిపండు,Banana
+te,మామిడి,Mango
+te,యాపిల్,Apple
+te,నారింజ,Orange
+te,ద్రాక్ష,Grapes
+te,పుచ్చకాయ,Watermelon
+te,బొప్పాయి,Papaya
+te,అనాస,Pineapple
+te,నిమ్మకాయ,Lemon
+te,జామకాయ,Guava
+te,కొబ్బరికాయ,Coconut
+# Household
+te,చేట,Winnowing Tray
+te,చెరిగిపారేసే బుట్ట,Winnowing Tray
+te,కుర్చీ,Chair
+te,బల్ల,Table
+te,మంచం,Bed
+te,డబ్బా,Box
+te,బకెట్,Bucket
+te,చీపురు,Broom
+te,సబ్బు,Soap
+te,లైజోల్,Lizol
+te,లైజోల్ బాటిల్,Lizol bottle
+te,డెట్టాల్,Dettol
+te,హార్పిక్,Harpic
+te,విమ్ బార్,Vim Bar
+te,సర్ఫ్ ఎక్సెల్,Surf Excel
+te,కత్తి,Knife
+te,గ్లాసు,Glass
+te,పళ్ళెం,Plate
+# ── Tamil (ta) ────────────────────────────────────────────────────────────────
+# Groceries
+ta,அரிசி,Rice
+ta,கோதுமை,Wheat
+ta,மாவு,Flour
+ta,சர்க்கரை,Sugar
+ta,உப்பு,Salt
+ta,தேயிலை,Tea
+ta,காபி,Coffee
+ta,பால்,Milk
+ta,தயிர்,Curd
+ta,நெய்,Ghee
+ta,எண்ணெய்,Oil
+ta,தேங்காய் எண்ணெய்,Coconut Oil
+ta,கடலை எண்ணெய்,Groundnut Oil
+ta,சூரியகாந்தி எண்ணெய்,Sunflower Oil
+ta,நல்லெண்ணெய்,Sesame Oil
+ta,மஞ்சள் தூள்,Turmeric Powder
+ta,மிளகாய் தூள்,Chilli Powder
+ta,மல்லி தூள்,Coriander Powder
+ta,கடுகு,Mustard Seeds
+ta,சீரகம்,Cumin Seeds
+ta,மிளகு,Black Pepper
+ta,புளி,Tamarind
+ta,வெங்காயம்,Onion
+ta,பூண்டு,Garlic
+ta,இஞ்சி,Ginger
+ta,கறிவேப்பிலை,Curry Leaves
+ta,கொத்தமல்லி,Coriander Leaves
+ta,வெல்லம்,Jaggery
+ta,தேன்,Honey
+# Dals
+ta,துவரம் பருப்பு,Toor Dal
+ta,உளுத்தம் பருப்பு,Urad Dal
+ta,பாசிப் பருப்பு,Moong Dal
+ta,கடலை பருப்பு,Chana Dal
+ta,மசூர் பருப்பு,Masoor Dal
+ta,பாசிப்பயறு,Green Gram
+ta,தட்டைப்பயறு,Black-eyed Peas
+ta,கொள்ளு,Horse Gram
+ta,காராமணி,Black-eyed Peas
+# Oils (already protected but include for dict completeness)
+ta,தேங்காய்,Coconut
+ta,கடலை,Groundnut
+# Vegetables
+ta,வாழைக்காய்,Raw Banana
+ta,கத்திரிக்காய்,Brinjal
+ta,வெண்டைக்காய்,Okra
+ta,பாகற்காய்,Bitter Gourd
+ta,சுரைக்காய்,Bottle Gourd
+ta,புடலங்காய்,Snake Gourd
+ta,அவரைக்காய்,Cluster Beans
+ta,முருங்கைக்காய்,Drumstick
+ta,கேரட்,Carrot
+ta,முள்ளங்கி,Radish
+ta,உருளைக்கிழங்கு,Potato
+ta,தக்காளி,Tomato
+ta,காலிஃப்ளவர்,Cauliflower
+ta,முட்டைகோஸ்,Cabbage
+ta,வெள்ளரி,Cucumber
+ta,பூசணிக்காய்,Pumpkin
+ta,சேனைக்கிழங்கு,Yam
+ta,கோலாவரை,Colocasia
+# Fruits
+ta,வாழைப்பழம்,Banana
+ta,மாம்பழம்,Mango
+ta,ஆப்பிள்,Apple
+ta,ஆரஞ்சு,Orange
+ta,திராட்சை,Grapes
+ta,தர்பூசணி,Watermelon
+ta,பப்பாளி,Papaya
+ta,அன்னாசி,Pineapple
+ta,எலுமிச்சை,Lemon
+ta,கொய்யா,Guava
+ta,தேங்காய்,Coconut
+# Household
+ta,தட்டு,Plate
+ta,கப்,Cup
+ta,கண்ணாடி,Glass
+ta,கத்தி,Knife
+ta,வாளி,Bucket
+ta,துடைப்பம்,Broom
+ta,மூரம்,Winnowing Tray
+ta,முறம்,Winnowing Tray
+ta,நாற்காலி,Chair
+ta,மேசை,Table
+ta,படுக்கை,Bed
+ta,டப்பா,Box
+ta,சோப்பு,Soap
+ta,ஷாம்பு,Shampoo
+ta,பேஸ்ட்,Toothpaste
+ta,சீப்பு,Comb
+# ── Kannada (kn) ────────────────────────────────────────────────────────────────
+# Groceries
+kn,ಅಕ್ಕಿ,Rice
+kn,ಗೋಧಿ,Wheat
+kn,ಹಿಟ್ಟು,Flour
+kn,ಸಕ್ಕರೆ,Sugar
+kn,ಉಪ್ಪು,Salt
+kn,ಚಹಾ ಪುಡಿ,Tea Powder
+kn,ಕಾಫಿ ಪುಡಿ,Coffee Powder
+kn,ಹಾಲು,Milk
+kn,ಮೊಸರು,Curd
+kn,ತುಪ್ಪ,Ghee
+kn,ಎಣ್ಣೆ,Oil
+kn,ತೆಂಗಿನ ಎಣ್ಣೆ,Coconut Oil
+kn,ಕಡಲೆ ಎಣ್ಣೆ,Groundnut Oil
+kn,ಸೂರ್ಯಕಾಂತಿ ಎಣ್ಣೆ,Sunflower Oil
+kn,ಸಾಸಿವೆ ಎಣ್ಣೆ,Mustard Oil
+kn,ಎಳ್ಳಿನ ಎಣ್ಣೆ,Sesame Oil
+kn,ಅರಿಶಿನ ಪುಡಿ,Turmeric Powder
+kn,ಮೆಣಸಿನ ಪುಡಿ,Chilli Powder
+kn,ಕೊತ್ತಂಬರಿ ಪುಡಿ,Coriander Powder
+kn,ಗರಂ ಮಸಾಲ,Garam Masala
+kn,ಸಾಸಿವೆ,Mustard Seeds
+kn,ಜೀರಿಗೆ,Cumin Seeds
+kn,ಕಾಳು ಮೆಣಸು,Black Pepper
+kn,ಹುಣಸೆ,Tamarind
+kn,ಈರುಳ್ಳಿ,Onion
+kn,ಬೆಳ್ಳುಳ್ಳಿ,Garlic
+kn,ಶುಂಠಿ,Ginger
+kn,ಕರಿಬೇವು,Curry Leaves
+kn,ಕೊತ್ತಂಬರಿ ಸೊಪ್ಪು,Coriander Leaves
+kn,ಬೆಲ್ಲ,Jaggery
+kn,ಜೇನು,Honey
+# Dals & Legumes
+kn,ತೊಗರಿ ಬೇಳೆ,Toor Dal
+kn,ಉದ್ದಿನ ಬೇಳೆ,Urad Dal
+kn,ಹೆಸರು ಬೇಳೆ,Moong Dal
+kn,ಕಡಲೆ ಬೇಳೆ,Chana Dal
+kn,ಮಸೂರ್ ಬೇಳೆ,Masoor Dal
+kn,ಹೆಸರು ಕಾಳು,Green Gram
+kn,ಅಲಸಂದೆ ಕಾಳು,Black-eyed Peas
+kn,ಹುರುಳಿ,Horse Gram
+kn,ಕಡಲೆ,Chickpeas
+# Vegetables
+kn,ಆಲೂಗಡ್ಡೆ,Potato
+kn,ಟೊಮ್ಯಾಟೊ,Tomato
+kn,ಬದನೆಕಾಯಿ,Brinjal
+kn,ಬೆಂಡೆಕಾಯಿ,Okra
+kn,ಹಾಗಲಕಾಯಿ,Bitter Gourd
+kn,ಸೋರೆಕಾಯಿ,Bottle Gourd
+kn,ಪಡವಲಕಾಯಿ,Snake Gourd
+kn,ಅವರೆಕಾಯಿ,Hyacinth Beans
+kn,ಗೋರಿಕಾಯಿ,Cluster Beans
+kn,ನುಗ್ಗೆಕಾಯಿ,Drumstick
+kn,ಗಜ್ಜರಿ,Carrot
+kn,ಮೂಲಂಗಿ,Radish
+kn,ಹೂಕೋಸು,Cauliflower
+kn,ಎಲೆಕೋಸು,Cabbage
+kn,ಸೌತೆಕಾಯಿ,Cucumber
+kn,ಕುಂಬಳಕಾಯಿ,Pumpkin
+kn,ಸುವರ್ಣ ಗಡ್ಡೆ,Yam
+kn,ಮೆಂತ್ಯ ಸೊಪ್ಪು,Fenugreek Leaves
+kn,ಪಾಲಕ್,Spinach
+kn,ಬಟಾಣಿ,Green Peas
+kn,ಮೆಕ್ಕೆ ಜೋಳ,Corn
+# Fruits
+kn,ಬಾಳೆಹಣ್ಣು,Banana
+kn,ಮಾವಿನ ಹಣ್ಣು,Mango
+kn,ಸೇಬು,Apple
+kn,ಕಿತ್ತಳೆ,Orange
+kn,ದ್ರಾಕ್ಷಿ,Grapes
+kn,ಕಲ್ಲಂಗಡಿ,Watermelon
+kn,ಪಪ್ಪಾಯ,Papaya
+kn,ಅನಾನಸ್,Pineapple
+kn,ನಿಂಬೆ,Lemon
+kn,ಪೇರಲ,Guava
+kn,ತೆಂಗಿನಕಾಯಿ,Coconut
+kn,ಸೀತಾಫಲ,Custard Apple
+kn,ದಾಳಿಂಬೆ,Pomegranate
+# Hardware
+kn,ಸುತ್ತಿಗೆ,Hammer
+kn,ಮೊಳೆ,Nail
+kn,ತಿರುಪು ಮೊಳೆ,Screw
+kn,ಸ್ಕ್ರೂಡ್ರೈವರ್,Screwdriver
+kn,ಪ್ಲೈಯರ್ಸ್,Pliers
+kn,ಸ್ಪಾನರ್ / ರಿಂಚ್,Spanner / Wrench
+kn,ಡ್ರಿಲ್ ಮಿಶನ್,Drill Machine
+kn,ಟೇಪ್,Tape
+kn,ಪೈಂಟ್ ಬ್ರಷ್,Paint Brush
+kn,ಪೈಪ್,Pipe
+kn,ಬೀಗ,Lock
+kn,ಕೀ,Key
+kn,ಹಿಂಜ್,Hinge
+kn,ಸ್ವಿಚ್,Switch
+kn,ಸಾಕೆಟ್,Socket
+kn,ವೈರ್,Wire
+kn,ಬಲ್ಬ್,Bulb
+kn,ಸಿಮೆಂಟ್,Cement
+kn,ಇಟ್ಟಿಗೆ,Brick
+kn,ಮರಳು,Sand
+# Household
+kn,ತಟ್ಟೆ,Plate
+kn,ಗ್ಲಾಸ್ / ಲೋಟ,Glass / Tumbler
+kn,ಕಪ್,Cup
+kn,ಚಮಚ,Spoon
+kn,ಚಾಕು,Knife
+kn,ಬಾಣಲಿ,Pan / Kadai
+kn,ಕುಕ್ಕರ್,Pressure Cooker
+kn,ಡಬ್ಬ,Box / Container
+kn,ಬಕೆಟ್,Bucket
+kn,ಪೊರಕೆ,Broom
+kn,ಮಾಪ್,Mop
+kn,ಕುರ್ಚಿ,Chair
+kn,ಮೇಜು,Table
+kn,ಮಂಚ,Bed
+kn,ದಿಂಬು,Pillow
+kn,ಹೊದ್ದಿಕೆ,Blanket
+kn,ಸಾಬೂನು,Soap
+kn,ಶಾಂಪೂ,Shampoo
+kn,ಹಲ್ಲುಜ್ಜುವ ಪೇಸ್ಟ್,Toothpaste
+kn,ಬಾಚಣಿಗೆ,Comb
+kn,ಟವೆಲ್,Towel
+kn,ಕನ್ನಡಿ,Mirror
+kn,ಗಡಿಯಾರ,Clock
+kn,ಕ್ಯಾಲೆಂಡರ್,Calendar
+# Electronics
+kn,ಮೊಬೈಲ್ ಫೋನ್,Mobile Phone
+kn,ದೂರದರ್ಶನ / ಟಿವಿ,Television
+kn,ಫ್ರಿಡ್ಜ್,Refrigerator
+kn,ವಾಷಿಂಗ್ ಮಶಿನ್,Washing Machine
+kn,ಮಿಕ್ಸರ್ ಗ್ರೈಂಡರ್,Mixer Grinder
+kn,ಇಸ್ತ್ರಿ ಪೆಟ್ಟಿಗೆ,Iron Box
+kn,ಫ್ಯಾನ್,Fan
+kn,ಎಸಿ,Air Conditioner
+kn,ಲ್ಯಾಪ್‌ಟಾಪ್,Laptop
+kn,ಕ್ಯಾಮರಾ,Camera
+kn,ಚಾರ್ಜರ್,Charger
+kn,ಹೆಡ್‌ಫೋನ್,Headphones
+kn,ಸ್ಪೀಕರ್,Speaker
+kn,ರೂಟರ್,Router
+kn,ಎಕ್ಸ್‌ಟೆನ್ಶನ್ ಬೋರ್ಡ್,Extension Board
+kn,ಟಾರ್ಚ್,Torch
+kn,ಇನ್ವರ್ಟರ್,Inverter
+kn,ಯುಪಿಎಸ್,UPS

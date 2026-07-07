@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <!-- Background -->
+  <rect width="200" height="200" fill="#FF0000"/>
+
+  <!-- Bag handle — white arc -->
+  <path d="M 68 98 Q 68 50 100 50 Q 132 50 132 98"
+        fill="none"
+        stroke="white"
+        stroke-width="12"
+        stroke-linecap="round"/>
+
+  <!-- Bag body — white filled rectangle -->
+  <rect x="46" y="98" width="108" height="82" rx="10" fill="white"/>
+
+  <!-- Clasp dot -->
+  <circle cx="100" cy="116" r="7" fill="#FF0000"/>
+
+  <!-- R — left half of the lettering, red on white -->
+  <text x="87" y="165"
+        font-family="Arial Black, Helvetica Neue, sans-serif"
+        font-weight="900"
+        font-size="46"
+        fill="#FF0000"
+        text-anchor="middle"
+        letter-spacing="-2">R</text>
+
+  <!-- E — right half, slightly darker red for subtle contrast -->
+  <text x="114" y="165"
+        font-family="Arial Black, Helvetica Neue, sans-serif"
+        font-weight="900"
+        font-size="46"
+        fill="#CC0000"
+        text-anchor="middle"
+        letter-spacing="-2">E</text>
+</svg>

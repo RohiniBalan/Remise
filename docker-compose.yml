@@ -1,0 +1,190 @@
+version: '3.9'
+
+# ─── Shared env for all services ─────────────────────────────────────────────
+x-common-env: &common-env
+  NODE_ENV: production
+  JWT_SECRET: ${JWT_SECRET}
+  FRONTEND_URL: ${FRONTEND_URL}
+
+services:
+
+  # ── API Gateway (public entry point) ────────────────────────────────────────
+  api-gateway:
+    build: ./services/api-gateway
+    container_name: api-gateway
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      <<: *common-env
+      PORT: 3000
+      AUTH_SERVICE_URL:    http://auth-service:3001
+      USER_SERVICE_URL:    http://user-service:3002
+      PRODUCT_SERVICE_URL: http://product-service:3003
+      ORDER_SERVICE_URL:   http://order-service:3004
+      PAYMENT_SERVICE_URL: http://payment-service:3005
+      CONTENT_SERVICE_URL: http://content-service:3006
+    depends_on:
+      - auth-service
+      - user-service
+      - product-service
+      - order-service
+      - payment-service
+      - content-service
+    networks:
+      - wowlife-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Auth Service ─────────────────────────────────────────────────────────────
+  auth-service:
+    build: ./services/auth-service
+    container_name: auth-service
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      <<: *common-env
+      PORT: 3001
+      MONGODB_URI: ${MONGODB_AUTH_URI}
+      JWT_EXPIRE: 7d
+      SESSION_SECRET: ${SESSION_SECRET}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      GOOGLE_CALLBACK_URL: ${GOOGLE_CALLBACK_URL}
+      GATEWAY_URL: http://api-gateway:3000
+    networks:
+      - wowlife-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── User Service ─────────────────────────────────────────────────────────────
+  user-service:
+    build: ./services/user-service
+    container_name: user-service
+    restart: unless-stopped
+    ports:
+      - "3002:3002"
+    environment:
+      <<: *common-env
+      PORT: 3002
+      MONGODB_URI: ${MONGODB_AUTH_URI}
+      PRODUCT_SERVICE_URL: http://product-service:3003
+      GATEWAY_URL: http://api-gateway:3000
+    networks:
+      - wowlife-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Product Service ──────────────────────────────────────────────────────────
+  product-service:
+    build: ./services/product-service
+    container_name: product-service
+    restart: unless-stopped
+    ports:
+      - "3003:3003"
+    volumes:
+      - product-uploads:/app/uploads
+    environment:
+      <<: *common-env
+      PORT: 3003
+      MONGODB_URI: ${MONGODB_PRODUCTS_URI}
+      GATEWAY_URL: http://api-gateway:3000
+    networks:
+      - wowlife-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Order Service ────────────────────────────────────────────────────────────
+  order-service:
+    build: ./services/order-service
+    container_name: order-service
+    restart: unless-stopped
+    ports:
+      - "3004:3004"
+    environment:
+      <<: *common-env
+      PORT: 3004
+      MONGODB_URI: ${MONGODB_ORDERS_URI}
+      GATEWAY_URL: http://api-gateway:3000
+    networks:
+      - wowlife-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3004/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Payment Service ──────────────────────────────────────────────────────────
+  payment-service:
+    build: ./services/payment-service
+    container_name: payment-service
+    restart: unless-stopped
+    ports:
+      - "3005:3005"
+    environment:
+      <<: *common-env
+      PORT: 3005
+      ORDER_SERVICE_URL:   http://order-service:3004
+      PRODUCT_SERVICE_URL: http://product-service:3003
+      GATEWAY_URL: http://api-gateway:3000
+      PHONEPE_CLIENT_ID:      ${PHONEPE_CLIENT_ID}
+      PHONEPE_CLIENT_SECRET:  ${PHONEPE_CLIENT_SECRET}
+      PHONEPE_MERCHANT_ID:    ${PHONEPE_MERCHANT_ID}
+      PHONEPE_CLIENT_VERSION: ${PHONEPE_CLIENT_VERSION}
+      PHONEPE_BASE_URL:       ${PHONEPE_BASE_URL}
+      FAST2SMS_API_KEY: ${FAST2SMS_API_KEY}
+      BREVO_API_KEY: ${BREVO_API_KEY}
+      BREVO_SENDER_EMAIL: ${BREVO_SENDER_EMAIL}
+    networks:
+      - wowlife-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3005/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Content Service ──────────────────────────────────────────────────────────
+  content-service:
+    build: ./services/content-service
+    container_name: content-service
+    restart: unless-stopped
+    ports:
+      - "3006:3006"
+    volumes:
+      - content-uploads:/app/uploads
+    environment:
+      <<: *common-env
+      PORT: 3006
+      MONGODB_URI: ${MONGODB_CONTENT_URI}
+      GATEWAY_URL: http://api-gateway:3000
+    networks:
+      - wowlife-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3006/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+
+# ── Shared network (internal service-to-service comms) ──────────────────────
+networks:
+  wowlife-net:
+    driver: bridge
+
+# ── Persistent volumes for uploaded files ───────────────────────────────────
+volumes:
+  product-uploads:
+  content-uploads:
