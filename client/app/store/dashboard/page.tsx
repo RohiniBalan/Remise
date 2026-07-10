@@ -8,7 +8,7 @@ import {
   CheckCircle, Edit2, Package, LayoutGrid, Settings, BarChart2,
   Search, X, ChevronDown, AlertCircle, RefreshCw, Eye, Star,
   Layers, IndianRupee, Users, ImageIcon, Save, ScanLine, Upload,
-  CheckCircle2, Sparkles, Truck, QrCode, Wallet,
+  CheckCircle2, Sparkles, Truck, QrCode, Wallet, ListChecks, Mic, MicOff,
 } from 'lucide-react';
 import { AuthContext }  from '../../context/AuthContext';
 import { storeApi }     from '../../api-services/storeApi';
@@ -17,6 +17,7 @@ import { productApi }   from '../../api-services/productApi';
 import { smartOrderApi } from '../../api-services/smartOrderApi';
 import UserAvatarMenu   from '../../components-main/UserAvatarMenu';
 import NotificationBell from '../../components-main/NotificationBell';
+import { useSpeechRecognition, VOICE_LANGUAGES, VoiceLanguageOption } from '../../hooks/useSpeechRecognition';
 
 // ── Palette ───────────────────────────────────────────────────────────────────
 // #F5F5F5 page bg · #DFF1F1 mint · #BBD5DA border · #FF0000 red · teal-600 CTA
@@ -120,6 +121,9 @@ function ProductModal({
   const [preview,   setPreview]   = useState<string>(product?.imageUrl ? `${API}${product.imageUrl}` : '');
   const [saving,    setSaving]    = useState(false);
   const [error,     setError]     = useState('');
+  const [voiceLang, setVoiceLang] = useState<VoiceLanguageOption>(VOICE_LANGUAGES[0]);
+  const [voiceParsing, setVoiceParsing] = useState(false);
+  const [voiceError,   setVoiceError]   = useState('');
 
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
 
@@ -129,6 +133,56 @@ function ProductModal({
     setImageFile(f);
     setPreview(URL.createObjectURL(f));
   };
+
+  // Speak-to-fill: transcript → /api/voice-product-parse (translates via the
+  // same indicTranslate() IndicTrans2 pipeline every OCR route uses, then
+  // Claude-parses fields, then getProductImage()) → bulk-fills this SAME
+  // form state. A returned image is almost always a data: URI (see
+  // getProductImage/imageResultToUrl), so route it through the existing
+  // `imageFile` upload path — exactly like a data-URI scan result already
+  // does in `createOneProduct` — rather than stuffing a huge base64 string
+  // into the `imageUrl` text field, which `handleSubmit` sends as a plain
+  // form value. `handleSubmit` itself is untouched either way.
+  const handleVoiceResult = useCallback(async (text: string) => {
+    setVoiceParsing(true); setVoiceError('');
+    try {
+      const res = await fetch('/api/voice-product-parse', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, sourceLang: voiceLang.short }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message || 'Could not understand that.');
+      const x = data.extracted;
+
+      setForm(f => ({
+        ...f,
+        title:           x.productName || f.title,
+        category:        x.category || f.category,
+        price:           x.price ? String(x.price) : f.price,
+        discountedPrice: x.discountedPrice ? String(x.discountedPrice) : f.discountedPrice,
+        totalStock:      x.totalStock ? String(x.totalStock) : f.totalStock,
+        description:     x.description || f.description,
+        brand:           x.brand || f.brand,
+      }));
+
+      if (x.imageUrl?.startsWith('data:')) {
+        const blob = await fetch(x.imageUrl).then(r => r.blob());
+        const ext  = blob.type === 'image/svg+xml' ? 'svg' : blob.type === 'image/png' ? 'png' : 'jpg';
+        setImageFile(new File([blob], `product.${ext}`, { type: blob.type }));
+        setPreview(x.imageUrl);
+      } else if (x.imageUrl) {
+        setImageFile(null);
+        set('imageUrl', x.imageUrl);
+        setPreview(x.imageUrl);
+      }
+    } catch (err: any) {
+      setVoiceError(err.message || 'Could not understand that.');
+    } finally {
+      setVoiceParsing(false);
+    }
+  }, [voiceLang]);
+
+  const voice = useSpeechRecognition(handleVoiceResult);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -159,6 +213,37 @@ function ProductModal({
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {error && <p className="text-sm text-[#FF0000] bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-center gap-2"><AlertCircle size={14}/>{error}</p>}
+
+          {/* Voice entry */}
+          <div className="bg-[#F5F5F5] border border-[#BBD5DA] rounded-xl p-3 space-y-2">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
+                {VOICE_LANGUAGES.map(l => (
+                  <button key={l.code} type="button" onClick={() => setVoiceLang(l)} disabled={voice.listening || voiceParsing}
+                    className={`px-2.5 py-1 rounded-full text-xs font-semibold transition disabled:opacity-50 ${
+                      voiceLang.code === l.code ? 'bg-teal-600 text-white' : 'bg-white text-gray-600 border border-[#BBD5DA]'
+                    }`}>
+                    {l.label}
+                  </button>
+                ))}
+              </div>
+              <button type="button"
+                onClick={() => (voice.listening ? voice.stop() : voice.start(voiceLang))}
+                disabled={voiceParsing || !voice.supported}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition disabled:opacity-50 ${
+                  voice.listening ? 'bg-[#FF0000] text-white' : 'bg-teal-600 hover:bg-teal-700 text-white'
+                }`}>
+                {voiceParsing
+                  ? <><RefreshCw size={14} className="animate-spin" /> Understanding…</>
+                  : voice.listening
+                  ? <><MicOff size={14} /> Stop</>
+                  : <><Mic size={14} /> Speak product details</>}
+              </button>
+            </div>
+            {!voice.supported && <p className="text-xs text-gray-400">Voice input isn't supported in this browser — try Chrome or Edge.</p>}
+            {voice.listening && <p className="text-xs text-teal-700">Listening… "{voice.interimTranscript || voice.transcript || '…'}"</p>}
+            {(voice.error || voiceError) && <p className="text-xs text-[#FF0000] flex items-center gap-1"><AlertCircle size={11} />{voice.error || voiceError}</p>}
+          </div>
 
           {/* Image upload */}
           <div>
@@ -330,6 +415,70 @@ type ScanStep = 'idle' | 'scanning' | 'review' | 'saving' | 'done' | 'error';
 
 const GATEWAY = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
+// Field set shared by ProductModal (Manual Add), SmartUploadModal (single-scan)
+// and BulkSmartUploadModal (bulk-scan) review forms.
+type ScanProductForm = {
+  productName: string; category: string; price: string; discountedPrice: string;
+  description: string; brand: string; imageUrl: string;
+  totalStock: string; availability: string; tags: string;
+};
+
+// Single-product creation, shared by SmartUploadModal and BulkSmartUploadModal
+// so bulk-adding N products is just N sequential calls to this — each one
+// independently try/catchable by the caller for continue-on-failure semantics.
+async function createOneProduct(form: ScanProductForm, storeId: string, token: string) {
+  const disclaimer = 'Note: Product image is for representation purposes only. Actual product may appear slightly different from what you see.';
+  const description = [form.description, disclaimer].filter(Boolean).join('\n\n');
+  const tags: string[] = form.tags.split(',').map(t => t.trim()).filter(Boolean);
+
+  const catList = await fetch(`${GATEWAY}/api/categories`).then(r => r.json());
+  const existing = (catList.data || []).find((c: any) => c.name.toLowerCase() === form.category.toLowerCase());
+  if (!existing && form.category) {
+    await fetch(`${GATEWAY}/api/categories`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ name: form.category }),
+    });
+  }
+
+  let productRes: Response;
+  const isDataUri = form.imageUrl?.startsWith('data:');
+  if (isDataUri) {
+    const blob = await fetch(form.imageUrl).then(r => r.blob());
+    const ext  = blob.type === 'image/svg+xml' ? 'svg'
+               : blob.type === 'image/png'     ? 'png' : 'jpg';
+    const fd = new FormData();
+    fd.append('image',           blob, `product.${ext}`);
+    fd.append('title',           form.productName);
+    fd.append('category',        form.category);
+    fd.append('price',           form.price);
+    fd.append('discountedPrice', String(Number(form.discountedPrice) || Number(form.price)));
+    fd.append('description',     description);
+    fd.append('brand',           form.brand);
+    fd.append('storeId',         storeId);
+    fd.append('availability',    form.availability);
+    fd.append('totalStock',      String(Number(form.totalStock) || 0));
+    if (tags.length) fd.append('tags', JSON.stringify(tags));
+    productRes = await fetch(`${GATEWAY}/api/products`, {
+      method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd,
+    });
+  } else {
+    const imageUrl = form.imageUrl || `https://loremflickr.com/400/400/${encodeURIComponent(form.productName.split(' ').slice(0,3).join(' '))}`;
+    productRes = await fetch(`${GATEWAY}/api/products`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        title: form.productName, category: form.category,
+        price: Number(form.price), discountedPrice: Number(form.discountedPrice) || Number(form.price),
+        description, brand: form.brand, imageUrl, images: [imageUrl],
+        storeId, availability: form.availability, tags, totalStock: Number(form.totalStock) || 0,
+      }),
+    });
+  }
+
+  const data = await productRes.json();
+  if (!data.success) throw new Error(data.message || 'Failed to create product.');
+  return data.data;
+}
+
 function SmartUploadModal({ storeId, token, onClose, onCreated }: {
   storeId: string; token: string; onClose: () => void; onCreated: () => void;
 }) {
@@ -342,14 +491,15 @@ function SmartUploadModal({ storeId, token, onClose, onCreated }: {
   const [aiGenerated, setAiGenerated] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // editable review form
+  // editable review form — same field set as ProductModal (Manual Add Product)
   const [form, setForm] = useState({
     productName: '', category: '', price: '', discountedPrice: '',
     validTill: '', description: '', brand: '', imageUrl: '',
+    totalStock: '', availability: 'In Stock', tags: '',
   });
   const setF = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
 
-  const reset = () => { setFile(null); setPreview(''); setStep('idle'); setErrMsg(''); setEngine(''); setAiGenerated(false); setForm({ productName:'', category:'', price:'', discountedPrice:'', validTill:'', description:'', brand:'', imageUrl:'' }); };
+  const reset = () => { setFile(null); setPreview(''); setStep('idle'); setErrMsg(''); setEngine(''); setAiGenerated(false); setForm({ productName:'', category:'', price:'', discountedPrice:'', validTill:'', description:'', brand:'', imageUrl:'', totalStock:'', availability:'In Stock', tags:'' }); };
 
   const pickFile = (f: File) => { setFile(f); setPreview(URL.createObjectURL(f)); setStep('idle'); setErrMsg(''); };
 
@@ -380,6 +530,9 @@ function SmartUploadModal({ storeId, token, onClose, onCreated }: {
         description:    x.description    || '',
         brand:          x.brand          || '',
         imageUrl:       x.imageUrl       || '',
+        totalStock:     '',
+        availability:   'In Stock',
+        tags:           x.validTill ? `Offer valid till ${x.validTill}` : '',
       });
       setStep('review');
     } catch (err: any) {
@@ -392,59 +545,7 @@ function SmartUploadModal({ storeId, token, onClose, onCreated }: {
     if (!form.productName || !form.price) return;
     setStep('saving');
     try {
-      const GW = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
-      const disclaimer = 'Note: Product image is for representation purposes only. Actual product may appear slightly different from what you see.';
-      const description = [form.description, disclaimer].filter(Boolean).join('\n\n');
-      const tags: string[] = form.validTill ? [`Offer valid till ${form.validTill}`] : [];
-
-      // Find or create category
-      const catList = await fetch(`${GW}/api/categories`).then(r => r.json());
-      const existing = (catList.data || []).find((c: any) => c.name.toLowerCase() === form.category.toLowerCase());
-      if (!existing && form.category) {
-        await fetch(`${GW}/api/categories`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ name: form.category }),
-        });
-      }
-
-      // All data URIs (SVG card, PNG from AI) → upload as a real file so they
-      // get a stable /uploads/products/xxx URL that can be indexed + shared
-      let productRes: Response;
-      const isDataUri = form.imageUrl?.startsWith('data:');
-      if (isDataUri) {
-        const blob = await fetch(form.imageUrl).then(r => r.blob());
-        const ext  = blob.type === 'image/svg+xml' ? 'svg'
-                   : blob.type === 'image/png'     ? 'png' : 'jpg';
-        const fd = new FormData();
-        fd.append('image',           blob, `product.${ext}`);
-        fd.append('title',           form.productName);
-        fd.append('category',        form.category);
-        fd.append('price',           form.price);
-        fd.append('discountedPrice', String(Number(form.discountedPrice) || Number(form.price)));
-        fd.append('description',     description);
-        fd.append('brand',           form.brand);
-        fd.append('storeId',         storeId);
-        fd.append('availability',    'In Stock');
-        fd.append('totalStock',      '0');
-        if (tags.length) fd.append('tags', JSON.stringify(tags));
-        productRes = await fetch(`${GW}/api/products`, {
-          method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd,
-        });
-      } else {
-        const imageUrl = form.imageUrl || `https://loremflickr.com/400/400/${encodeURIComponent(form.productName.split(' ').slice(0,3).join(' '))}`;
-        productRes = await fetch(`${GW}/api/products`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({
-            title: form.productName, category: form.category,
-            price: Number(form.price), discountedPrice: Number(form.discountedPrice) || Number(form.price),
-            description, brand: form.brand, imageUrl, images: [imageUrl],
-            storeId, availability: 'In Stock', tags, totalStock: 0,
-          }),
-        });
-      }
-
-      const data = await productRes.json();
-      if (!data.success) throw new Error(data.message || 'Failed to create product.');
+      await createOneProduct(form, storeId, token);
       setStep('done');
     } catch (err: any) {
       setErrMsg(err.message || 'Failed to create product.');
@@ -589,6 +690,24 @@ function SmartUploadModal({ storeId, token, onClose, onCreated }: {
                   <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Brand</label>
                   <input value={form.brand} onChange={e => setF('brand', e.target.value)} className={inputCls} placeholder="Brand name (optional)" />
                 </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Stock Quantity</label>
+                    <input type="number" min="0" value={form.totalStock} onChange={e => setF('totalStock', e.target.value)} className={inputCls} placeholder="0" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Availability</label>
+                    <select value={form.availability} onChange={e => setF('availability', e.target.value)} className={inputCls}>
+                      <option value="In Stock">In Stock</option>
+                      <option value="Out Of Stock">Out Of Stock</option>
+                      <option value="Pre Order">Pre Order</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Tags (comma-separated)</label>
+                  <input value={form.tags} onChange={e => setF('tags', e.target.value)} className={inputCls} placeholder="e.g. skincare, organic, moisturizer" />
+                </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Description</label>
                   <textarea value={form.description} onChange={e => setF('description', e.target.value)} rows={3}
@@ -644,12 +763,295 @@ function SmartUploadModal({ storeId, token, onClose, onCreated }: {
   );
 }
 
+// ── Bulk Smart Upload Modal (Scan Grocery List) ─────────────────────────────
+// New, separate entry point from SmartUploadModal above — the single-scan
+// flow stays untouched. Reuses the same OCR/AI/image-generation pipeline
+// (via `/api/smart-bulk-product-scan`) and the same `createOneProduct`
+// creation call, just looped per detected item with continue-on-failure.
+type BulkStep = 'idle' | 'scanning' | 'review' | 'saving' | 'done' | 'error';
+type BulkProductRow = ScanProductForm & { id: string; aiGenerated?: boolean };
+
+function BulkSmartUploadModal({ storeId, token, onClose, onCreated }: {
+  storeId: string; token: string; onClose: () => void; onCreated: () => void;
+}) {
+  const [file,     setFile]     = useState<File | null>(null);
+  const [preview,  setPreview]  = useState('');
+  const [step,     setStep]     = useState<BulkStep>('idle');
+  const [errMsg,   setErrMsg]   = useState('');
+  const [dragging, setDragging] = useState(false);
+  const [products,    setProducts]    = useState<BulkProductRow[]>([]);
+  const [failedItems, setFailedItems] = useState<{ name: string; reason: string }[]>([]);
+  const [summary, setSummary] = useState<{ added: number; failed: { name: string; reason: string }[] }>({ added: 0, failed: [] });
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const reset = () => { setFile(null); setPreview(''); setStep('idle'); setErrMsg(''); setProducts([]); setFailedItems([]); };
+
+  const pickFile = (f: File) => { setFile(f); setPreview(URL.createObjectURL(f)); setStep('idle'); setErrMsg(''); };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault(); setDragging(false);
+    const f = e.dataTransfer.files[0];
+    if (f && f.type.startsWith('image/')) pickFile(f);
+  };
+
+  const setRow = (id: string, k: keyof ScanProductForm, v: string) =>
+    setProducts(rows => rows.map(r => r.id === id ? { ...r, [k]: v } : r));
+
+  const removeRow = (id: string) => setProducts(rows => rows.filter(r => r.id !== id));
+
+  const addManually = (name: string) => {
+    setProducts(rows => [...rows, {
+      id: `${Date.now()}-${Math.random()}`,
+      productName: name, category: '', price: '', discountedPrice: '',
+      description: '', brand: '', imageUrl: '', totalStock: '', availability: 'In Stock', tags: '',
+    }]);
+    setFailedItems(items => items.filter(i => i.name !== name));
+  };
+
+  const handleScan = async () => {
+    if (!file) return;
+    setStep('scanning'); setErrMsg('');
+    try {
+      const fd = new FormData();
+      fd.append('image', file);
+      const res  = await fetch('/api/smart-bulk-product-scan', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message || 'Scan failed.');
+      const rows: BulkProductRow[] = (data.products || []).map((p: any, i: number) => ({
+        id: `${Date.now()}-${i}`,
+        productName:  p.productName || '',
+        category:     p.category    || '',
+        price: '', discountedPrice: '',
+        description:  p.description || '',
+        brand:        p.brand        || '',
+        imageUrl:     p.imageUrl     || '',
+        totalStock: '', availability: 'In Stock', tags: '',
+        aiGenerated: !!p.aiGenerated,
+      }));
+      setProducts(rows);
+      setFailedItems(data.failed || []);
+      setStep('review');
+    } catch (err: any) {
+      setErrMsg(err.message || 'Something went wrong.');
+      setStep('error');
+    }
+  };
+
+  const handleAddAll = async () => {
+    setStep('saving');
+    let added = 0;
+    const failed: { name: string; reason: string }[] = [];
+    for (const row of products) {
+      if (!row.productName || !row.price) {
+        failed.push({ name: row.productName || '(unnamed)', reason: 'Missing name or price.' });
+        continue;
+      }
+      try {
+        await createOneProduct(row, storeId, token);
+        added++;
+      } catch (err: any) {
+        failed.push({ name: row.productName, reason: err.message || 'Failed to create product.' });
+      }
+    }
+    setSummary({ added, failed: [...failedItems, ...failed] });
+    setStep('done');
+  };
+
+  const inputCls = 'w-full bg-white border border-[#BBD5DA] rounded-lg px-2.5 py-1.5 text-xs text-gray-900 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 transition placeholder-gray-400';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-white rounded-2xl border border-[#BBD5DA] w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
+
+        <div className="border-b border-[#BBD5DA] px-6 py-4 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2">
+            <ListChecks size={18} className="text-teal-600" />
+            <h2 className="text-base font-bold text-gray-900">Scan Grocery List & Add Products</h2>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700"><X size={20} /></button>
+        </div>
+
+        <div className="overflow-y-auto flex-1 p-6 space-y-4">
+
+          {/* ── Step 1: upload ── */}
+          {(step === 'idle' || step === 'scanning' || step === 'error') && (
+            <>
+              <div
+                className={`relative border-2 border-dashed rounded-2xl transition cursor-pointer
+                  ${dragging ? 'border-teal-500 bg-teal-50' : 'border-[#BBD5DA] hover:border-teal-400 hover:bg-[#F5F5F5]'}
+                  ${preview ? 'p-2' : 'p-10'}`}
+                onDragOver={e => { e.preventDefault(); setDragging(true); }}
+                onDragLeave={() => setDragging(false)}
+                onDrop={handleDrop}
+                onClick={() => !preview && inputRef.current?.click()}
+              >
+                <input ref={inputRef} type="file" accept="image/*" className="hidden"
+                  onChange={e => { const f = e.target.files?.[0]; if (f) pickFile(f); }} />
+                {preview
+                  ? <div className="relative">
+                      <img src={preview} alt="List" className="w-full max-h-56 object-contain rounded-xl" />
+                      <button onClick={e => { e.stopPropagation(); reset(); }}
+                        className="absolute top-2 right-2 bg-white/90 border border-gray-200 rounded-full p-1 shadow">
+                        <X size={14} className="text-gray-600" />
+                      </button>
+                    </div>
+                  : <div className="flex flex-col items-center gap-3 text-center">
+                      <div className="w-14 h-14 rounded-2xl bg-[#DFF1F1] flex items-center justify-center">
+                        <ListChecks size={24} className="text-teal-600" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-gray-800 text-sm">Drop a grocery list, invoice or handwritten list</p>
+                        <p className="text-xs text-gray-400 mt-0.5">or click to browse — JPG, PNG, WEBP</p>
+                        <p className="text-xs text-teal-600 font-medium mt-2">Up to 25 items per scan · supports multiple Indian languages</p>
+                      </div>
+                    </div>
+                }
+              </div>
+
+              {step === 'scanning' && (
+                <div className="flex items-center gap-3 bg-teal-50 border border-teal-200 rounded-xl p-4">
+                  <RefreshCw size={18} className="text-teal-600 animate-spin shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold text-teal-800">Reading your list…</p>
+                    <p className="text-xs text-teal-600 mt-0.5">OCR reading → translating → identifying each product</p>
+                  </div>
+                </div>
+              )}
+              {step === 'error' && (
+                <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-xl p-4">
+                  <AlertCircle size={16} className="text-[#FF0000] shrink-0 mt-0.5" />
+                  <p className="text-sm text-red-700">{errMsg}</p>
+                </div>
+              )}
+              <button onClick={handleScan} disabled={!file || step === 'scanning'}
+                className="w-full flex items-center justify-center gap-2 py-3 bg-[#FF0000] hover:bg-[#e00000] disabled:opacity-50 text-white font-semibold rounded-xl text-sm transition">
+                {step === 'scanning'
+                  ? <><RefreshCw size={15} className="animate-spin" /> Scanning…</>
+                  : <><Sparkles size={15} /> Scan & Extract Products</>}
+              </button>
+            </>
+          )}
+
+          {/* ── Step 2: review & edit ── */}
+          {(step === 'review' || step === 'saving') && (
+            <>
+              <div className="flex items-center gap-2 bg-teal-50 border border-teal-200 rounded-xl px-4 py-2.5">
+                <CheckCircle2 size={14} className="text-teal-600 shrink-0" />
+                <p className="text-xs font-semibold text-teal-800 flex-1">{products.length} product{products.length === 1 ? '' : 's'} detected — review, edit price/stock, then add all</p>
+              </div>
+
+              <div className="space-y-3">
+                {products.map(row => (
+                  <div key={row.id} className="border border-[#BBD5DA] rounded-xl p-3 flex gap-3">
+                    <div className="relative w-16 h-16 rounded-lg border border-[#BBD5DA] bg-[#F5F5F5] overflow-hidden shrink-0">
+                      {row.imageUrl
+                        ? <img src={row.imageUrl} alt={row.productName} className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).src = `https://loremflickr.com/64/64/${encodeURIComponent(row.productName || 'product')}`; }} />
+                        : <div className="w-full h-full flex items-center justify-center"><ImageIcon size={16} className="text-gray-300" /></div>
+                      }
+                    </div>
+                    <div className="flex-1 min-w-0 space-y-1.5">
+                      <div className="flex gap-2">
+                        <input value={row.productName} onChange={e => setRow(row.id, 'productName', e.target.value)} className={`${inputCls} flex-1 font-semibold`} placeholder="Product name *" />
+                        <button onClick={() => removeRow(row.id)} className="text-gray-400 hover:text-[#FF0000] shrink-0"><Trash2 size={15} /></button>
+                      </div>
+                      <div className="grid grid-cols-4 gap-1.5">
+                        <input type="number" value={row.price} onChange={e => setRow(row.id, 'price', e.target.value)} className={inputCls} placeholder="MRP ₹ *" />
+                        <input type="number" value={row.discountedPrice} onChange={e => setRow(row.id, 'discountedPrice', e.target.value)} className={inputCls} placeholder="Offer ₹" />
+                        <input type="number" value={row.totalStock} onChange={e => setRow(row.id, 'totalStock', e.target.value)} className={inputCls} placeholder="Stock qty" />
+                        <select value={row.availability} onChange={e => setRow(row.id, 'availability', e.target.value)} className={inputCls}>
+                          <option value="In Stock">In Stock</option>
+                          <option value="Out Of Stock">Out Of Stock</option>
+                          <option value="Pre Order">Pre Order</option>
+                        </select>
+                      </div>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <input value={row.category} onChange={e => setRow(row.id, 'category', e.target.value)} className={inputCls} placeholder="Category" />
+                        <input value={row.brand} onChange={e => setRow(row.id, 'brand', e.target.value)} className={inputCls} placeholder="Brand" />
+                      </div>
+                      <input value={row.tags} onChange={e => setRow(row.id, 'tags', e.target.value)} className={inputCls} placeholder="Tags (comma-separated)" />
+                    </div>
+                  </div>
+                ))}
+                {products.length === 0 && (
+                  <p className="text-sm text-gray-400 text-center py-6">No products left to add.</p>
+                )}
+              </div>
+
+              {failedItems.length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-2">
+                  <p className="text-xs font-semibold text-amber-800">Couldn't confidently identify {failedItems.length} item{failedItems.length === 1 ? '' : 's'}:</p>
+                  {failedItems.map(f => (
+                    <div key={f.name} className="flex items-center justify-between gap-2 text-xs">
+                      <span className="text-amber-700 truncate">{f.name} — {f.reason}</span>
+                      <button onClick={() => addManually(f.name)} className="text-teal-700 font-semibold hover:underline shrink-0">Add manually</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {step === 'saving' && (
+                <div className="flex items-center gap-3 bg-teal-50 border border-teal-200 rounded-xl p-3">
+                  <RefreshCw size={15} className="text-teal-600 animate-spin shrink-0" />
+                  <p className="text-sm text-teal-700 font-medium">Adding products…</p>
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-1">
+                <button onClick={reset} disabled={step === 'saving'}
+                  className="px-5 py-2.5 border border-[#BBD5DA] rounded-xl text-sm font-semibold text-gray-700 hover:bg-[#F5F5F5] transition disabled:opacity-50">
+                  ← Rescan
+                </button>
+                <button onClick={handleAddAll} disabled={products.length === 0 || step === 'saving'}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#FF0000] hover:bg-[#e00000] disabled:opacity-50 text-white font-semibold rounded-xl text-sm transition">
+                  {step === 'saving' ? <><RefreshCw size={14} className="animate-spin" /> Adding…</> : <><Plus size={14} /> Add All Products ({products.length})</>}
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* ── Step 3: done ── */}
+          {step === 'done' && (
+            <div className="space-y-4">
+              <div className="flex flex-col items-center gap-3 py-6 text-center">
+                <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center">
+                  <CheckCircle2 size={28} className="text-green-600" />
+                </div>
+                <p className="font-bold text-gray-900">{summary.added} product{summary.added === 1 ? '' : 's'} added successfully!</p>
+                {summary.failed.length > 0 && (
+                  <p className="text-sm text-amber-600">{summary.failed.length} could not be added</p>
+                )}
+              </div>
+              {summary.failed.length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-1">
+                  {summary.failed.map((f, i) => (
+                    <p key={i} className="text-xs text-amber-700"><span className="font-semibold">{f.name}</span> — {f.reason}</p>
+                  ))}
+                </div>
+              )}
+              <div className="flex gap-3">
+                <button onClick={reset} className="flex-1 py-2.5 border border-[#BBD5DA] rounded-xl text-sm font-semibold text-gray-700 hover:bg-[#F5F5F5] transition">
+                  Scan Another List
+                </button>
+                <button onClick={() => { onCreated(); onClose(); }} className="flex-1 py-2.5 bg-teal-600 hover:bg-teal-700 rounded-xl text-sm font-semibold text-white transition">
+                  Done
+                </button>
+              </div>
+            </div>
+          )}
+
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ProductsTab({ products, categories, storeId, token, onRefresh }: any) {
   const [search,    setSearch]    = useState('');
   const [catFilter, setCatFilter] = useState('');
   const [editProd,  setEditProd]  = useState<any>(null);
-  const [showAdd,   setShowAdd]   = useState(false);
-  const [showScan,  setShowScan]  = useState(false);
+  const [showAdd,      setShowAdd]      = useState(false);
+  const [showScan,      setShowScan]      = useState(false);
+  const [showBulkScan,  setShowBulkScan]  = useState(false);
   const [deleting,  setDeleting]  = useState<string | null>(null);
 
   const handleDelete = async (id: string) => {
@@ -683,6 +1085,10 @@ function ProductsTab({ products, categories, storeId, token, onRefresh }: any) {
         <button onClick={() => setShowScan(true)}
           className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold transition shrink-0">
           <ScanLine size={15} /> Scan Paper
+        </button>
+        <button onClick={() => setShowBulkScan(true)}
+          className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold transition shrink-0">
+          <ListChecks size={15} /> Scan Product List
         </button>
         <button onClick={() => setShowAdd(true)}
           className="flex items-center gap-2 bg-[#FF0000] hover:bg-[#e00000] text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition shrink-0">
@@ -762,6 +1168,15 @@ function ProductsTab({ products, categories, storeId, token, onRefresh }: any) {
           storeId={storeId}
           token={token}
           onClose={() => setShowScan(false)}
+          onCreated={onRefresh}
+        />
+      )}
+
+      {showBulkScan && (
+        <BulkSmartUploadModal
+          storeId={storeId}
+          token={token}
+          onClose={() => setShowBulkScan(false)}
           onCreated={onRefresh}
         />
       )}

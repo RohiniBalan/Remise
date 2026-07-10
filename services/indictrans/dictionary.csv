@@ -287,9 +287,11 @@ ta,பாசிப்பயறு,Green Gram
 ta,தட்டைப்பயறு,Black-eyed Peas
 ta,கொள்ளு,Horse Gram
 ta,காராமணி,Black-eyed Peas
+ta,கொண்டைக்கடலை,Chickpeas
 # Oils (already protected but include for dict completeness)
 ta,தேங்காய்,Coconut
 ta,கடலை,Groundnut
+ta,சோயா பீன்ஸ்,Soya Beans
 # Vegetables
 ta,வாழைக்காய்,Raw Banana
 ta,கத்திரிக்காய்,Brinjal
@@ -297,6 +299,7 @@ ta,வெண்டைக்காய்,Okra
 ta,பாகற்காய்,Bitter Gourd
 ta,சுரைக்காய்,Bottle Gourd
 ta,புடலங்காய்,Snake Gourd
+ta,அவரைக்காய்,Hyacinth Beans
 ta,அவரைக்காய்,Cluster Beans
 ta,முருங்கைக்காய்,Drumstick
 ta,கேரட்,Carrot
@@ -309,6 +312,10 @@ ta,வெள்ளரி,Cucumber
 ta,பூசணிக்காய்,Pumpkin
 ta,சேனைக்கிழங்கு,Yam
 ta,கோலாவரை,Colocasia
+ta,வெந்தயக்கீரை,Fenugreek Leaves
+ta,பசலைக்கீரை,Spinach
+ta,பசலைக்கீரை,Green Peas
+ta,சோளம்,Corn
 # Fruits
 ta,வாழைப்பழம்,Banana
 ta,மாம்பழம்,Mango
@@ -318,26 +325,121 @@ ta,திராட்சை,Grapes
 ta,தர்பூசணி,Watermelon
 ta,பப்பாளி,Papaya
 ta,அன்னாசி,Pineapple
+ta,ஸ்ட்ராபெர்ரி,Strawberry
+ta,பலாப்பழம்,Jackfruit
 ta,எலுமிச்சை,Lemon
 ta,கொய்யா,Guava
 ta,தேங்காய்,Coconut
+ta,சீதாப்பழம்,Custard Apple
+ta,மாதுளை,Pomegranate
+# Rice & Grains
+ta,பாஸ்மதி அரிசி,Basmati Rice
+ta,புழுங்கல் அரிசி,Parboiled Rice
+ta,இட்லி அரிசி,Idli Rice
+ta,ரவை,Rava (Semolina)
+ta,சுஜி,Sooji (Semolina)
+ta,கோதுமை மாவு,Wheat Flour
+ta,அரிசி மாவு,Rice Flour
+ta,கடலை மாவு,Chickpea Flour (Besan)
+# Dairy
+ta,வெண்ணெய்,Butter
+ta,சீஸ்,Cheese
+ta,பனீர்,Paneer
+# Hardware
+ta,சுத்தியல்,Hammer
+ta,ஆணி,Nail
+ta,திருகு,Screw
+ta,திருகுப்பிடி,Screwdriver
+ta,பிளையர்,Pliers
+ta,ஸ்பானர் / ரெஞ்ச்,Spanner / Wrench
+ta,துளையிடும் இயந்திரம்,Drill Machine
+ta,டேப்,Tape
+ta,குழாய்,Pipe
+ta,பூட்டு,Lock
+ta,சாவி,Key
+ta,கீல்,Hinge
+ta,சுவிட்ச்,Switch
+ta,சாக்கெட்,Socket
+ta,கம்பி,Wire
+ta,மின்விளக்கு,Bulb
+ta,சிமெண்டு,Cement
+ta,செங்கல்,Brick
+ta,மணல்,Sand
+# Cosmetics & Personal Care
+ta,பிஸ்கட்,Biscuit
+ta,கண்டிஷனர்,Conditioner
+ta,பல் துலக்கும் தூரிகை,Toothbrush
+ta,முகம் கழுவும் திரவம்,Face Wash
+ta,கிரீம்,Cream
+ta,லோஷன்,Lotion
+ta,டியோடரண்ட்,Deodorant
+ta,ஷேவிங் கிரீம்,Shaving Cream
+ta,நகம் வெட்டும் கருவி,Nail Cutter
+ta,சலவை தூள்,Detergent Powder
+ta,பாத்திரம் கழுவும் திரவம்,Dish Wash Liquid
 # Household
 ta,தட்டு,Plate
 ta,கப்,Cup
+ta,குவளை/டம்ளர், Tumbler
+ta,ஸ்பூன்/கரண்டி, Spoon
 ta,கண்ணாடி,Glass
 ta,கத்தி,Knife
 ta,வாளி,Bucket
+ta,ஃப்ரையிங் பான், Pan
+ta,கடாய், Kadai
+ta,பிரஷர் குக்கர், Pressure Cooker
 ta,துடைப்பம்,Broom
+ta,மாப்/தரை துடைப்பான், Mop
 ta,மூரம்,Winnowing Tray
 ta,முறம்,Winnowing Tray
 ta,நாற்காலி,Chair
 ta,மேசை,Table
 ta,படுக்கை,Bed
+ta,தலையணை,Pillow
+ta,போர்வை,Blanket
+ta,துண்டு,Towel
+ta,கண்ணாடி,Mirror
+ta,கடிகாரம்,Clock
+ta,நாட்காட்டி,Calendar
+ta,പത്രം,Newspaper
 ta,டப்பா,Box
 ta,சோப்பு,Soap
 ta,ஷாம்பு,Shampoo
 ta,பேஸ்ட்,Toothpaste
 ta,சீப்பு,Comb
+# Electronics
+ta,கைப்பேசி/மொபைல் போன்/அலைபேசி,Mobile Phone
+ta,தொலைக்காட்சி,Television
+ta,ரிமோட்,Remote
+ta,குளிர்சாதனப் பெட்டி,Refrigerator
+ta,சலவை இயந்திரம்,Washing Machine
+ta,மிக்ஸி/மிக்ஸர் கிரைண்டர்,Mixer Grinder
+ta,இஸ்திரி பெட்டி,Iron Box
+ta,விசிறி,Fan
+ta,குளிர்சாதன இயந்திரம்/ஏர் கண்டிஷனர்,Air Conditioner
+ta,காற்று குளிர்விப்பான்,Air Cooler
+ta,கணினி,Computer
+ta,லேப்டாப்/மடிக்கணினி,Laptop
+ta,விசைப்பலகை,Keyboard
+ta,மவுஸ்,Mouse
+ta,அச்சுப்பொறி,Printer
+ta,கேமரா,Camera
+ta,சார்ஜர்,Charger
+ta,சார்ஜர்,Headphones
+ta,இயர்போன்,Earphone
+ta,ஒலிவாங்கி,Microphone
+ta,பவர் பேங்க்,Power Bank
+ta,மின்உற்பத்தி இயந்திரம்,Generator
+ta,ഇലക്ട്രിക് സ്റ്റൗ,Electric Stove
+ta,மின்அடுப்பு,Induction Stove
+ta,தூசி உறிஞ்சும் இயந்திரம்,Vacuum Cleaner
+ta,மின் கெட்டில்,Electric Kettle
+ta,ஸ்பீக்கர்,Speaker
+ta,ரூட்டர்,Router
+ta,எக்ஸ்டென்ஷன் போர்டு,Extension Board
+ta,டார்ச்,Torch
+ta,இன்வெர்டர்,Inverter
+ta,யூபிஎஸ்,UPS
 # ── Kannada (kn) ────────────────────────────────────────────────────────────────
 # Groceries
 kn,ಅಕ್ಕಿ,Rice

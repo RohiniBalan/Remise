@@ -4,10 +4,11 @@ import { useState, useRef, useCallback } from 'react';
 import {
   ScanLine, Plus, Trash2, Printer, Copy, Check,
   Upload, RefreshCw, AlertCircle, CheckCircle2,
-  X, Sparkles, ShoppingBasket, ListChecks, Languages, Store,
+  X, Sparkles, ShoppingBasket, ListChecks, Languages, Store, Mic, MicOff, HelpCircle,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import CompareModal from './CompareModal';
+import { useSpeechRecognition, VOICE_LANGUAGES, VoiceLanguageOption } from '../../hooks/useSpeechRecognition';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -16,6 +17,10 @@ interface BulkItem {
   name: string;
   quantity: string;
   checked: boolean;
+  // Set when a voice-parsed item's name/quantity was ambiguous — flagged
+  // for the customer to confirm/edit inline instead of silently dropping it
+  // or failing the whole request.
+  needsClarification?: boolean;
 }
 
 type ScanStep = 'idle' | 'scanning' | 'done' | 'error';
@@ -190,6 +195,9 @@ export default function BulkPurchasePage() {
   const [copied,        setCopied]        = useState(false);
   const [editingId,     setEditingId]     = useState<string | null>(null);
   const [translatingId, setTranslatingId] = useState<string | null>(null);
+  const [voiceLang,    setVoiceLang]    = useState<VoiceLanguageOption>(VOICE_LANGUAGES[0]);
+  const [voiceParsing, setVoiceParsing] = useState(false);
+  const [voiceError,   setVoiceError]   = useState('');
   const printRef = useRef<HTMLDivElement>(null);
 
   const addFromScan = (raw: { name: string; quantity: string }[]) => {
@@ -202,6 +210,37 @@ export default function BulkPurchasePage() {
     setItems(prev => [...prev, ...newItems]);
   };
 
+  // Speak-your-list: transcript → /api/voice-purchase-list (translates via
+  // the same indicTranslate() pipeline every OCR route uses, then Claude
+  // splits it into items) → appended into the SAME `items` list the "Scan
+  // Paper List" button already feeds, so CompareModal/matchCart/placeOrder
+  // downstream are untouched. Ambiguous items are still added, just flagged.
+  const addFromVoice = (raw: { name: string; quantity: string; needsClarification?: boolean }[]) => {
+    const newItems: BulkItem[] = raw.map(r => ({
+      id: uid(), name: r.name, quantity: r.quantity, checked: false, needsClarification: r.needsClarification,
+    }));
+    setItems(prev => [...prev, ...newItems]);
+  };
+
+  const handleVoiceResult = useCallback(async (text: string) => {
+    setVoiceParsing(true); setVoiceError('');
+    try {
+      const res = await fetch('/api/voice-purchase-list', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, sourceLang: voiceLang.short }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message || 'Could not understand that.');
+      addFromVoice(data.items);
+    } catch (err: any) {
+      setVoiceError(err.message || 'Could not understand that.');
+    } finally {
+      setVoiceParsing(false);
+    }
+  }, [voiceLang]);
+
+  const voice = useSpeechRecognition(handleVoiceResult);
+
   const addBlank = () => {
     const item: BulkItem = { id: uid(), name: '', quantity: '', checked: false };
     setItems(prev => [...prev, item]);
@@ -209,7 +248,7 @@ export default function BulkPurchasePage() {
   };
 
   const update = (id: string, field: 'name' | 'quantity', value: string) =>
-    setItems(prev => prev.map(i => i.id === id ? { ...i, [field]: value } : i));
+    setItems(prev => prev.map(i => i.id === id ? { ...i, [field]: value, needsClarification: false } : i));
 
   // Translate typed Tanglish/Tamil name to English on commit (blur / Enter)
   const commitName = useCallback(async (id: string, value: string) => {
@@ -297,7 +336,38 @@ export default function BulkPurchasePage() {
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 pt-8 space-y-4">
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 pt-6 space-y-4">
+
+        {/* ── Voice entry ──────────────────────────────────────────────────── */}
+        <div className="bg-white border border-[#BBD5DA] rounded-2xl p-4 space-y-2 shadow-sm">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap">
+              {VOICE_LANGUAGES.map(l => (
+                <button key={l.code} type="button" onClick={() => setVoiceLang(l)} disabled={voice.listening || voiceParsing}
+                  className={`px-2.5 py-1 rounded-full text-xs font-semibold transition disabled:opacity-50 ${
+                    voiceLang.code === l.code ? 'bg-teal-600 text-white' : 'bg-[#F5F5F5] text-gray-600 border border-[#BBD5DA]'
+                  }`}>
+                  {l.label}
+                </button>
+              ))}
+            </div>
+            <button type="button"
+              onClick={() => (voice.listening ? voice.stop() : voice.start(voiceLang))}
+              disabled={voiceParsing || !voice.supported}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition disabled:opacity-50 shrink-0 ${
+                voice.listening ? 'bg-[#FF0000] text-white' : 'bg-teal-600 hover:bg-teal-700 text-white'
+              }`}>
+              {voiceParsing
+                ? <><RefreshCw size={14} className="animate-spin" /> Understanding…</>
+                : voice.listening
+                ? <><MicOff size={14} /> Stop</>
+                : <><Mic size={14} /> Speak your list</>}
+            </button>
+          </div>
+          {!voice.supported && <p className="text-xs text-gray-400">Voice input isn't supported in this browser — try Chrome or Edge.</p>}
+          {voice.listening && <p className="text-xs text-teal-700">Listening… "{voice.interimTranscript || voice.transcript || '…'}"</p>}
+          {(voice.error || voiceError) && <p className="text-xs text-[#FF0000] flex items-center gap-1"><AlertCircle size={11} />{voice.error || voiceError}</p>}
+        </div>
 
         {/* ── Empty state ──────────────────────────────────────────────────── */}
         {items.length === 0 && (
@@ -387,6 +457,7 @@ export default function BulkPurchasePage() {
                     className={`grid grid-cols-[2rem_1fr_7rem_2.5rem] gap-2 items-center px-4 py-3
                       ${idx % 2 === 1 ? 'bg-[#FAFAFA]' : 'bg-white'}
                       ${item.checked ? 'opacity-50' : ''}
+                      ${item.needsClarification ? 'bg-amber-50' : ''}
                       border-b border-[#BBD5DA] last:border-0`}
                   >
                     {/* Checkbox */}
@@ -429,10 +500,12 @@ export default function BulkPurchasePage() {
                       : (
                         <button
                           onClick={() => setEditingId(item.id)}
-                          className={`text-left text-sm font-medium text-gray-800 truncate hover:text-teal-700 transition
+                          className={`flex items-center gap-1.5 text-left text-sm font-medium text-gray-800 truncate hover:text-teal-700 transition
                             ${item.checked ? 'line-through text-gray-400' : ''}`}
                         >
-                          {item.name || <span className="text-gray-300 italic">tap to name</span>}
+                          {item.needsClarification && <HelpCircle size={12} className="text-amber-500 shrink-0" />}
+                          <span className="truncate">{item.name || <span className="text-gray-300 italic">tap to name</span>}</span>
+                          {item.needsClarification && <span className="text-[10px] text-amber-600 font-semibold shrink-0">confirm?</span>}
                         </button>
                       )}
 
