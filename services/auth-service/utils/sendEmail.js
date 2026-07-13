@@ -31,12 +31,28 @@ function getTransporter() {
     return null; // email disabled — will log a warning per call
   }
 
-  _transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: { user, pass },
-  });
+  // _transporter = nodemailer.createTransport({
+  //   service: 'gmail',
+  //   auth: { user, pass },
+  // });
 
-  return _transporter;
+  // return _transporter;
+
+  _transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: { user, pass },
+});
+
+// Verify SMTP connection
+_transporter.verify((err, success) => {
+  if (err) {
+    console.error("❌ SMTP VERIFY ERROR:", err);
+  } else {
+    console.log("✅ SMTP Server is ready.");
+  }
+});
+
+return _transporter;
 }
 
 // ── Low-level send ────────────────────────────────────────────────────────────
