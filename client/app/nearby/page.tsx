@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState, useContext, useCallback } from 'react';
+import { useEffect, useState, useContext, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, MapPin, Bell, BellOff, Clock, ShoppingBag } from 'lucide-react';
@@ -106,7 +106,7 @@ function OrderModal({ offer, onClose, onSuccess }: { offer: Offer; onClose: ()=>
   );
 }
 
-export default function NearbyPage() {
+function NearbyContent() {
   const ctx             = useContext(AuthContext) as any;
   const token: string | null = ctx?.token ?? (typeof window !== 'undefined' ? localStorage.getItem('token') : null);
   const searchParams    = useSearchParams();
@@ -357,5 +357,18 @@ export default function NearbyPage() {
         </div>
       )}
     </div>
+  );
+}
+
+
+export default function NearbyPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#F5F5F5] flex items-center justify-center">
+        <p className="text-gray-500">Loading nearby offers...</p>
+      </div>
+    }>
+      <NearbyContent />
+    </Suspense>
   );
 }

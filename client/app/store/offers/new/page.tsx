@@ -297,30 +297,59 @@ export default function NewOfferPage() {
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!imgFile) { setError('Please upload an offer image.'); return; }
-    if (!store)   { setError('Store not found.'); return; }
-    if (!latitude || !longitude) { setError('Notification coordinates are required.'); return; }
-    if (+form.offerPrice >= +form.originalPrice) {
-      setError('Offer price must be less than original price.'); return;
-    }
-    setLoading(true); setError('');
-    try {
-      const fd = new FormData();
-      fd.append('image',     imgFile);
-      fd.append('storeId',   store._id);
-      fd.append('storeName', store.name);
-      fd.append('latitude',  latitude);
-      fd.append('longitude', longitude);
-      Object.entries(form).forEach(([k, v]) => fd.append(k, v));
-      await offersApi.create(fd, token);
-      router.push('/store/dashboard');
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to publish offer.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  e.preventDefault();
+
+  if (!token) {
+    setError('Authentication token missing. Please login again.');
+    return;
+  }
+
+  if (!imgFile) { 
+    setError('Please upload an offer image.'); 
+    return; 
+  }
+
+  if (!store) { 
+    setError('Store not found.'); 
+    return; 
+  }
+
+  if (!latitude || !longitude) { 
+    setError('Notification coordinates are required.'); 
+    return; 
+  }
+
+  if (+form.offerPrice >= +form.originalPrice) {
+    setError('Offer price must be less than original price.');
+    return;
+  }
+
+  setLoading(true);
+  setError('');
+
+  try {
+    const fd = new FormData();
+
+    fd.append('image', imgFile);
+    fd.append('storeId', store._id);
+    fd.append('storeName', store.name);
+    fd.append('latitude', latitude);
+    fd.append('longitude', longitude);
+
+    Object.entries(form).forEach(([k, v]) => {
+      fd.append(k, v);
+    });
+
+    await offersApi.create(fd, token);
+
+    router.push('/store/dashboard');
+
+  } catch (err: any) {
+    setError(err.response?.data?.message || 'Failed to publish offer.');
+  } finally {
+    setLoading(false);
+  }
+};
 
   if (!store) return (
     <div className="min-h-screen bg-[#F5F5F5] flex items-center justify-center">
