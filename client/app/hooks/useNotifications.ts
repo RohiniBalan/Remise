@@ -4,12 +4,30 @@ import axios from 'axios';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
-function urlBase64ToUint8Array(base64String: string): Uint8Array {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-  const base64   = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const rawData  = window.atob(base64);
-  return new Uint8Array([...rawData].map((c) => c.charCodeAt(0)));
-}
+// function urlBase64ToUint8Array(base64String: string): Uint8Array {
+//   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+//   const base64   = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+//   const rawData  = window.atob(base64);
+//   return new Uint8Array([...rawData].map((c) => c.charCodeAt(0)));
+// }
+
+const urlBase64ToUint8Array = (base64String: string): Uint8Array => {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+
+  const base64 = (base64String + padding)
+    .replace(/-/g, '+')
+    .replace(/_/g, '/');
+
+  const rawData = window.atob(base64);
+
+  const outputArray = new Uint8Array(rawData.length);
+
+  for (let i = 0; i < rawData.length; i++) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+
+  return outputArray;
+};
 
 export function useNotifications(token: string | null) {
   const [permission, setPermission]   = useState<NotificationPermission>('default');
@@ -63,9 +81,10 @@ export function useNotifications(token: string | null) {
       if (existing) await existing.unsubscribe();
 
       // 5. Fresh subscribe with current VAPID key
+      const applicationServerKey = urlBase64ToUint8Array(vapidKey);
       const pushSub = await reg.pushManager.subscribe({
         userVisibleOnly:      true,
-        applicationServerKey: urlBase64ToUint8Array(vapidKey),
+        applicationServerKey: urlBase64ToUint8Array(vapidKey).buffer as ArrayBuffer,
       });
 
       // 6. Send subscription + location to server
