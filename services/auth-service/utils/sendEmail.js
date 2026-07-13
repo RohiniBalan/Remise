@@ -38,9 +38,21 @@ function getTransporter() {
 
   // return _transporter;
 
-  _transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: { user, pass },
+//   _transporter = nodemailer.createTransport({
+//   service: 'gmail',
+//   auth: { user, pass },
+// });
+
+_transporter = nodemailer.createTransport({
+  host: "smtp.gmail.com",
+  port: 587,
+  secure: false,
+  requireTLS: true,
+  auth: {
+    user,
+    pass,
+  },
+  family: 4,   // Force IPv4
 });
 
 // Verify SMTP connection
