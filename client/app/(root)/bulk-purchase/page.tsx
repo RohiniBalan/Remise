@@ -313,7 +313,7 @@ export default function BulkPurchasePage() {
   const checkedCount = items.filter(i => i.checked).length;
 
   return (
-    <div className="min-h-screen bg-[#F5F5F5] pb-20">
+    <div className="min-h-screen bg-[#F5F5F5] pt-[80px] sm:pt-[112px] lg:pt-[152px] pb-20">
 
       {/* ── Hero banner ───────────────────────────────────────────────────── */}
       <div className="bg-white border-b border-[#BBD5DA]">

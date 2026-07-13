@@ -34,9 +34,19 @@ interface AddressData {
   phone: string;
 }
 
+const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+
+// Product-service stores uploaded-image URLs as relative paths
+// (e.g. "/uploads/products/xxx.jpg"); AI-generated/external images are
+// already absolute. Same prefixing rule as store/dashboard/page.tsx.
+const resolveImageUrl = (image: unknown) => {
+  if (typeof image !== 'string' || !image) return '';
+  return image.startsWith('http') || image.startsWith('data:') ? image : `${API}${image}`;
+};
+
 // ⚠️ MOVED OUTSIDE: This prevents the component from re-rendering and losing focus while typing!
-const AddressForm = ({ 
-  data, 
+const AddressForm = ({
+  data,
   onChange, 
   inputBaseClass 
 }: { 
@@ -430,7 +440,7 @@ export default function CheckoutPage() {
                 <div key={item.id} className="flex gap-4 items-start group">
                   <div className="relative flex-shrink-0">
                     <div className={`w-20 h-20 rounded-md border flex items-center justify-center p-1 ${theme === 'light' ? 'bg-white border-gray-200' : 'bg-[#111] border-[#333]'}`}>
-                      <img src={item.image} alt={String(item.title) || 'Product image'} className="w-full h-full object-contain" />
+                      <img src={resolveImageUrl(item.image)} alt={String(item.title) || 'Product image'} className="w-full h-full object-contain" />
                     </div>
                   </div>
                   <div className="flex-1 flex flex-col justify-between h-20">

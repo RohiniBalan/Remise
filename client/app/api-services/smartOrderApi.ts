@@ -12,6 +12,13 @@ export const smartOrderApi = {
   getStoreOrders: (storeId: string, token: string) =>
     axios.get(`${BASE}/api/orders/store/${storeId}`, { headers: { Authorization: `Bearer ${token}` } }),
 
+  // Logged-in customer's own order history, for the "My Orders" page.
+  getMyOrders: (userId: string, email: string, token?: string | null) =>
+    axios.get(`${BASE}/api/orders/my-orders`, {
+      params: { userId, email },
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    }),
+
   matchCart: (items: CartItem[], storeIds: string[]) =>
     axios.post(`${BASE}/api/products/match-cart`, { items, storeIds }),
 

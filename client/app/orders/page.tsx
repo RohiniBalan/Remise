@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, ChevronRight, Loader2, PackageX, Circle, Star } from 'lucide-react';
-import NavbarHome from '@/app/components-main/NavbarHome'; 
+import NavbarHome from '@/app/components-main/NavbarHome';
+import { smartOrderApi } from '@/app/api-services/smartOrderApi';
 
 interface OrderItem {
   productId: string;
@@ -24,12 +25,19 @@ interface OrderData {
   items: OrderItem[];
 }
 
-interface DisplayItem extends OrderItem {
-  parentOrderId: string;
+interface DisplayOrder extends OrderData {
   displayStatus: string;
   orderDate: string;
-  deliveryDate: string; 
+  deliveryDate: string;
 }
+
+const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+
+// Product-service stores uploaded-image URLs as relative paths
+// (e.g. "/uploads/products/xxx.jpg"); AI-generated/external images are
+// already absolute. Same prefixing rule as store/dashboard/page.tsx.
+const resolveImageUrl = (image: string) =>
+  !image ? '' : image.startsWith('http') || image.startsWith('data:') ? image : `${API}${image}`;
 
 export default function MyOrdersPage() {
   const router = useRouter();
@@ -68,16 +76,11 @@ export default function MyOrdersPage() {
       const userId = userData._id || userData.id || '';
       const email = userData.email || '';
 
-      const response = await fetch(`http://localhost:5000/api/orders/my-orders?userId=${userId}&email=${email}`, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
+      const token = localStorage.getItem('token');
+      const response = await smartOrderApi.getMyOrders(userId, email, token);
 
-      const data = await response.json();
-      if (data.success) {
-        setOrders(data.data);
+      if (response.data.success) {
+        setOrders(response.data.data);
       }
     } catch (error) {
       console.error("Failed to fetch orders:", error);
@@ -95,39 +98,38 @@ export default function MyOrdersPage() {
     );
   };
 
-  const displayItems: DisplayItem[] = orders.flatMap(order => 
-    order.items.map(item => {
-      const orderDateObj = new Date(order.createdAt);
-      
-      // Estimated delivery is Order Date + 5 days
-      const deliveryDateObj = new Date(orderDateObj);
-      deliveryDateObj.setDate(deliveryDateObj.getDate() + 5);
+  // One card per order — all items placed together stay together.
+  const displayOrders: DisplayOrder[] = orders.map(order => {
+    const orderDateObj = new Date(order.createdAt);
 
-      return {
-        ...item,
-        parentOrderId: order.orderId,
-        // Using the REAL status from MongoDB modified by the admin
-        displayStatus: order.orderStatus || 'Processing', 
-        orderDate: orderDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-        deliveryDate: deliveryDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-      };
-    })
-  );
+    // Estimated delivery is Order Date + 5 days
+    const deliveryDateObj = new Date(orderDateObj);
+    deliveryDateObj.setDate(deliveryDateObj.getDate() + 5);
+
+    return {
+      ...order,
+      // Using the REAL status from MongoDB modified by the admin
+      displayStatus: order.orderStatus || 'Processing',
+      orderDate: orderDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      deliveryDate: deliveryDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    };
+  });
 
   // Apply Search AND Status Filters
-  const filteredItems = displayItems.filter(item => {
-    // 1. Check Search Query
-    const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase());
+  const filteredOrders = displayOrders.filter(order => {
+    // 1. Check Search Query — matches if ANY item in the order matches
+    const matchesSearch = searchQuery.trim() === '' ||
+      order.items.some(item => item.title.toLowerCase().includes(searchQuery.toLowerCase()));
 
     // 2. Check Status Filters
     let matchesStatus = true;
     if (statusFilters.length > 0) {
       matchesStatus = statusFilters.some(filter => {
         // Map UI filters to Backend Statuses
-        if (filter === 'Cancelled') return item.displayStatus === 'Cancelled';
-        if (filter === 'Delivered') return item.displayStatus === 'Delivered';
-        if (filter === 'Returned') return item.displayStatus === 'Returned';
-        if (filter === 'On the way') return item.displayStatus === 'Shipped' || item.displayStatus === 'Processing';
+        if (filter === 'Cancelled') return order.displayStatus === 'Cancelled';
+        if (filter === 'Delivered') return order.displayStatus === 'Delivered';
+        if (filter === 'Returned') return order.displayStatus === 'Returned';
+        if (filter === 'On the way') return order.displayStatus === 'Shipped' || order.displayStatus === 'Processing';
         return false;
       });
     }
@@ -154,7 +156,7 @@ export default function MyOrdersPage() {
     <div className={`min-h-screen ${theme === 'light' ? 'bg-[#f1f3f6]' : 'bg-[#0a0a0a]'} font-sans pb-12`}>
       <NavbarHome theme={theme} toggleTheme={() => setTheme(theme === 'light' ? 'dark' : 'light')} />
 
-      <div className="max-w-[1200px] mx-auto px-4 sm:px-6 pt-24 md:pt-32">
+      <div className="max-w-[1200px] mx-auto px-4 sm:px-6 pt-[80px] sm:pt-[112px] lg:pt-[152px]">
         <div className={`flex items-center gap-2 text-xs mb-4 ${theme === 'light' ? 'text-gray-500' : 'text-gray-400'}`}>
           <span className="hover:text-blue-600 cursor-pointer" onClick={() => router.push('/')}>Home</span>
           <ChevronRight size={12} />
@@ -215,56 +217,78 @@ export default function MyOrdersPage() {
                   <Loader2 className="animate-spin text-blue-600 mb-4" size={32} />
                   <p className={theme === 'light' ? 'text-gray-600' : 'text-gray-400'}>Loading your orders...</p>
                 </div>
-              ) : filteredItems.length === 0 ? (
+              ) : filteredOrders.length === 0 ? (
                 <div className={`p-16 text-center rounded-sm shadow-sm flex flex-col items-center justify-center ${theme === 'light' ? 'bg-white' : 'bg-[#111] border border-[#222]'}`}>
                   <PackageX className="text-gray-300 mb-4" size={64} />
                   <h3 className={`text-xl font-medium mb-2 ${theme === 'light' ? 'text-gray-800' : 'text-gray-200'}`}>No Orders Found</h3>
                   <p className={theme === 'light' ? 'text-gray-500' : 'text-gray-400'}>Looks like you haven't placed any orders matching that filter.</p>
                 </div>
               ) : (
-                filteredItems.map((item, idx) => {
-                  const statusUI = getStatusUI(item.displayStatus, item.orderDate, item.deliveryDate);
+                filteredOrders.map(order => {
+                  const statusUI = getStatusUI(order.displayStatus, order.orderDate, order.deliveryDate);
 
                   return (
-                    <div 
-                      key={`${item.parentOrderId}-${idx}`} 
-                      className={`p-4 sm:p-6 flex flex-col sm:flex-row gap-6 rounded-sm shadow-sm border transition-colors hover:shadow-md cursor-pointer ${
+                    <div
+                      key={order.orderId}
+                      className={`rounded-sm shadow-sm border transition-colors hover:shadow-md ${
                         theme === 'light' ? 'bg-white border-gray-100 hover:border-gray-200' : 'bg-[#111] border-[#222] hover:border-[#333]'
                       }`}
                     >
-                      <div className="w-20 h-20 sm:w-24 sm:h-24 flex-shrink-0 bg-white border border-gray-100 rounded">
-                        <img src={item.image} alt={item.title} className="w-full h-full object-contain p-2" />
-                      </div>
-
-                      <div className="flex-1 min-w-0 flex flex-col justify-start">
-                        <h4 className={`text-sm font-medium line-clamp-2 mb-1 hover:text-blue-600 ${theme === 'light' ? 'text-gray-800' : 'text-gray-200'}`}>
-                          {item.title}
-                        </h4>
-                        <p className={`text-xs mt-1 ${theme === 'light' ? 'text-gray-500' : 'text-gray-500'}`}>
-                          Qty: {item.quantity}
-                        </p>
-                      </div>
-
-                      <div className={`w-24 flex-shrink-0 flex sm:justify-center text-sm font-medium ${theme === 'light' ? 'text-gray-900' : 'text-gray-100'}`}>
-                        ₹{item.price.toLocaleString()}
-                      </div>
-
-                      <div className="sm:w-72 flex-shrink-0 flex flex-col justify-start gap-1">
-                        <div className="flex items-center gap-2">
-                          <Circle size={10} className={`fill-current ${statusUI.dot.replace('bg-', 'text-')}`} />
+                      {/* Order-level header: one per order, not per item */}
+                      <div className={`flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-3 border-b ${
+                        theme === 'light' ? 'border-gray-100 bg-gray-50' : 'border-[#222] bg-[#0c0c0c]'
+                      }`}>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <Circle size={10} className={`fill-current ${statusUI.dot.replace('bg-', 'text-')}`} />
+                            <span className={`text-sm font-semibold ${theme === 'light' ? 'text-gray-900' : 'text-gray-100'}`}>
+                              {statusUI.text}
+                            </span>
+                          </div>
+                          <p className={`text-xs mt-1 leading-relaxed ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>
+                            {statusUI.subText}
+                          </p>
+                        </div>
+                        <div className={`flex items-center gap-4 text-xs ${theme === 'light' ? 'text-gray-500' : 'text-gray-400'}`}>
+                          <span>Order #{order.orderId}</span>
+                          <span>Placed {order.orderDate}</span>
                           <span className={`text-sm font-semibold ${theme === 'light' ? 'text-gray-900' : 'text-gray-100'}`}>
-                            {statusUI.text}
+                            ₹{order.totalAmount.toLocaleString()}
                           </span>
                         </div>
-                        <p className={`text-xs mt-1 leading-relaxed ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>
-                          {statusUI.subText}
-                        </p>
-                        
-                        {item.displayStatus === 'Delivered' && (
-                          <button className="text-blue-600 hover:text-blue-700 text-sm font-medium mt-3 flex items-center gap-1.5 w-fit">
-                            <Star size={16} className="fill-blue-600" /> Rate & Review Product
-                          </button>
-                        )}
+                      </div>
+
+                      {/* All items from this single order, grouped in one card */}
+                      <div className={`divide-y ${theme === 'light' ? 'divide-gray-100' : 'divide-[#222]'}`}>
+                        {order.items.map((item, idx) => (
+                          <div key={idx} className="px-4 sm:px-6 py-2.5 flex items-center gap-3">
+                            <div className="w-12 h-12 flex-shrink-0 bg-white border border-gray-100 rounded overflow-hidden">
+                              <img src={resolveImageUrl(item.image)} alt={item.title} className="w-full h-full object-contain p-1" />
+                            </div>
+
+                            <div className="flex-1 min-w-0">
+                              <h4 className={`text-sm font-medium truncate ${theme === 'light' ? 'text-gray-800' : 'text-gray-200'}`}>
+                                {item.title}
+                              </h4>
+                              <p className={`text-xs ${theme === 'light' ? 'text-gray-500' : 'text-gray-500'}`}>
+                                Qty: {item.quantity}
+                              </p>
+                            </div>
+
+                            <div className={`text-sm font-medium flex-shrink-0 ${theme === 'light' ? 'text-gray-900' : 'text-gray-100'}`}>
+                              ₹{item.price.toLocaleString()}
+                            </div>
+
+                            {order.displayStatus === 'Delivered' && (
+                              <button
+                                title="Rate & Review Product"
+                                className="text-blue-600 hover:text-blue-700 flex-shrink-0 p-1"
+                              >
+                                <Star size={16} className="fill-blue-600" />
+                              </button>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     </div>
                   )

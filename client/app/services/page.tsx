@@ -114,7 +114,7 @@ export default function ServicesPage(props: any) {
 
       {!isPreview && <Navbar theme={theme} toggleTheme={toggleTheme} />}
 
-      <div className={`relative z-10 flex-grow ${isPreview ? 'py-12' : 'pt-24 pb-12'} px-4 md:px-8`}>
+      <div className={`relative z-10 flex-grow ${isPreview ? 'py-12' : 'pt-[80px] sm:pt-[112px] lg:pt-[152px] pb-12'} px-4 md:px-8`}>
         <div className="max-w-7xl mx-auto mb-12">
           
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-12">

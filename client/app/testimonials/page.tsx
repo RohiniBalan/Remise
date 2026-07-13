@@ -148,7 +148,7 @@ export default function EnhancedTestimonials(props: any) {
       
       {!isPreview && <Navbar theme={theme} toggleTheme={toggleTheme} />}
 
-      <div className={isPreview ? 'pt-12' : 'pt-[80px]'}>
+      <div className={isPreview ? 'pt-12' : 'pt-[80px] sm:pt-[112px] lg:pt-[152px]'}>
         
         {/* --- HERO & MARQUEE SECTION --- */}
         <section className="relative pt-24 pb-20 px-4 overflow-hidden">
