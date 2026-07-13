@@ -44,17 +44,23 @@ export default function NotificationBell() {
     if (!open) loadNotifications();
   };
 
-  const markRead = async (id: string) => {
-    await notificationApi.markRead(id, token);
-    setNotifs(prev => prev.map(n => n._id === id ? { ...n, isRead: true } : n));
-    fetchUnread();
-  };
+ const markRead = async (id: string) => {
+  if (!token) return;
 
-  const markAll = async () => {
-    await notificationApi.markAllRead(token);
-    setNotifs(prev => prev.map(n => ({ ...n, isRead: true })));
-    fetchUnread();
-  };
+  await notificationApi.markRead(id, token);
+  setNotifs(prev =>
+    prev.map(n => (n._id === id ? { ...n, isRead: true } : n))
+  );
+  fetchUnread();
+};
+
+const markAll = async () => {
+  if (!token) return;
+
+  await notificationApi.markAllRead(token);
+  setNotifs(prev => prev.map(n => ({ ...n, isRead: true })));
+  fetchUnread();
+};
 
   if (!token) return null;
 
