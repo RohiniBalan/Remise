@@ -31,22 +31,10 @@ function getTransporter() {
     return null; // email disabled — will log a warning per call
   }
 
-  // _transporter = nodemailer.createTransport({
-  //   service: 'gmail',
-  //   auth: { user, pass },
-  // });
-
   _transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 587,
-  secure: false,      // STARTTLS
-  requireTLS: true,
-  auth: {
-    user,
-    pass,
-  },
-  family: 4,          // Force IPv4
-});
+    service: 'gmail',
+    auth: { user, pass },
+  });
 
   return _transporter;
 }
