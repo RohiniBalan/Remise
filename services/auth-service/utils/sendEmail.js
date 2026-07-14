@@ -18,6 +18,9 @@
 
 const nodemailer = require('nodemailer');
 
+// newly added dns
+const dns = require('dns');
+
 // ── Transporter (lazy-initialised so missing env vars don't crash boot) ───────
 let _transporter = null;
 
@@ -43,16 +46,32 @@ function getTransporter() {
 //   auth: { user, pass },
 // });
 
+// _transporter = nodemailer.createTransport({
+//   host: "smtp.gmail.com",
+//   port: 587,
+//   secure: false,
+//   requireTLS: true,
+//   auth: {
+//     user,
+//     pass,
+//   },
+//   family: 4,   // Force IPv4
+// });
+
 _transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
   port: 587,
   secure: false,
-  requireTLS: true,
   auth: {
     user,
     pass,
   },
-  family: 4,   // Force IPv4
+  tls: {
+    rejectUnauthorized: false,
+  },
+  dnsLookup: (hostname, options, callback) => {
+    dns.lookup(hostname, { family: 4 }, callback);
+  },
 });
 
 // Verify SMTP connection
