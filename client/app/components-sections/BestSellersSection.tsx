@@ -81,7 +81,7 @@ const ProductCard = memo(({ item, theme }: { item: BestSellerItem; theme: 'dark'
           src={item.img}
           alt={item.name}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-          onError={e => { (e.target as HTMLImageElement).src = '/placeholder.png'; }}
+          onError={e => { (e.target as HTMLImageElement).src = '/placeholder.jpeg'; }}
         />
       </div>
 

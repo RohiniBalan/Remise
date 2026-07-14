@@ -10,6 +10,7 @@ import {
   Award, Star, Gift, Smile, Globe2, Shield, Rocket, Headphones, Globe, Loader2
 } from 'lucide-react';
 
+import { API_URL } from '../utils/api';
 const ICON_MAP: Record<string, React.ElementType> = {
   Globe2, Smile, Shield, Rocket
 };
@@ -70,7 +71,7 @@ export default function ToyBlogLifestyle({ isPreview = false, previewData = null
 
     const fetchData = async () => {
       try {
-        const API_URL = "https://wow-lifebackend.onrender.com/api";
+        // const API_URL = "https://wow-lifebackend.onrender.com/api";
         const response = await fetch(`${API_URL}/blog-lifestyle`);
         const result = await response.json();
         if (result.success && result.data) setData(result.data);
