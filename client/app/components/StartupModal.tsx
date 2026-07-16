@@ -1,9 +1,9 @@
 "use client";
 
-import useWakeUp from "../hooks/useWakeup";
+import useWakeup from "../hooks/useWakeup";
 
 export default function StartupModal() {
-  const loading = useWakeUp();
+  const loading = useWakeup();
 
   if (!loading) return null;
 
