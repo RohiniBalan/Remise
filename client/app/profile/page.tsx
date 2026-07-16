@@ -1124,11 +1124,6 @@ export default function ProfilePage() {
                         className="w-full rounded-xl border border-[#BBD5DA] bg-white px-3.5 py-2.5 text-sm outline-none"
                       />
                     </label>
-                    {renderList(
-                      "storeActivity",
-                      "Store activity",
-                      "Add activity",
-                    )}
                   </div>
                 </div>
               </div>
