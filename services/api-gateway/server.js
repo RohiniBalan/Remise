@@ -62,7 +62,9 @@ app.get('/health', (req, res) => {
 });
 
 // ─── Wake-Up Check ────────────────────────────────────────────────────────────
+// ─── Wake-Up Check ────────────────────────────────────────────────────────────
 app.get("/wake-up", async (req, res) => {
+
   const services = [
     { name: "Auth", url: `${SERVICES.auth}/health` },
     { name: "User", url: `${SERVICES.user}/health` },
@@ -75,7 +77,7 @@ app.get("/wake-up", async (req, res) => {
     { name: "Notification", url: `${SERVICES.notification}/health` },
   ];
 
-  const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
   const MAX_RETRIES = 15;
 
@@ -85,24 +87,37 @@ app.get("/wake-up", async (req, res) => {
 
     results = [];
 
-    let allAwake = true;
-
     await Promise.all(
       services.map(async (service) => {
+
         try {
+
           const response = await axios.get(service.url, {
-            timeout: 5000,
+            timeout: 10000,
+            validateStatus: () => true,
           });
 
-          results.push({
-            service: service.name,
-            status: "awake",
-            code: response.status,
-          });
+          // 200 = awake
+          // 429 = awake (rate limited)
+          if (response.status === 200 || response.status === 429) {
+
+            results.push({
+              service: service.name,
+              status: "awake",
+              code: response.status,
+            });
+
+          } else {
+
+            results.push({
+              service: service.name,
+              status: "sleeping",
+              code: response.status,
+            });
+
+          }
 
         } catch (err) {
-
-          allAwake = false;
 
           results.push({
             service: service.name,
@@ -111,34 +126,37 @@ app.get("/wake-up", async (req, res) => {
           });
 
         }
+
       })
     );
 
+    const awakeCount = results.filter(r => r.status === "awake").length;
+
     console.log(
-      `Wake-up attempt ${attempt}/${MAX_RETRIES} : ${
-        results.filter((r) => r.status === "awake").length
-      }/${services.length} services awake`
+      `Wake-up attempt ${attempt}/${MAX_RETRIES} : ${awakeCount}/${services.length} services awake`
     );
 
-    if (allAwake) {
+    if (awakeCount === services.length) {
+
       return res.json({
         success: true,
         message: "All services are awake.",
         services: results,
       });
+
     }
 
+    // Wait 3 seconds before trying again
     await delay(3000);
+
   }
 
-  const allAwake = results.every(
-    service => service.status === "awake"
-);
+  return res.json({
+    success: false,
+    message: "Some services are still sleeping.",
+    services: results,
+  });
 
-res.json({
-    success: allAwake,
-    services: results
-});
 });
 
 // ─── Proxy Factory ───────────────────────────────────────────────────────────
