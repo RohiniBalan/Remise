@@ -212,8 +212,29 @@ const getProfile = async (req, res, next) => {
 // @access  Private
 const updateProfile = async (req, res, next) => {
   try {
-    const { fullname, mobilenumber } = req.body;
-    
+    const {
+      fullname,
+      email,
+      mobilenumber,
+      dob,
+      gender,
+      avatar,
+      profileData,
+      addresses,
+      paymentMethods,
+      wishlist,
+      savedCart,
+      rewardsCoupons,
+      recentOrders,
+      recentlyViewedProducts,
+      favoriteStores,
+      storeProfile,
+      businessDetails,
+      verificationStatus,
+      storeActivity,
+      upiId
+    } = req.body;
+
     const user = await User.findById(req.user.id);
 
     if (!user) {
@@ -223,7 +244,6 @@ const updateProfile = async (req, res, next) => {
       });
     }
 
-    // Check if mobile number is already taken by another user
     if (mobilenumber && mobilenumber !== user.mobilenumber) {
       const existingUser = await User.findOne({ mobilenumber });
       if (existingUser) {
@@ -234,10 +254,44 @@ const updateProfile = async (req, res, next) => {
       }
     }
 
-    // Update fields
-    user.fullname = fullname || user.fullname;
-    user.mobilenumber = mobilenumber || user.mobilenumber;
+    if (email && email !== user.email) {
+      const existingUser = await User.findOne({ email });
+      if (existingUser) {
+        return res.status(400).json({
+          success: false,
+          message: 'Email address already in use'
+        });
+      }
+      user.email = email;
+      user.isEmailVerified = false;
+    }
 
+    user.fullname = fullname || user.fullname;
+    user.mobilenumber = mobilenumber !== undefined ? mobilenumber : user.mobilenumber;
+    user.dob = dob !== undefined ? dob : user.dob;
+    user.gender = gender !== undefined ? gender : user.gender;
+    user.avatar = avatar !== undefined ? avatar : user.avatar;
+
+    const nextProfileData = {
+      ...(user.profileData || {}),
+      ...(profileData || {})
+    };
+
+    if (addresses !== undefined) nextProfileData.addresses = addresses;
+    if (paymentMethods !== undefined) nextProfileData.paymentMethods = paymentMethods;
+    if (wishlist !== undefined) nextProfileData.wishlist = wishlist;
+    if (savedCart !== undefined) nextProfileData.savedCart = savedCart;
+    if (rewardsCoupons !== undefined) nextProfileData.rewardsCoupons = rewardsCoupons;
+    if (recentOrders !== undefined) nextProfileData.recentOrders = recentOrders;
+    if (recentlyViewedProducts !== undefined) nextProfileData.recentlyViewedProducts = recentlyViewedProducts;
+    if (favoriteStores !== undefined) nextProfileData.favoriteStores = favoriteStores;
+    if (storeProfile !== undefined) nextProfileData.storeProfile = storeProfile;
+    if (businessDetails !== undefined) nextProfileData.businessDetails = businessDetails;
+    if (verificationStatus !== undefined) nextProfileData.verificationStatus = verificationStatus;
+    if (storeActivity !== undefined) nextProfileData.storeActivity = storeActivity;
+    if (upiId !== undefined) nextProfileData.upiId = upiId;
+
+    user.profileData = nextProfileData;
     await user.save();
 
     res.status(200).json({
@@ -248,10 +302,54 @@ const updateProfile = async (req, res, next) => {
         fullname: user.fullname,
         email: user.email,
         mobilenumber: user.mobilenumber,
-        role: user.role
+        role: user.role,
+        avatar: user.avatar,
+        dob: user.dob,
+        gender: user.gender,
+        profileData: user.profileData,
+        isEmailVerified: user.isEmailVerified
       }
     });
 
+  } catch (error) {
+    next(error);
+  }
+};
+
+const changePassword = async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Current and new passwords are required'
+      });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    const isMatch = await user.comparePassword(currentPassword);
+    if (!isMatch) {
+      return res.status(401).json({
+        success: false,
+        message: 'Current password is incorrect'
+      });
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Password updated successfully'
+    });
   } catch (error) {
     next(error);
   }
@@ -310,6 +408,7 @@ module.exports = {
   googleSuccess,
   getProfile,
   updateProfile,
+  changePassword,
   logout,
   logoutAll
 };

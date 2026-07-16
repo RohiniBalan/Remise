@@ -45,6 +45,18 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  dob: {
+    type: Date,
+    default: null
+  },
+  gender: {
+    type: String,
+    default: null
+  },
+  profileData: {
+    type: Object,
+    default: {}
+  },
   role: {
     type: String,
     enum: ['user', 'moderator', 'admin'],

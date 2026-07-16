@@ -7,7 +7,10 @@ const {
   googleCallback,
   googleSuccess,
   getProfile, 
-  updateProfile 
+  updateProfile,
+  changePassword,
+  logout,
+  logoutAll
 } = require('../controllers/authController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
@@ -35,6 +38,9 @@ router.post('/google/success', googleSuccess);
 // Protected routes
 router.get('/profile', protect, getProfile);
 router.put('/profile', protect, updateProfile);
+router.post('/change-password', protect, changePassword);
+router.post('/logout', protect, logout);
+router.post('/logout-all', protect, logoutAll);
 
 // Admin only routes
 router.get('/admin', protect, authorize('admin'), (req, res) => {
