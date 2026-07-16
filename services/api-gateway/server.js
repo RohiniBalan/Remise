@@ -62,50 +62,82 @@ app.get('/health', (req, res) => {
 });
 
 // ─── Wake-Up Check ────────────────────────────────────────────────────────────
-app.get('/wake-up', async (req, res) => {
+app.get("/wake-up", async (req, res) => {
   const services = [
-    { name: 'Auth', url: `${SERVICES.auth}/health` },
-    { name: 'User', url: `${SERVICES.user}/health` },
-    { name: 'Product', url: `${SERVICES.product}/health` },
-    { name: 'Order', url: `${SERVICES.order}/health` },
-    { name: 'Payment', url: `${SERVICES.payment}/health` },
-    { name: 'Content', url: `${SERVICES.content}/health` },
-    { name: 'Store', url: `${SERVICES.store}/health` },
-    { name: 'Offers', url: `${SERVICES.offers}/health` },
-    { name: 'Notification', url: `${SERVICES.notification}/health` },
+    { name: "Auth", url: `${SERVICES.auth}/health` },
+    { name: "User", url: `${SERVICES.user}/health` },
+    { name: "Product", url: `${SERVICES.product}/health` },
+    { name: "Order", url: `${SERVICES.order}/health` },
+    { name: "Payment", url: `${SERVICES.payment}/health` },
+    { name: "Content", url: `${SERVICES.content}/health` },
+    { name: "Store", url: `${SERVICES.store}/health` },
+    { name: "Offers", url: `${SERVICES.offers}/health` },
+    { name: "Notification", url: `${SERVICES.notification}/health` },
   ];
 
-  const response = [];
+  const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-  for (const service of services) {
-    try {
-      const result = await axios.get(service.url, {
-        timeout: 10000,
+  const MAX_RETRIES = 15;
+
+  let results = [];
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+
+    results = [];
+
+    let allAwake = true;
+
+    await Promise.all(
+      services.map(async (service) => {
+        try {
+          const response = await axios.get(service.url, {
+            timeout: 5000,
+          });
+
+          results.push({
+            service: service.name,
+            status: "awake",
+            code: response.status,
+          });
+
+        } catch (err) {
+
+          allAwake = false;
+
+          results.push({
+            service: service.name,
+            status: "sleeping",
+            code: err.response?.status || 500,
+          });
+
+        }
+      })
+    );
+
+    console.log(
+      `Wake-up attempt ${attempt}/${MAX_RETRIES} : ${
+        results.filter((r) => r.status === "awake").length
+      }/${services.length} services awake`
+    );
+
+    if (allAwake) {
+      return res.json({
+        success: true,
+        message: "All services are awake.",
+        services: results,
       });
-
-      response.push({
-        service: service.name,
-        url: service.url,
-        status: "awake",
-        code: result.status
-      });
-
-    } catch (err) {
-
-      response.push({
-        service: service.name,
-        url: service.url,
-        status: "failed",
-        error: err.message,
-        code: err.response?.status
-      });
-
     }
+
+    await delay(3000);
   }
 
-  res.json({
-  success: true,
-  services: response
+  const allAwake = results.every(
+    service => service.status === "awake"
+);
+
+res.json({
+    success: allAwake,
+    services: results
 });
 });
 

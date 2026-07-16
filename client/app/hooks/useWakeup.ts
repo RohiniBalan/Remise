@@ -9,29 +9,36 @@ export default function useWakeUp() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    console.log("WakeUp Hook Started");
-    console.log("API =", API);
-
     const wakeUp = async () => {
       try {
-        console.log("Calling:", `${API}/wake-up`);
+        console.log("Calling Wake-up API...");
 
         const res = await axios.get(`${API}/wake-up`, {
           timeout: 70000,
         });
 
-        console.log("WakeUp Success", res.data);
+        console.log(res.data);
 
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // If every service is awake
+        if (res.data.success) {
+          console.log("All services are awake.");
+
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+
+          setLoading(false);
+          return;
+        }
+
+        console.log("Some services are still sleeping.");
+
       } catch (err) {
-        console.error("WakeUp Error", err);
-
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        console.error("Wake-up failed:", err);
       }
 
-      console.log("Closing Modal");
+      // Retry after 5 seconds
+      console.log("Retrying in 5 seconds...");
 
-      setLoading(false);
+      setTimeout(wakeUp, 5000);
     };
 
     wakeUp();
