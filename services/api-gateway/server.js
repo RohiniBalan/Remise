@@ -6,6 +6,8 @@ const rateLimit = require('express-rate-limit');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const authForward = require('./middleware/authForward');
 
+const axios = require('axios');
+
 const app = express();
 
 app.set('trust proxy', 1);
@@ -57,6 +59,37 @@ app.use(authForward);
 // ─── Health Check ────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {
   res.json({ success: true, gateway: 'running', services: SERVICES, timestamp: new Date().toISOString() });
+});
+
+// ─── Wake-Up Check ────────────────────────────────────────────────────────────
+app.get('/wake-up', async (req, res) => {
+  const services = [
+    { name: 'Auth', url: `${SERVICES.auth}/health` },
+    { name: 'User', url: `${SERVICES.user}/health` },
+    { name: 'Product', url: `${SERVICES.product}/health` },
+    { name: 'Order', url: `${SERVICES.order}/health` },
+    { name: 'Payment', url: `${SERVICES.payment}/health` },
+    { name: 'Content', url: `${SERVICES.content}/health` },
+    { name: 'Store', url: `${SERVICES.store}/health` },
+    { name: 'Offers', url: `${SERVICES.offers}/health` },
+    { name: 'Notification', url: `${SERVICES.notification}/health` },
+  ];
+
+  const results = await Promise.allSettled(
+    services.map(service =>
+      axios.get(service.url, { timeout: 60000 })
+    )
+  );
+
+  const response = services.map((service, index) => ({
+    service: service.name,
+    status: results[index].status === 'fulfilled' ? 'awake' : 'failed'
+  }));
+
+  res.json({
+    success: true,
+    services: response
+  });
 });
 
 // ─── Proxy Factory ───────────────────────────────────────────────────────────
