@@ -80,7 +80,7 @@ app.get('/wake-up', async (req, res) => {
   for (const service of services) {
     try {
       const result = await axios.get(service.url, {
-        timeout: 60000,
+        timeout: 10000,
       });
 
       response.push({
@@ -103,7 +103,10 @@ app.get('/wake-up', async (req, res) => {
     }
   }
 
-  res.json(response);
+  res.json({
+  success: true,
+  services: response
+});
 });
 
 // ─── Proxy Factory ───────────────────────────────────────────────────────────
