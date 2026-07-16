@@ -195,7 +195,7 @@ export default function ServicesPage(props: any) {
                   </div>
                 </div>
 
-                <div className="overflow-x-auto">
+                <div className="hidden md:block overflow-x-auto">
                   <table className="w-full min-w-[600px]">
                     <thead className={`border-b ${isDarkMode ? 'bg-neutral-900/40 border-yellow-500/20' : 'bg-yellow-50/50 border-yellow-200'}`}>
                       <tr>
@@ -276,6 +276,41 @@ export default function ServicesPage(props: any) {
                   </table>
                   {currentProducts.length === 0 && (
                     <div className={`p-10 sm:p-16 text-center font-medium border-t ${isDarkMode ? 'text-gray-500 border-white/5' : 'text-slate-400 border-slate-100'}`}>
+                      No exclusive products available in this category yet.
+                    </div>
+                  )}
+                </div>
+
+                <div className="md:hidden p-4 sm:p-6 space-y-3">
+                  {currentProducts.map((product, index) => (
+                    <button
+                      key={product.id}
+                      onClick={() => setSelectedProduct(index)}
+                      className={`w-full rounded-2xl border p-4 text-left transition-all duration-300 ${
+                        selectedProduct === index
+                          ? `bg-gradient-to-r from-yellow-500/10 to-transparent ${isDarkMode ? 'border-yellow-400' : 'border-yellow-500'}`
+                          : `${isDarkMode ? 'border-white/10 bg-neutral-900/70' : 'border-yellow-200 bg-white'}`
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border text-xl ${isDarkMode ? 'border-yellow-500/20 bg-neutral-900' : 'border-yellow-200 bg-yellow-50'}`}>
+                          {product.icon}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className={`font-bold text-sm ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{product.name}</div>
+                          <div className={`mt-1 text-[11px] font-medium ${isDarkMode ? 'text-gray-400' : 'text-slate-500'}`}>{product.category}</div>
+                          <div className="mt-2 flex items-center justify-between gap-3">
+                            <span className={`text-sm font-black ${isDarkMode ? 'text-yellow-400' : 'text-yellow-600'}`}>{product.price}</span>
+                            <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase ${isDarkMode ? 'bg-yellow-500/10 text-yellow-400' : 'bg-yellow-100 text-yellow-700'}`}>
+                              {viewMode === 'retail' ? product.discount || product.stock : product.moq || product.margin}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                  {currentProducts.length === 0 && (
+                    <div className={`rounded-2xl border p-8 text-center text-sm ${isDarkMode ? 'border-white/10 bg-neutral-900/70 text-gray-400' : 'border-yellow-200 bg-white text-slate-400'}`}>
                       No exclusive products available in this category yet.
                     </div>
                   )}
