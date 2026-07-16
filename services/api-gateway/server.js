@@ -75,21 +75,35 @@ app.get('/wake-up', async (req, res) => {
     { name: 'Notification', url: `${SERVICES.notification}/health` },
   ];
 
-  const results = await Promise.allSettled(
-    services.map(service =>
-      axios.get(service.url, { timeout: 60000 })
-    )
-  );
+  const response = [];
 
-  const response = services.map((service, index) => ({
-    service: service.name,
-    status: results[index].status === 'fulfilled' ? 'awake' : 'failed'
-  }));
+  for (const service of services) {
+    try {
+      const result = await axios.get(service.url, {
+        timeout: 60000,
+      });
 
-  res.json({
-    success: true,
-    services: response
-  });
+      response.push({
+        service: service.name,
+        url: service.url,
+        status: "awake",
+        code: result.status
+      });
+
+    } catch (err) {
+
+      response.push({
+        service: service.name,
+        url: service.url,
+        status: "failed",
+        error: err.message,
+        code: err.response?.status
+      });
+
+    }
+  }
+
+  res.json(response);
 });
 
 // ─── Proxy Factory ───────────────────────────────────────────────────────────
