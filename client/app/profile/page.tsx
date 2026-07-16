@@ -26,7 +26,7 @@ import {
   EyeOff,
 } from "lucide-react";
 
-type TabKey = "overview" | "addresses" | "security" | "customer" | "store";
+type TabKey = "overview" | "addresses" | "security" | "store";
 
 type Address = {
   id: string;
@@ -89,8 +89,6 @@ export default function ProfilePage() {
   const [addressDraft, setAddressDraft] =
     useState<Address>(getInitialAddress());
   const [isAddressEditorOpen, setIsAddressEditorOpen] = useState(false);
-  const [newPaymentMethod, setNewPaymentMethod] = useState("");
-  const [newListItem, setNewListItem] = useState("");
   const [security, setSecurity] = useState({
     currentPassword: "",
     newPassword: "",
@@ -113,8 +111,6 @@ export default function ProfilePage() {
     ];
     if (isStoreOwner) {
       base.push({ id: "store", label: "Store" });
-    } else {
-      base.push({ id: "customer", label: "Customer" });
     }
     return base;
   }, [isStoreOwner]);
@@ -273,26 +269,6 @@ export default function ProfilePage() {
     await saveProfileData(nextProfileData);
   };
 
-  const handleAddListItem = async (key: string) => {
-    const value = newListItem.trim();
-    if (!value) return;
-    const items = [...(form.profileData[key] || [])];
-    items.push(value);
-    const nextProfileData = { ...form.profileData, [key]: items };
-    setForm((prev) => ({ ...prev, profileData: nextProfileData }));
-    setNewListItem("");
-    await saveProfileData(nextProfileData);
-  };
-
-  const handleRemoveListItem = async (key: string, item: string) => {
-    const items = (form.profileData[key] || []).filter(
-      (entry: string) => entry !== item,
-    );
-    const nextProfileData = { ...form.profileData, [key]: items };
-    setForm((prev) => ({ ...prev, profileData: nextProfileData }));
-    await saveProfileData(nextProfileData);
-  };
-
   const handlePasswordChange = async () => {
     if (security.newPassword !== security.confirmPassword) {
       setToast({ message: "Passwords do not match", ok: false });
@@ -344,44 +320,6 @@ export default function ProfilePage() {
       setToast({ message: error.message || "Logout failed", ok: false });
     }
   };
-
-  const renderList = (key: string, title: string, placeholder: string) => (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
-        <div className="flex items-center gap-2">
-          <input
-            value={newListItem}
-            onChange={(event) => setNewListItem(event.target.value)}
-            placeholder={placeholder}
-            className="w-44 rounded-xl border border-[#BBD5DA] bg-white px-3 py-2 text-sm outline-none"
-          />
-          <button
-            onClick={() => handleAddListItem(key)}
-            className="rounded-xl bg-[#FF0000] p-2 text-white"
-          >
-            <Plus size={15} />
-          </button>
-        </div>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {(form.profileData[key] || []).map((item: string, index: number) => (
-          <div
-            key={`${key}-${index}`}
-            className="flex items-center gap-2 rounded-full border border-[#BBD5DA] bg-[#F5F5F5] px-3 py-1.5 text-sm text-gray-700"
-          >
-            <span>{item}</span>
-            <button
-              onClick={() => handleRemoveListItem(key, item)}
-              className="text-[#FF0000]"
-            >
-              <Trash2 size={14} />
-            </button>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
 
   if (loading) {
     return (
@@ -563,52 +501,6 @@ export default function ProfilePage() {
                         <option value="Other">Other</option>
                       </select>
                     </label>
-                  </div>
-                </div>
-
-                <div className="space-y-4 rounded-2xl border border-[#BBD5DA] bg-[#FCFCFC] p-5">
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-gray-500">
-                    Quick snapshot
-                  </h3>
-                  <div className="space-y-3 text-sm text-gray-700">
-                    <div className="flex items-center justify-between rounded-xl bg-white px-3 py-3">
-                      <span className="flex items-center gap-2">
-                        <MapPin size={15} className="text-[#FF0000]" /> Default
-                        address
-                      </span>
-                      <span className="font-semibold">
-                        {(form.profileData.addresses || []).find(
-                          (item: Address) => item.isDefault,
-                        )?.city || "Not added"}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between rounded-xl bg-white px-3 py-3">
-                      <span className="flex items-center gap-2">
-                        <CreditCard size={15} className="text-[#FF0000]" />{" "}
-                        Saved UPI IDs
-                      </span>
-                      <span className="font-semibold">
-                        {(form.profileData.paymentMethods || []).length}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between rounded-xl bg-white px-3 py-3">
-                      <span className="flex items-center gap-2">
-                        <Heart size={15} className="text-[#FF0000]" /> Wishlist
-                        items
-                      </span>
-                      <span className="font-semibold">
-                        {(form.profileData.wishlist || []).length}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between rounded-xl bg-white px-3 py-3">
-                      <span className="flex items-center gap-2">
-                        <ShoppingBag size={15} className="text-[#FF0000]" />{" "}
-                        Saved carts
-                      </span>
-                      <span className="font-semibold">
-                        {(form.profileData.savedCart || []).length}
-                      </span>
-                    </div>
                   </div>
                 </div>
               </div>
@@ -923,109 +815,6 @@ export default function ProfilePage() {
                       <ChevronRight size={15} />
                     </button>
                   </div>
-                </div>
-              </div>
-            )}
-
-            {activeTab === "customer" && (
-              <div className="grid gap-6 lg:grid-cols-2">
-                <div className="space-y-5 rounded-2xl border border-[#BBD5DA] bg-[#FCFCFC] p-5">
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-gray-500">
-                    Customer profile
-                  </h3>
-                  <div className="space-y-4">
-                    <div className="rounded-xl border border-[#BBD5DA] bg-white p-4">
-                      <div className="mb-3 flex items-center justify-between">
-                        <span className="flex items-center gap-2 font-semibold text-gray-900">
-                          <CreditCard size={15} className="text-[#FF0000]" />{" "}
-                          Saved UPI IDs
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <input
-                            value={newPaymentMethod}
-                            onChange={(event) =>
-                              setNewPaymentMethod(event.target.value)
-                            }
-                            placeholder="name@bank"
-                            className="rounded-xl border border-[#BBD5DA] px-3 py-2 text-sm outline-none"
-                          />
-                          <button
-                            onClick={() => {
-                              const value = newPaymentMethod.trim();
-                              if (!value) return;
-                              const methods = [
-                                ...(form.profileData.paymentMethods || []),
-                              ];
-                              methods.push(value);
-                              const nextProfileData = {
-                                ...form.profileData,
-                                paymentMethods: methods,
-                              };
-                              setForm((prev) => ({
-                                ...prev,
-                                profileData: nextProfileData,
-                              }));
-                              setNewPaymentMethod("");
-                              saveProfileData(nextProfileData);
-                            }}
-                            className="rounded-xl bg-[#FF0000] p-2 text-white"
-                          >
-                            <Plus size={15} />
-                          </button>
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {(form.profileData.paymentMethods || []).map(
-                          (item: string, index: number) => (
-                            <div
-                              key={`${item}-${index}`}
-                              className="flex items-center gap-2 rounded-full border border-[#BBD5DA] bg-[#F5F5F5] px-3 py-1.5 text-sm text-gray-700"
-                            >
-                              <span>{item}</span>
-                              <button
-                                onClick={() => {
-                                  const methods = (
-                                    form.profileData.paymentMethods || []
-                                  ).filter((entry: string) => entry !== item);
-                                  const nextProfileData = {
-                                    ...form.profileData,
-                                    paymentMethods: methods,
-                                  };
-                                  setForm((prev) => ({
-                                    ...prev,
-                                    profileData: nextProfileData,
-                                  }));
-                                  saveProfileData(nextProfileData);
-                                }}
-                                className="text-[#FF0000]"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
-                          ),
-                        )}
-                      </div>
-                    </div>
-                    {renderList("wishlist", "Wishlist", "Add a product")}
-                    {renderList("savedCart", "Saved cart", "Add a cart item")}
-                    {renderList(
-                      "rewardsCoupons",
-                      "Rewards & coupons",
-                      "Add coupon",
-                    )}
-                  </div>
-                </div>
-                <div className="space-y-4 rounded-2xl border border-[#BBD5DA] bg-[#FCFCFC] p-5">
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-gray-500">
-                    Activity & preferences
-                  </h3>
-                  {renderList("recentOrders", "Recent orders", "Add order")}
-                  {renderList(
-                    "recentlyViewedProducts",
-                    "Recently viewed",
-                    "Add item",
-                  )}
-                  {renderList("favoriteStores", "Favorite stores", "Add store")}
                 </div>
               </div>
             )}
