@@ -7,9 +7,6 @@ import { CartProvider } from "./components-main/CartContext";
 import { AuthProvider } from "./context/AuthContext";
 
 
-// Service WakeUp
-import StartupModal from "./components/StartupModal";
-
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
@@ -31,7 +28,6 @@ export default function RootLayout({
         */}
         <AuthProvider>
           <CartProvider>
-            <StartupModal />
             {children}
           </CartProvider>
         </AuthProvider>
