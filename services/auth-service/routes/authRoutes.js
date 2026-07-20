@@ -4,12 +4,15 @@ const passport = require('passport');
 const {
   register, login, googleCallback, googleSuccess,
   getProfile, updateProfile, logout, logoutAll,
+  forgotPassword, resetPassword,
   verifyEmail, resendVerification, upgradeToStoreOwner,
 } = require('../controllers/authController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
 router.post('/register', register);
 router.post('/login', login);
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password', resetPassword);
 router.post('/logout', protect, logout);
 router.post('/logout-all', protect, logoutAll);
 

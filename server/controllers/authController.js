@@ -1,7 +1,20 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const Token = require('../models/Token');
+const { sendEmail } = require('../utils/sendEmail');
 
+const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+
+const validatePassword = (password) => {
+  if (!password) return 'Password is required';
+  if (password.length < 8) return 'Password must be at least 8 characters';
+  if (!/[A-Z]/.test(password)) return 'Password must include at least one uppercase letter';
+  if (!/[a-z]/.test(password)) return 'Password must include at least one lowercase letter';
+  if (!/\d/.test(password)) return 'Password must include at least one number';
+  if (!/[^A-Za-z0-9]/.test(password)) return 'Password must include at least one special character';
+  return '';
+};
 
 // Generate JWT Token
 const generateToken = (id, role) => {
@@ -18,6 +31,14 @@ const generateToken = (id, role) => {
 const register = async (req, res, next) => {
   try {
     const { fullname, email, mobilenumber, password } = req.body;
+
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      return res.status(400).json({
+        success: false,
+        message: passwordError
+      });
+    }
 
     // Check if user already exists
     const existingUser = await User.findOne({
@@ -81,7 +102,7 @@ const login = async (req, res, next) => {
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid credentials'
+        message: 'Invalid email'
       });
     }
 
@@ -99,7 +120,7 @@ const login = async (req, res, next) => {
     if (!isPasswordMatch) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid credentials'
+        message: 'Invalid password'
       });
     }
 
@@ -316,6 +337,101 @@ const updateProfile = async (req, res, next) => {
   }
 };
 
+const forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is required'
+      });
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'No account found with that email'
+      });
+    }
+
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    user.passwordResetToken = resetToken;
+    user.passwordResetExpires = Date.now() + 1000 * 60 * 30;
+    await user.save();
+
+    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:4000'}/reset-password?token=${resetToken}`;
+    const html = `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
+        <h2>Reset your Remise password</h2>
+        <p>We received a request to reset your password. Click the button below to continue.</p>
+        <p><a href="${resetUrl}" style="display:inline-block;padding:12px 20px;background:#ff0000;color:#fff;text-decoration:none;border-radius:8px;">Reset password</a></p>
+        <p>If you did not request this, you can safely ignore this email.</p>
+      </div>
+    `;
+
+    await sendEmail({
+      to: user.email,
+      subject: 'Reset your Remise password',
+      html,
+      text: `Reset your Remise password: ${resetUrl}`
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Password reset instructions have been sent to your email'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const resetPassword = async (req, res, next) => {
+  try {
+    const { token, password } = req.body;
+
+    if (!token || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Reset token and new password are required'
+      });
+    }
+
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      return res.status(400).json({
+        success: false,
+        message: passwordError
+      });
+    }
+
+    const user = await User.findOne({
+      passwordResetToken: token,
+      passwordResetExpires: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: 'Reset link is invalid or has expired'
+      });
+    }
+
+    user.password = password;
+    user.passwordResetToken = null;
+    user.passwordResetExpires = null;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Password reset successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 const changePassword = async (req, res, next) => {
   try {
     const { currentPassword, newPassword } = req.body;
@@ -324,6 +440,14 @@ const changePassword = async (req, res, next) => {
       return res.status(400).json({
         success: false,
         message: 'Current and new passwords are required'
+      });
+    }
+
+    const passwordError = validatePassword(newPassword);
+    if (passwordError) {
+      return res.status(400).json({
+        success: false,
+        message: passwordError
       });
     }
 
@@ -408,6 +532,8 @@ module.exports = {
   googleSuccess,
   getProfile,
   updateProfile,
+  forgotPassword,
+  resetPassword,
   changePassword,
   logout,
   logoutAll

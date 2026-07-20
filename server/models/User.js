@@ -36,6 +36,14 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: function() { return !this.googleId; }
   },
+  passwordResetToken: {
+    type: String,
+    default: null
+  },
+  passwordResetExpires: {
+    type: Date,
+    default: null
+  },
   googleId: {
     type: String,
     unique: true,

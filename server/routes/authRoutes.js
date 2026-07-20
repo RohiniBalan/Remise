@@ -9,6 +9,8 @@ const {
   getProfile, 
   updateProfile,
   changePassword,
+  forgotPassword,
+  resetPassword,
   logout,
   logoutAll
 } = require('../controllers/authController');
@@ -17,6 +19,8 @@ const { protect, authorize } = require('../middleware/authMiddleware');
 // Public routes
 router.post('/register', register);
 router.post('/login', login);
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password', resetPassword);
 
 // Google OAuth routes
 router.get('/google', passport.authenticate('google', { 

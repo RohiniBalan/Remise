@@ -16,8 +16,8 @@
  * FRONTEND_URL — base URL of your Next.js app (http://localhost:3000 locally)
  */
 
+require('dotenv').config();
 const nodemailer = require('nodemailer');
-
 
 // ── Transporter (lazy-initialised so missing env vars don't crash boot) ───────
 let _transporter = null;
@@ -173,7 +173,7 @@ async function sendVerificationEmail(toEmail, toName, token) {
  * Send password-reset link.
  */
 async function sendPasswordResetEmail(toEmail, toName, token) {
-  const link = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password/${token}`;
+  const link = `${process.env.FRONTEND_URL || 'http://localhost:4000'}/reset-password?token=${token}`;
 
   console.log(`\n🔗 [Password Reset] Link for ${toEmail}:\n   ${link}\n`);
 

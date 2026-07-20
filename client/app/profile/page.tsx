@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { normalizeAuthErrorMessage, validatePasswordChangeForm } from "../utils/authValidation";
 import {
   ArrowLeft,
   Camera,
@@ -270,10 +271,16 @@ export default function ProfilePage() {
   };
 
   const handlePasswordChange = async () => {
-    if (security.newPassword !== security.confirmPassword) {
-      setToast({ message: "Passwords do not match", ok: false });
+    const errors = validatePasswordChangeForm({
+      currentPassword: security.currentPassword,
+      newPassword: security.newPassword,
+      confirmPassword: security.confirmPassword,
+    });
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
       return;
     }
+
     const token = localStorage.getItem("token");
     try {
       const res = await fetch(`${API}/api/auth/change-password`, {
@@ -288,8 +295,9 @@ export default function ProfilePage() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Password change failed");
+      if (!res.ok) throw new Error(normalizeAuthErrorMessage(data.message) || "Password change failed");
       setToast({ message: "Password updated successfully", ok: true });
+      setFieldErrors({});
       setSecurity({
         currentPassword: "",
         newPassword: "",
@@ -740,7 +748,7 @@ export default function ProfilePage() {
                                 : "password"
                             }
                             value={item.value}
-                            onChange={(event) =>
+                            onChange={(event) => {
                               setSecurity((prev) => ({
                                 ...prev,
                                 [item.key === "current"
@@ -748,8 +756,10 @@ export default function ProfilePage() {
                                   : item.key === "new"
                                     ? "newPassword"
                                     : "confirmPassword"]: event.target.value,
-                              }))
-                            }
+                              }));
+                              const fieldKey = item.key === "current" ? "currentPassword" : item.key === "new" ? "newPassword" : "confirmPassword";
+                              setFieldErrors((prev) => ({ ...prev, [fieldKey]: "" }));
+                            }}
                             className="w-full bg-transparent text-sm outline-none"
                           />
                           <button
@@ -774,6 +784,11 @@ export default function ProfilePage() {
                             )}
                           </button>
                         </div>
+                        {fieldErrors[item.key === "current" ? "currentPassword" : item.key === "new" ? "newPassword" : "confirmPassword"] && (
+                          <p className="mt-2 text-sm text-[#FF0000]">
+                            {fieldErrors[item.key === "current" ? "currentPassword" : item.key === "new" ? "newPassword" : "confirmPassword"]}
+                          </p>
+                        )}
                       </label>
                     ))}
                   </div>
