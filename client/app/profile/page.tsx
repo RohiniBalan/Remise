@@ -80,6 +80,7 @@ function getInitialAddress(): Address {
 export default function ProfilePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({}); 
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ message: string; ok: boolean } | null>(
     null,
