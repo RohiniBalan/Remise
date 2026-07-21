@@ -23,6 +23,19 @@ app.use(cors({ origin: '*' }));
 app.use(morgan('dev'));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// DEBUG ROUTE (NEWLY ADDED)
+const fs = require("fs");
+const path = require("path");
+
+app.get("/debug/files", (req, res) => {
+  const dir = path.join(__dirname, "uploads", "products");
+
+  res.json({
+    exists: fs.existsSync(dir),
+    files: fs.existsSync(dir) ? fs.readdirSync(dir) : [],
+  });
+});
+
 app.use('/api/admin/products', productRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/admin/categories', categoryRoutes);
