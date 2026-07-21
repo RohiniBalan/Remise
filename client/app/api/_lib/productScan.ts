@@ -372,6 +372,7 @@ export function parseItems(englishText: string): BulkItem[] {
 // instead of duplicating it — same models/version-fallback/429-backoff
 // behavior either way.
 
+// ORIGINAL CODE
 async function callGemini(parts: any[]): Promise<string> {
   const key = process.env.GOOGLE_AI_API_KEY;
   if (!key) throw new Error("GOOGLE_AI_API_KEY not set");
@@ -718,6 +719,7 @@ export type ImageResult =
   | { base64: string; mimeType: string }
   | { url: string };
 
+  //ORIGINAL CODE
 export async function generateWithFluxSchnell(
   productName: string,
   category: string,
