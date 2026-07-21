@@ -933,19 +933,70 @@ export async function checkSharedLibrary(
   return null;
 }
 
+// export async function getProductImage(
+//   productName: string,
+//   category: string,
+// ): Promise<{ result: ImageResult; aiGenerated: boolean }> {
+//   // 1. Shared library — reuse existing image uploaded by any store
+//   const shared = await checkSharedLibrary(productName);
+//   if (shared) return { result: shared, aiGenerated: false };
+
+//   // 2. AI image generation (Pollinations.ai FLUX)
+//   const generated = await generateWithFluxSchnell(productName, category);
+//   if (generated) return { result: generated, aiGenerated: true };
+
+//   // 3. Generated product card — always works, zero external calls
+//   return {
+//     result: await buildProductCard(productName, category),
+//     aiGenerated: false,
+//   };
+// }
+
 export async function getProductImage(
   productName: string,
   category: string,
 ): Promise<{ result: ImageResult; aiGenerated: boolean }> {
-  // 1. Shared library — reuse existing image uploaded by any store
+
+  // 1. Check shared library
   const shared = await checkSharedLibrary(productName);
-  if (shared) return { result: shared, aiGenerated: false };
 
-  // 2. AI image generation (Pollinations.ai FLUX)
+  if (shared && "url" in shared) {
+    try {
+      const res = await fetch(
+        shared.url.startsWith("http")
+          ? shared.url
+          : `${GATEWAY}${shared.url}`,
+        { method: "HEAD" }
+      );
+
+      if (res.ok) {
+        return {
+          result: shared,
+          aiGenerated: false,
+        };
+      }
+
+      console.log(
+        `[Image Library] Stored image missing for "${productName}". Generating a new one...`
+      );
+    } catch (err) {
+      console.log(
+        `[Image Library] Could not verify stored image. Generating a new one...`
+      );
+    }
+  }
+
+  // 2. Generate AI image
   const generated = await generateWithFluxSchnell(productName, category);
-  if (generated) return { result: generated, aiGenerated: true };
 
-  // 3. Generated product card — always works, zero external calls
+  if (generated) {
+    return {
+      result: generated,
+      aiGenerated: true,
+    };
+  }
+
+  // 3. Fallback product card
   return {
     result: await buildProductCard(productName, category),
     aiGenerated: false,
