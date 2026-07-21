@@ -16,78 +16,96 @@
  * FRONTEND_URL — base URL of your Next.js app (http://localhost:3000 locally)
  */
 
+const { Resend } = require("resend");
+
+const resend = new Resend(process.env.RESEND_API_KEY);
+
 require('dotenv').config();
-const nodemailer = require('nodemailer');
 
-// ── Transporter (lazy-initialised so missing env vars don't crash boot) ───────
-let _transporter = null;
-
-function getTransporter() {
-  if (_transporter) return _transporter;
-
-  const user = process.env.GMAIL_USER;
-  const pass = process.env.GMAIL_APP_PASSWORD;
-
-  if (!user || !pass || pass === 'your_gmail_app_password_here') {
-    return null; // email disabled — will log a warning per call
-  }
-
-  // _transporter = nodemailer.createTransport({
-  //   service: 'gmail',
-  //   auth: { user, pass },
-  // });
-
-  // return _transporter;
-
-//   _transporter = nodemailer.createTransport({
-//   service: 'gmail',
-//   auth: { user, pass },
-// });
-
-_transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 587,
-  secure: false,
-  requireTLS: true,
-  auth: {
-    user,
-    pass,
-  },
-  family: 4,   // Force IPv4
-});
-
-
-// Verify SMTP connection
-_transporter.verify((err, success) => {
-  if (err) {
-    console.error("❌ SMTP VERIFY ERROR:", err);
-  } else {
-    console.log("✅ SMTP Server is ready.");
-  }
-});
-
-return _transporter;
-}
-
-// ── Low-level send ────────────────────────────────────────────────────────────
+// RESEND
 async function sendMail({ to, subject, html }) {
-  const transporter = getTransporter();
-
-  if (!transporter) {
-    console.warn(
-      '⚠️  [Email] GMAIL_USER / GMAIL_APP_PASSWORD not configured — email skipped.\n' +
-      '   Set them in services/auth-service/.env to enable real emails.'
-    );
-    return;
-  }
-
-  await transporter.sendMail({
-    from: `"${process.env.GMAIL_SENDER_NAME || 'Remise'}" <${process.env.GMAIL_USER}>`,
+  await resend.emails.send({
+    from: process.env.RESEND_FROM_EMAIL,
     to,
     subject,
     html,
   });
 }
+// const nodemailer = require('nodemailer');
+
+// ── Transporter (lazy-initialised so missing env vars don't crash boot) ───────
+
+// NODEMAILER CODE
+// let _transporter = null;
+
+// function getTransporter() {
+//   if (_transporter) return _transporter;
+
+//   const user = process.env.GMAIL_USER;
+//   const pass = process.env.GMAIL_APP_PASSWORD;
+
+//   if (!user || !pass || pass === 'your_gmail_app_password_here') {
+//     return null; // email disabled — will log a warning per call
+//   }
+
+//   //  OLD CODE
+//   // _transporter = nodemailer.createTransport({
+//   //   service: 'gmail',
+//   //   auth: { user, pass },
+//   // });
+
+//   // return _transporter;
+
+// //   _transporter = nodemailer.createTransport({
+// //   service: 'gmail',
+// //   auth: { user, pass },
+// // });
+
+// _transporter = nodemailer.createTransport({
+//   host: "smtp.gmail.com",
+//   port: 587,
+//   secure: false,
+//   requireTLS: true,
+//   auth: {
+//     user,
+//     pass,
+//   },
+//   family: 4,   // Force IPv4
+// });
+
+
+// // Verify SMTP connection
+// _transporter.verify((err, success) => {
+//   if (err) {
+//     console.error("❌ SMTP VERIFY ERROR:", err);
+//   } else {
+//     console.log("✅ SMTP Server is ready.");
+//   }
+// });
+
+// return _transporter;
+// }
+
+// ── Low-level send ────────────────────────────────────────────────────────────
+// NODEMAILER CODE
+// async function sendMail({ to, subject, html }) {
+//   const transporter = getTransporter();
+
+//   if (!transporter) {
+//     console.warn(
+//       '⚠️  [Email] GMAIL_USER / GMAIL_APP_PASSWORD not configured — email skipped.\n' +
+//       '   Set them in services/auth-service/.env to enable real emails.'
+//     );
+//     return;
+//   }
+
+//   await transporter.sendMail({
+//     from: `"${process.env.GMAIL_SENDER_NAME || 'Remise'}" <${process.env.GMAIL_USER}>`,
+//     to,
+//     subject,
+//     html,
+//   });
+// }
 
 // ── Shared HTML wrapper ───────────────────────────────────────────────────────
 function emailWrapper(bodyHtml) {
