@@ -24,9 +24,6 @@ app.use(morgan('dev'));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // DEBUG ROUTE (NEWLY ADDED)
-const fs = require("fs");
-const path = require("path");
-
 app.get("/debug/files", (req, res) => {
   const dir = path.join(__dirname, "uploads", "products");
 
