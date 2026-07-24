@@ -9,6 +9,7 @@ const NOTIFICATION_SERVICE_URL = process.env.NOTIFICATION_SERVICE_URL || 'http:/
 // affect an already-successful order.
 const notifyOrderParties = async (order) => {
   if (!order.storeId) return;
+  console.log('[notifyOrderParties] storeId:', order.storeId, 'userId:', order.userId);
 
   let store = null;
   try {

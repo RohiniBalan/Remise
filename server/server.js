@@ -7,6 +7,9 @@ const path = require('path');
 const fs = require('fs');
 require('dotenv').config();
 
+const dns = require('dns');
+dns.setServers(['8.8.8.8', '8.8.4.4']);
+
 // Import routes
 const authRoutes = require('./routes/authRoutes');
 const heroRoutes = require('./routes/heroRoutes');
@@ -176,8 +179,9 @@ mongoose.connect(mongoUri)
     console.log('\nAll configurations initialized successfully');
 
     const PORT = process.env.PORT || 5000;
-    app.listen(PORT, () => {
+    app.listen(PORT, '0.0.0.0', () => {
       console.log(`\n🚀 Server is running on port ${PORT}`);
+      console.log(`Listening on all network interfaces`);
       console.log(`📡 API URL: http://localhost:${PORT}`);
       console.log(`\nAvailable routes:`);
       console.log(`  - /api/auth`);
