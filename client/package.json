@@ -16,14 +16,17 @@
     "framer-motion": "^12.34.0",
     "lucide-react": "^0.566.0",
     "next": "^14.0.4",
+    "pdfkit": "^0.19.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "recharts": "^3.10.1",
     "sharp": "^0.34.5",
     "tailwind-merge": "^3.5.0",
     "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "@types/node": "25.2.3",
+    "@types/pdfkit": "^0.17.6",
     "@types/react": "19.2.14",
     "@types/react-dom": "^19.2.3",
     "autoprefixer": "^10.4.24",

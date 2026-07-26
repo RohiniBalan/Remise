@@ -6,6 +6,7 @@ const morgan    = require('morgan');
 const path      = require('path');
 
 const storeRoutes = require('./routes/storeRoutes');
+const analyticsRoutes = require('./routes/analytics');
 
 const app = express();
 
@@ -19,6 +20,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Routes
 app.use('/api/stores', storeRoutes);
+app.use('/api/stores', analyticsRoutes);
 
 // Health check
 app.get('/health', (req, res) => res.json({ service: 'store-service', status: 'ok' }));

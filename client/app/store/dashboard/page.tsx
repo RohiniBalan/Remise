@@ -10,6 +10,8 @@ import {
   Layers, IndianRupee, Users, ImageIcon, Save, ScanLine, Upload,
   CheckCircle2, Sparkles, Truck, QrCode, Wallet, ListChecks, Mic, MicOff,
 } from 'lucide-react';
+import { LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, BarChart, Bar } from 'recharts';
+import { extractLineItems, computeAnalytics, buildTrend, getDateRange, DateRangeKey } from './analytics';
 import { AuthContext }  from '../../context/AuthContext';
 import { storeApi }     from '../../api-services/storeApi';
 import { offersApi }    from '../../api-services/offersApi';
@@ -59,6 +61,7 @@ function normalizeSmartOrder(o: any) {
     paymentMethod: o.paymentMethod,
     paymentStatus: o.paymentStatus,
     deliveryStatus: o.deliveryStatus,
+    rawItems: items,
     _source: 'smartOrder' as const,
   };
 }
@@ -306,7 +309,41 @@ function ProductModal({
 }
 
 // ── Overview Tab ──────────────────────────────────────────────────────────────
-function OverviewTab({ store, offers, orders, products, onTabSwitch }: any) {
+const PIE_COLORS = ['#0d9488', '#FF0000', '#f59e0b', '#3b82f6', '#8b5cf6', '#ec4899'];
+
+function OverviewTab({ store, offers, orders, products, categories, onTabSwitch }: any) {
+  const [range, setRange]         = useState<DateRangeKey>('month');
+  const [custom, setCustom]       = useState({ from: '', to: '' });
+  const [category, setCategory]   = useState('');
+  const [productFilter, setProductFilter] = useState('');
+  const [granularity, setGranularity]     = useState<'daily'|'weekly'|'monthly'>('daily');
+
+  const { from, to } = getDateRange(range, custom);
+  const filteredOrders = orders.filter((o: any) => {
+    const d = new Date(o.createdAt);
+    return d >= from && d <= to;
+  });
+
+  let items = extractLineItems(filteredOrders, products);
+  if (category)      items = items.filter(i => i.category === category);
+  if (productFilter) items = items.filter(i => i.productTitle === productFilter);
+
+  const analytics = computeAnalytics(items);
+  const trend = buildTrend(analytics.byDay, granularity);
+
+  const handleExportPdf = async () => {
+    const res = await fetch('/api/store-analytics-pdf', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ storeName: store?.name, ...analytics }),
+    });
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'sales-analytics-report.pdf'; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // ── Original stats (based on ALL orders, unaffected by the analytics filters above) ──
   const totalRevenue   = orders.filter((o: any) => o.status === 'Delivered').reduce((s: number, o: any) => s + (o.totalAmount || 0), 0);
   const activeOffers   = offers.filter((o: any) => o.isActive && new Date(o.validUntil) > new Date()).length;
   const pendingOrders  = orders.filter((o: any) => o.status === 'Pending').length;
@@ -321,13 +358,53 @@ function OverviewTab({ store, offers, orders, products, onTabSwitch }: any) {
     { label: 'Low Stock',       value: lowStock,        icon: <AlertCircle size={20} />,  color: lowStock > 0 ? 'text-amber-600' : 'text-gray-600', bg: lowStock > 0 ? 'bg-amber-50' : 'bg-[#F5F5F5]', border: lowStock > 0 ? 'border-amber-200' : 'border-[#BBD5DA]' },
   ];
 
-  const recentOrders  = [...orders].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 5);
-  const topProducts   = [...products].sort((a, b) => (b.totalStock - a.totalStock)).slice(0, 4);
+  const recentOrders = [...orders].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 5);
+  const topStockProducts = [...products].sort((a, b) => (b.totalStock - a.totalStock)).slice(0, 4);
 
   return (
     <div className="space-y-6">
-      {/* Stats grid */}
+
+      {/* ── Analytics filter bar ── */}
+      <div className="flex flex-wrap items-center gap-3 bg-white rounded-2xl border border-[#BBD5DA] p-3 shadow-sm">
+        <select value={range} onChange={e => setRange(e.target.value as DateRangeKey)}
+          className="bg-[#F5F5F5] border border-[#BBD5DA] rounded-xl px-3 py-2 text-sm outline-none">
+          <option value="today">Today</option>
+          <option value="week">This Week</option>
+          <option value="month">This Month</option>
+          <option value="lastMonth">Last Month</option>
+          <option value="custom">Custom Range</option>
+        </select>
+        {range === 'custom' && (
+          <>
+            <input type="date" value={custom.from} onChange={e => setCustom(c => ({ ...c, from: e.target.value }))}
+              className="bg-[#F5F5F5] border border-[#BBD5DA] rounded-xl px-3 py-2 text-sm outline-none" />
+            <input type="date" value={custom.to} onChange={e => setCustom(c => ({ ...c, to: e.target.value }))}
+              className="bg-[#F5F5F5] border border-[#BBD5DA] rounded-xl px-3 py-2 text-sm outline-none" />
+          </>
+        )}
+        <select value={category} onChange={e => setCategory(e.target.value)}
+          className="bg-[#F5F5F5] border border-[#BBD5DA] rounded-xl px-3 py-2 text-sm outline-none">
+          <option value="">All Categories</option>
+          {categories.map((c: any) => <option key={c._id} value={c.name}>{c.name}</option>)}
+        </select>
+        <select value={productFilter} onChange={e => setProductFilter(e.target.value)}
+          className="bg-[#F5F5F5] border border-[#BBD5DA] rounded-xl px-3 py-2 text-sm outline-none">
+          <option value="">All Products</option>
+          {products.map((p: any) => <option key={p._id} value={p.title}>{p.title}</option>)}
+        </select>
+        <button onClick={handleExportPdf}
+          className="ml-auto flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-xl text-sm font-semibold transition">
+          Export PDF
+        </button>
+      </div>
+
+      {/* ── Stats grid: original 6 cards + Total Products Sold ── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        <div className="bg-white rounded-2xl border border-purple-100 p-4 shadow-sm">
+          <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center text-purple-600 mb-3"><TrendingUp size={20} /></div>
+          <p className="text-2xl font-bold text-purple-600">{analytics.totalProductsSold}</p>
+          <p className="text-gray-500 text-xs mt-0.5">Total Products Sold</p>
+        </div>
         {stats.map(s => (
           <div key={s.label} className={`bg-white rounded-2xl border p-4 shadow-sm ${s.border}`}>
             <div className={`w-10 h-10 rounded-xl ${s.bg} flex items-center justify-center ${s.color} mb-3`}>{s.icon}</div>
@@ -337,8 +414,8 @@ function OverviewTab({ store, offers, orders, products, onTabSwitch }: any) {
         ))}
       </div>
 
+      {/* ── Recent Orders + Product Stock (original) ── */}
       <div className="grid lg:grid-cols-2 gap-5">
-        {/* Recent orders */}
         <div className="bg-white rounded-2xl border border-[#BBD5DA] shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-[#BBD5DA] flex items-center justify-between">
             <h3 className="font-bold text-gray-900 text-sm">Recent Orders</h3>
@@ -363,16 +440,15 @@ function OverviewTab({ store, offers, orders, products, onTabSwitch }: any) {
           }
         </div>
 
-        {/* Product stock */}
         <div className="bg-white rounded-2xl border border-[#BBD5DA] shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-[#BBD5DA] flex items-center justify-between">
             <h3 className="font-bold text-gray-900 text-sm">Product Stock</h3>
             <button onClick={() => onTabSwitch('products')} className="text-xs text-teal-600 hover:underline font-medium">Manage</button>
           </div>
-          {topProducts.length === 0
+          {topStockProducts.length === 0
             ? <p className="text-gray-400 text-sm text-center py-10">No products yet</p>
             : <div className="divide-y divide-[#F5F5F5]">
-                {topProducts.map((p: any) => (
+                {topStockProducts.map((p: any) => (
                   <div key={p._id} className="px-5 py-3 flex items-center gap-3">
                     <div className="w-10 h-10 rounded-lg bg-[#F5F5F5] shrink-0 overflow-hidden">
                       {p.imageUrl
@@ -395,7 +471,90 @@ function OverviewTab({ store, offers, orders, products, onTabSwitch }: any) {
         </div>
       </div>
 
-      {/* Store verification notice */}
+      {/* ── Sales trend ── */}
+      <div className="bg-white rounded-2xl border border-[#BBD5DA] p-5 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-bold text-gray-900 text-sm">Sales Trend</h3>
+          <div className="flex gap-1">
+            {(['daily', 'weekly', 'monthly'] as const).map(g => (
+              <button key={g} onClick={() => setGranularity(g)}
+                className={`px-3 py-1 rounded-lg text-xs font-semibold ${granularity === g ? 'bg-teal-600 text-white' : 'bg-[#F5F5F5] text-gray-600'}`}>
+                {g[0].toUpperCase() + g.slice(1)}
+              </button>
+            ))}
+          </div>
+        </div>
+        <ResponsiveContainer width="100%" height={260}>
+          <LineChart data={trend}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#F5F5F5" />
+            <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+            <YAxis tick={{ fontSize: 11 }} />
+            <Tooltip />
+            <Line type="monotone" dataKey="revenue" stroke="#0d9488" strokeWidth={2} dot={false} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* ── Top/Least selling, category pie, revenue by month ── */}
+      <div className="grid lg:grid-cols-2 gap-5">
+        {[{ title: 'Top Selling Products', rows: analytics.topProducts }, { title: 'Least Selling Products', rows: analytics.leastProducts }]
+          .map(({ title, rows }) => (
+          <div key={title} className="bg-white rounded-2xl border border-[#BBD5DA] shadow-sm overflow-hidden">
+            <div className="px-5 py-4 border-b border-[#BBD5DA]"><h3 className="font-bold text-gray-900 text-sm">{title}</h3></div>
+            <table className="w-full text-sm">
+              <thead><tr className="text-xs text-gray-400 uppercase">
+                <th className="text-left px-5 py-2">Product</th><th className="text-right px-5 py-2">Qty</th><th className="text-right px-5 py-2">Revenue</th>
+              </tr></thead>
+              <tbody>
+                {rows.map((r: any) => (
+                  <tr key={r.title} className="border-t border-[#F5F5F5]">
+                    <td className="px-5 py-2.5 font-medium text-gray-800">{r.title}</td>
+                    <td className="px-5 py-2.5 text-right">{r.qty}</td>
+                    <td className="px-5 py-2.5 text-right text-teal-700 font-semibold">₹{r.revenue.toLocaleString('en-IN')}</td>
+                  </tr>
+                ))}
+                {rows.length === 0 && <tr><td colSpan={3} className="text-center text-gray-400 py-6">No data</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        ))}
+
+        <div className="bg-white rounded-2xl border border-[#BBD5DA] p-5 shadow-sm">
+          <h3 className="font-bold text-gray-900 text-sm mb-4">Category-wise Sales</h3>
+          <ResponsiveContainer width="100%" height={260}>
+            <PieChart>
+              <Pie data={analytics.categoryWise} dataKey="revenue" nameKey="name" outerRadius={90} label>
+                {analytics.categoryWise.map((_: any, i: number) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+              </Pie>
+              <Tooltip /><Legend />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-[#BBD5DA] p-5 shadow-sm">
+          <h3 className="font-bold text-gray-900 text-sm mb-4">Revenue by Month</h3>
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={analytics.revenueByMonth}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#F5F5F5" />
+              <XAxis dataKey="month" tick={{ fontSize: 11 }} /><YAxis tick={{ fontSize: 11 }} /><Tooltip />
+              <Bar dataKey="revenue" fill="#0d9488" radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* ── Best sales day ── */}
+      {analytics.bestDay && (
+        <div className="bg-white rounded-2xl border border-[#BBD5DA] p-5 shadow-sm">
+          <h3 className="font-bold text-gray-900 text-sm mb-2">Best Sales Day</h3>
+          <p className="text-2xl font-bold text-teal-700">
+            {new Date(analytics.bestDay.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+          </p>
+          <p className="text-sm text-gray-500 mt-1">Revenue: ₹{analytics.bestDay.revenue.toLocaleString('en-IN')} · Orders: {analytics.bestDay.orders}</p>
+        </div>
+      )}
+
+      {/* ── Store verification notice (original) ── */}
       {!store?.isVerified && (
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
           <AlertCircle size={18} className="text-amber-600 mt-0.5 shrink-0" />
@@ -1804,7 +1963,7 @@ export default function StoreDashboard() {
             )}
 
             {/* ── Panels ────────────────────────────────────────────────── */}
-            {tab === 'overview'   && <OverviewTab store={store} offers={offers} orders={orders} products={products} onTabSwitch={setTab} />}
+            {tab === 'overview'   && <OverviewTab store={store} offers={offers} orders={orders} products={products} categories={categories} onTabSwitch={setTab} />}
             {tab === 'products'   && <ProductsTab products={products} categories={categories} storeId={store?._id} token={token!} onRefresh={loadData} />}
             {tab === 'categories' && <CategoriesTab categories={categories} token={token!} onRefresh={loadData} />}
             {tab === 'orders'     && <OrdersTab orders={orders} token={token!} onRefresh={loadData} />}

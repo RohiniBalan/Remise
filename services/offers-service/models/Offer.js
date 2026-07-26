@@ -21,7 +21,7 @@ const offerSchema = new mongoose.Schema({
   // Offer details
   title:       { type: String, required: true, trim: true },
   description: { type: String, default: '' },
-  image:       { type: String, required: true },   // uploaded image path
+  image:       { type: String, required: true },   
   category:    { type: String, default: 'General' },
 
   // Pricing
