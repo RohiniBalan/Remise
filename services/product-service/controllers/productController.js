@@ -52,6 +52,7 @@ const createProduct = async (req, res) => {
     if (!isAdmin) {
       data.ownerId = req.user.id;
       data.storeId = req.body.storeId || req.headers['x-store-id'] || null;
+      data.ownerRole = req.user.role;
     }
 
     const product = await Product.create(data);
@@ -78,12 +79,13 @@ const createProduct = async (req, res) => {
 
 const getProducts = async (req, res) => {
   try {
-    const { category, availability, featured, search, storeId, page = 1, limit = 50 } = req.query;
+    const { category, availability, featured, search, storeId, ownerRole, page = 1, limit = 50 } = req.query;
     const filter = {};
     if (category)    filter.category     = category;
     if (availability) filter.availability = availability;
     if (featured !== undefined) filter.featured = featured === 'true';
     if (storeId)     filter.storeId      = storeId;
+    if (ownerRole)     filter.ownerRole    = ownerRole;
     if (search) filter.$or = [
       { title:       { $regex: search, $options: 'i' } },
       { description: { $regex: search, $options: 'i' } },

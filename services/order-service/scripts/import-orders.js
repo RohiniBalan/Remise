@@ -15,7 +15,8 @@ mongoose
 
 
     const workbook = XLSX.readFile(
-        path.join(__dirname, "orders.xlsx")
+        path.join(__dirname, "orders.xlsx"),
+         { cellDates: true } 
     );
 
 
@@ -68,6 +69,8 @@ mongoose
             productId: row.productId,
 
             title: row.itemTitle,
+
+            brand: row.brand,
 
             price: Number(row.itemPrice),
 

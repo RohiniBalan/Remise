@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 
 export const AuthContext = createContext();
 
@@ -72,13 +72,18 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('token');
   };
 
-  const value = {
-    user,
+  const value = useMemo(
+    ()=> ({
+      user,
     token,
     loading,
     login,
     logout
-  };
+    }),
+    [user, token, loading]
+  );
+    
+
 
   return (
     <AuthContext.Provider value={value}>

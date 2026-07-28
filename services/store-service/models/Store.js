@@ -26,6 +26,12 @@ const storeSchema = new mongoose.Schema({
     enum: ['Food & Beverages', 'Grocery', 'Fashion', 'Electronics', 'Pharmacy', 'Toys', 'Home & Living', 'Beauty', 'Sports', 'Other'],
     default: 'Other'
   },
+  storeType: {
+  type: String,
+  enum: ['store', 'whole_saler', 'home_business'],
+  default: 'store',
+  index: true,
+},
 
   // Physical address
   address: {

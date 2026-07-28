@@ -22,7 +22,7 @@ const registerStore = async (req, res) => {
       return res.status(400).json({ success: false, message: 'You already have a registered store.' });
     }
 
-    const { name, description, phone, email, category, address, latitude, longitude, ownerName, upiId } = req.body;
+    const { name, description, phone, email, category, address, latitude, longitude, ownerName, upiId, storeType } = req.body;
 
     if (!latitude || !longitude) {
       return res.status(400).json({ success: false, message: 'Store location (latitude & longitude) is required.' });
@@ -55,6 +55,7 @@ const registerStore = async (req, res) => {
       phone,
       email,
       category,
+      storeType: storeType || 'store',
       address: typeof address === 'string' ? JSON.parse(address) : (address || {}),
       location: {
         type: 'Point',
@@ -71,7 +72,7 @@ const registerStore = async (req, res) => {
       const authUrl = process.env.AUTH_SERVICE_URL || 'http://localhost:3001';
       const upgradeRes = await axios.post(
         `${authUrl}/api/auth/internal/upgrade-role`,
-        { userId: ownerId },
+        { userId: ownerId, role: storeType },
         { headers: { 'x-internal-secret': process.env.INTERNAL_SECRET } }
       );
       newToken = upgradeRes.data?.data?.token || null;

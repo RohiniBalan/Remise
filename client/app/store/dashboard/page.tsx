@@ -16,6 +16,7 @@ import { AuthContext }  from '../../context/AuthContext';
 import { storeApi }     from '../../api-services/storeApi';
 import { offersApi }    from '../../api-services/offersApi';
 import { productApi }   from '../../api-services/productApi';
+import { orderApi } from '../../api-services/orderApi';
 import { smartOrderApi } from '../../api-services/smartOrderApi';
 import UserAvatarMenu   from '../../components-main/UserAvatarMenu';
 import NotificationBell from '../../components-main/NotificationBell';
@@ -27,7 +28,7 @@ import { useSpeechRecognition, VOICE_LANGUAGES, VoiceLanguageOption } from '../.
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type Tab = 'overview' | 'products' | 'categories' | 'orders' | 'offers' | 'settings';
+type Tab = 'overview' | 'products' | 'categories' | 'orders' | 'offers' | 'suppliers' | 'settings';
 
 const ORDER_STATUSES = ['Pending','Confirmed','Ready','Out for Delivery','Delivered','Cancelled'] as const;
 const STATUS_STYLE: Record<string, string> = {
@@ -472,7 +473,7 @@ function OverviewTab({ store, offers, orders, products, categories, onTabSwitch 
       </div>
 
       {/* ── Sales trend ── */}
-      <div className="bg-white rounded-2xl border border-[#BBD5DA] p-5 shadow-sm">
+       <div className="bg-white rounded-2xl border border-[#BBD5DA] p-5 shadow-sm">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-bold text-gray-900 text-sm">Sales Trend</h3>
           <div className="flex gap-1">
@@ -554,7 +555,6 @@ function OverviewTab({ store, offers, orders, products, categories, onTabSwitch 
         </div>
       )}
 
-      {/* ── Store verification notice (original) ── */}
       {!store?.isVerified && (
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
           <AlertCircle size={18} className="text-amber-600 mt-0.5 shrink-0" />
@@ -1590,6 +1590,259 @@ function OffersTab({ offers, token, onRefresh }: any) {
   );
 }
 
+// ── Suppliers Tab ──────────────────────────────────────────────────────────────
+function SuppliersTab({ token, store }: any) {
+  const [supplierType, setSupplierType] = useState<'whole_saler' | 'home_business'>('whole_saler');
+  const [products,     setProducts]     = useState<any[]>([]);
+  const [loading,      setLoading]      = useState(true);
+  const [search,       setSearch]       = useState('');
+  const [cart,         setCart]         = useState<Record<string, number>>({}); // productId -> qty
+  const [placing,      setPlacing]      = useState(false);
+  const [placedMsg,    setPlacedMsg]    = useState('');
+  const [error,        setError]        = useState('');
+  const [myOrders,     setMyOrders]     = useState<any[]>([]);
+  const [view,         setView]         = useState<'browse' | 'orders'>('browse');
+
+  const loadProducts = useCallback(async () => {
+    setLoading(true); setError('');
+    try {
+      const res = await productApi.getSuppliers(supplierType, { search: search || undefined });
+      setProducts(res.data.data || []);
+    } catch {
+      setError('Could not load suppliers right now. Try again shortly.');
+    } finally { setLoading(false); }
+  }, [supplierType, search]);
+
+  const loadMyOrders = useCallback(async () => {
+    if (!store?.ownerId) return;
+    try {
+      const res = await orderApi.getMyWholesaleOrders(store.ownerId, token);
+      setMyOrders(res.data.data || []);
+    } catch { /* non-fatal */ }
+  }, [store, token]);
+
+  useEffect(() => { loadProducts(); }, [loadProducts]);
+  useEffect(() => { if (view === 'orders') loadMyOrders(); }, [view, loadMyOrders]);
+
+  // Best matching bulk-price tier for a given quantity
+  const tierFor = (product: any, qty: number) => {
+    if (!product.bulkPricing?.length) return { price: product.discountedPrice || product.price, label: null };
+    const sorted = [...product.bulkPricing].sort((a, b) => b.minQty - a.minQty);
+    const match = sorted.find((t: any) => qty >= t.minQty);
+    if (!match) return { price: product.discountedPrice || product.price, label: null };
+    return { price: match.price, label: `${match.minQty}+ units @ ₹${match.price}` };
+  };
+
+  const setQty = (product: any, qty: number) => {
+    const moq = product.moq || 1;
+    const clamped = qty <= 0 ? 0 : Math.max(qty, moq);
+    setCart(c => {
+      const next = { ...c };
+      if (clamped === 0) delete next[product._id];
+      else next[product._id] = clamped;
+      return next;
+    });
+  };
+
+  const cartItems = Object.entries(cart).map(([id, qty]) => {
+    const product = products.find(p => p._id === id);
+    if (!product) return null;
+    const { price, label } = tierFor(product, qty);
+    return { product, qty, price, label };
+  }).filter(Boolean) as { product: any; qty: number; price: number; label: string | null }[];
+
+  const cartTotal = cartItems.reduce((sum, i) => sum + i.price * i.qty, 0);
+
+  const handlePlaceOrder = async () => {
+    if (!cartItems.length) return;
+    setPlacing(true); setError(''); setPlacedMsg('');
+    try {
+      // Group by supplier storeId — one order per supplier
+      const bySupplier: Record<string, typeof cartItems> = {};
+      cartItems.forEach(i => {
+        const sid = i.product.storeId || i.product.ownerId;
+        (bySupplier[sid] = bySupplier[sid] || []).push(i);
+      });
+
+      for (const [supplierStoreId, items] of Object.entries(bySupplier)) {
+        await orderApi.placeWholesaleOrder({
+          supplierStoreId,
+          supplierStoreName: items[0].product.storeName || null,
+          supplierRole: items[0].product.ownerRole,
+          contactEmail: store?.email,
+          items: items.map(i => ({
+            productId: i.product._id,
+            title: i.product.title,
+            price: i.price,
+            quantity: i.qty,
+            image: i.product.imageUrl,
+            moq: i.product.moq,
+            tierLabel: i.label,
+          })),
+        }, token);
+      }
+
+      setCart({});
+      setPlacedMsg('Order(s) placed successfully!');
+      setTimeout(() => setPlacedMsg(''), 4000);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to place order.');
+    } finally { setPlacing(false); }
+  };
+
+  const inputCls = 'w-full bg-white border border-[#BBD5DA] rounded-xl px-3 py-2.5 text-sm text-gray-800 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 transition placeholder-gray-400';
+
+  return (
+    <div>
+      {/* View toggle */}
+      <div className="flex gap-2 mb-5">
+        <button onClick={() => setView('browse')}
+          className={`px-4 py-2 rounded-xl text-sm font-semibold transition ${view === 'browse' ? 'bg-[#FF0000] text-white' : 'bg-white border border-[#BBD5DA] text-gray-600'}`}>
+          Browse Suppliers
+        </button>
+        <button onClick={() => setView('orders')}
+          className={`px-4 py-2 rounded-xl text-sm font-semibold transition ${view === 'orders' ? 'bg-[#FF0000] text-white' : 'bg-white border border-[#BBD5DA] text-gray-600'}`}>
+          My Orders
+        </button>
+      </div>
+
+      {error && <p className="text-sm text-[#FF0000] bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-4 flex items-center gap-2"><AlertCircle size={14}/>{error}</p>}
+      {placedMsg && <p className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-xl px-4 py-3 mb-4 flex items-center gap-2"><CheckCircle size={14}/>{placedMsg}</p>}
+
+      {view === 'browse' ? (
+        <div className="grid lg:grid-cols-3 gap-5">
+          {/* Left: catalog */}
+          <div className="lg:col-span-2 space-y-4">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex gap-2">
+                <button onClick={() => setSupplierType('whole_saler')}
+                  className={`px-4 py-2.5 rounded-xl text-sm font-semibold border transition ${supplierType === 'whole_saler' ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-gray-600 border-[#BBD5DA]'}`}>
+                  📦 Wholesalers
+                </button>
+                <button onClick={() => setSupplierType('home_business')}
+                  className={`px-4 py-2.5 rounded-xl text-sm font-semibold border transition ${supplierType === 'home_business' ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-gray-600 border-[#BBD5DA]'}`}>
+                  🏠 Home Business
+                </button>
+              </div>
+              <div className="relative flex-1">
+                <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search products…" className={`${inputCls} pl-9`} />
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="bg-white rounded-2xl border border-[#BBD5DA] py-16 text-center shadow-sm">
+                <RefreshCw size={24} className="mx-auto text-teal-600 animate-spin mb-3" />
+                <p className="text-sm text-gray-500">Loading catalog…</p>
+              </div>
+            ) : products.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-[#BBD5DA] py-16 text-center shadow-sm">
+                <Package size={36} className="mx-auto text-gray-200 mb-3" />
+                <p className="text-sm text-gray-500">No products from this supplier type yet.</p>
+              </div>
+            ) : (
+              <div className="grid sm:grid-cols-2 gap-4">
+                {products.map(p => {
+                  const qty = cart[p._id] || 0;
+                  const { price, label } = tierFor(p, Math.max(qty, p.moq || 1));
+                  const img = p.imageUrl ? (p.imageUrl.startsWith('http') ? p.imageUrl : `${API}${p.imageUrl}`) : (p.images?.[0] || '');
+                  return (
+                    <div key={p._id} className="bg-white rounded-2xl border border-[#BBD5DA] overflow-hidden shadow-sm">
+                      <div className="aspect-square bg-[#F5F5F5]">
+                        {img ? <img src={img} alt={p.title} className="w-full h-full object-cover" />
+                             : <div className="w-full h-full flex items-center justify-center"><Package size={32} className="text-gray-200" /></div>}
+                      </div>
+                      <div className="p-3.5 space-y-2">
+                        <p className="font-semibold text-gray-900 text-sm truncate">{p.title}</p>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-teal-700 font-bold text-base">₹{price}</span>
+                          <span className="text-[10px] text-gray-400">/ unit</span>
+                        </div>
+                        {label && <p className="text-[10px] text-teal-600 font-medium">{label}</p>}
+                        <p className="text-[10px] text-gray-400">MOQ: {p.moq || 1} units</p>
+                        {p.bulkPricing?.length > 0 && (
+                          <div className="text-[10px] text-gray-400 space-y-0.5">
+                            {p.bulkPricing.map((t: any, i: number) => <p key={i}>{t.minQty}+ units — ₹{t.price}</p>)}
+                          </div>
+                        )}
+                        <div className="flex items-center gap-2 pt-1">
+                          <div className="flex items-center border border-[#BBD5DA] rounded-lg">
+                            <button onClick={() => setQty(p, qty ? qty - 1 : 0)} className="w-8 h-8 flex items-center justify-center text-gray-500 hover:bg-[#F5F5F5]">−</button>
+                            <span className="w-10 text-center text-sm font-semibold">{qty}</span>
+                            <button onClick={() => setQty(p, qty ? qty + 1 : p.moq || 1)} className="w-8 h-8 flex items-center justify-center text-gray-500 hover:bg-[#F5F5F5]">+</button>
+                          </div>
+                          {qty === 0 && (
+                            <button onClick={() => setQty(p, p.moq || 1)} className="flex-1 text-xs font-semibold bg-[#FF0000] hover:bg-[#e00000] text-white py-2 rounded-lg transition">
+                              Add
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Right: cart / order summary */}
+          <div className="bg-white rounded-2xl border border-[#BBD5DA] p-5 shadow-sm h-fit sticky top-24">
+            <h3 className="font-bold text-gray-900 text-sm mb-4">Order Summary</h3>
+            {cartItems.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-8">Your cart is empty.</p>
+            ) : (
+              <>
+                <div className="space-y-3 mb-4 max-h-80 overflow-y-auto">
+                  {cartItems.map(i => (
+                    <div key={i.product._id} className="flex justify-between text-sm">
+                      <div className="min-w-0 pr-2">
+                        <p className="font-medium text-gray-800 truncate">{i.product.title}</p>
+                        <p className="text-xs text-gray-400">{i.qty} × ₹{i.price}</p>
+                      </div>
+                      <p className="font-semibold text-teal-700 shrink-0">₹{(i.price * i.qty).toLocaleString('en-IN')}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="border-t border-[#F5F5F5] pt-3 flex justify-between mb-4">
+                  <span className="font-bold text-gray-900 text-sm">Total</span>
+                  <span className="font-bold text-teal-700 text-lg">₹{cartTotal.toLocaleString('en-IN')}</span>
+                </div>
+                <button onClick={handlePlaceOrder} disabled={placing}
+                  className="w-full flex items-center justify-center gap-2 py-3 bg-[#FF0000] hover:bg-[#e00000] disabled:opacity-50 text-white font-semibold rounded-xl text-sm transition">
+                  {placing ? <><RefreshCw size={14} className="animate-spin" /> Placing…</> : 'Place Order'}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {myOrders.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-[#BBD5DA] py-16 text-center shadow-sm">
+              <ShoppingBag size={36} className="mx-auto text-gray-200 mb-3" />
+              <p className="text-sm text-gray-500">No supplier orders yet.</p>
+            </div>
+          ) : myOrders.map((o: any) => (
+            <div key={o._id} className="bg-white rounded-2xl border border-[#BBD5DA] p-5 shadow-sm">
+              <div className="flex justify-between items-start mb-2">
+                <div>
+                  <p className="font-bold text-gray-900 text-sm">{o.storeName || 'Supplier'}</p>
+                  <p className="text-xs text-gray-400">{o.orderId}</p>
+                </div>
+                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${STATUS_STYLE[o.orderStatus] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>{o.orderStatus}</span>
+              </div>
+              <div className="text-xs text-gray-500 space-y-0.5 mb-2">
+                {o.items?.map((it: any, i: number) => <p key={i}>{it.quantity}× {it.title} {it.tierLabel ? `(${it.tierLabel})` : ''}</p>)}
+              </div>
+              <p className="text-sm font-bold text-teal-700">₹{o.totalAmount?.toLocaleString('en-IN')}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Settings Tab ──────────────────────────────────────────────────────────────
 function SettingsTab({ store, token, onRefresh }: any) {
   const [form, setForm] = useState({
@@ -1726,9 +1979,11 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'products',    label: 'Products',    icon: <Package size={15} /> },
   { id: 'categories',  label: 'Categories',  icon: <Layers size={15} /> },
   { id: 'orders',      label: 'Orders',      icon: <ShoppingBag size={15} /> },
+  { id: 'suppliers',   label: 'Order Stock', icon: <Truck size={15} /> },
   { id: 'offers',      label: 'Offers',      icon: <Tag size={15} /> },
   { id: 'settings',    label: 'Settings',    icon: <Settings size={15} /> },
 ];
+
 
 // ── Main Dashboard ────────────────────────────────────────────────────────────
 export default function StoreDashboard() {
@@ -1843,6 +2098,12 @@ export default function StoreDashboard() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
+    useEffect(() => {
+    if (user && !['store_owner', 'user'].includes(user.role)) {
+      router.push('/seller/dashboard');
+    }
+  }, [user, router]);
+  
   if (loading) return (
     <div className="min-h-screen bg-[#F5F5F5] flex items-center justify-center">
       <div className="flex flex-col items-center gap-4">
@@ -1967,6 +2228,7 @@ export default function StoreDashboard() {
             {tab === 'products'   && <ProductsTab products={products} categories={categories} storeId={store?._id} token={token!} onRefresh={loadData} />}
             {tab === 'categories' && <CategoriesTab categories={categories} token={token!} onRefresh={loadData} />}
             {tab === 'orders'     && <OrdersTab orders={orders} token={token!} onRefresh={loadData} />}
+            {tab === 'suppliers'  && <SuppliersTab token={token!} store={store} />}
             {tab === 'offers'     && <OffersTab offers={offers} token={token!} onRefresh={loadData} />}
             {tab === 'settings'   && <SettingsTab store={store} token={token!} onRefresh={loadData} />}
           </main>

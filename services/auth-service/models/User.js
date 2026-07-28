@@ -16,7 +16,7 @@ const userSchema = new mongoose.Schema({
   dob: { type: Date, default: null },
   gender: { type: String, default: null },
   profileData: { type: Object, default: {} },
-  role: { type: String, enum: ['user', 'store_owner', 'moderator', 'admin'], default: 'user' },
+  role: { type: String, enum: ['user', 'store_owner', 'moderator', 'admin', 'whole_saler', 'home_business'], default: 'user' },
   cart: { type: [cartItemSchema], default: [], select: false },
   isEmailVerified:          { type: Boolean, default: false },
   emailVerificationToken:   { type: String,  default: null, select: false },

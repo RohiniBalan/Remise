@@ -15,7 +15,8 @@ mongoose
 
 
     const workbook = XLSX.readFile(
-        path.join(__dirname, "notifications.xlsx")
+        path.join(__dirname, "notifications.xlsx"),
+         { cellDates: true } 
     );
 
 

@@ -17,6 +17,10 @@ export const productApi = {
   getCategories: () =>
     axios.get(`${BASE}/api/categories`),
 
+  // productApi.ts — add
+ getSuppliers: (ownerRole: 'whole_saler' | 'home_business', params?: Record<string, string | number | undefined>) =>
+  axios.get(`${BASE}/api/products`, { params: { ...params, ownerRole } }),
+ 
   // ── Store Owner / Admin ──────────────────────────────────────────────────────
   create: (formData: FormData, token: string) =>
     axios.post(`${BASE}/api/products`, formData, { headers: auth(token) }),

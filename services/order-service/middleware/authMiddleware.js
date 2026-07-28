@@ -5,6 +5,16 @@ const protect = (req, res, next) => {
   next();
 };
 
+const authorize = (...roles) => (req, res, next) => {
+  if (!roles.includes(req.user?.role)) {
+    return res.status(403).json({
+      success: false,
+      message: `Role ${req.user?.role} is not authorized to access this route`,
+    });
+  }
+  next();
+};
+
 const verifyAdmin = (req, res, next) => {
   if (req.user?.role !== 'admin') {
     return res.status(403).json({ success: false, message: 'Access denied. Admin privileges required.' });
@@ -13,4 +23,4 @@ const verifyAdmin = (req, res, next) => {
   next();
 };
 
-module.exports = { protect, verifyAdmin };
+module.exports = { protect, authorize, verifyAdmin };

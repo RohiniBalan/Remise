@@ -3,8 +3,8 @@ const multer  = require('multer');
 const path    = require('path');
 const fs      = require('fs');
 const router = express.Router();
-const { getMyOrders, createOrder, getOrderByOrderId, updatePaymentStatus, getOrdersByStore, confirmQrPayment } = require('../controllers/orderController');
-const { protect } = require('../middleware/authMiddleware');
+const { getMyOrders, createOrder, getOrderByOrderId, updatePaymentStatus, getOrdersByStore, confirmQrPayment, createWholesaleOrder, getOrdersByBuyer, updateOrderStatus } = require('../controllers/orderController');
+const { protect, authorize } = require('../middleware/authMiddleware');
 
 // Multer setup for QR payment screenshots
 const uploadDir = path.join(__dirname, '..', 'uploads', 'payment-proofs');
@@ -34,5 +34,11 @@ router.get('/store/:storeId', protect, getOrdersByStore);
 router.post('/internal', createOrder);
 router.get('/internal/:orderId', getOrderByOrderId);
 router.patch('/internal/:orderId/payment-status', updatePaymentStatus);
+
+// Store owner: orders THEY placed as a buyer (mirrors getOrdersByStore, but from the buyer's side)
+router.post('/wholesale',        protect, authorize('store_owner'), createWholesaleOrder);
+router.get('/buyer/:buyerId',    protect, authorize('store_owner'), getOrdersByBuyer);
+
+router.patch('/:id/seller-status', protect, authorize('whole_saler', 'home_business'), updateOrderStatus);
 
 module.exports = router;

@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const orderItemSchema = new mongoose.Schema({
   productId: { type: String, required: true },
   title: { type: String, required: true },
+  brand: { type: String },
   price: { type: Number, required: true },
   quantity: { type: Number, required: true },
   image: { type: String },
@@ -40,6 +41,11 @@ const orderSchema = new mongoose.Schema({
   deliveryStatus: { type: String, enum: ['Pending', 'Ready', 'Out for Delivery', 'Delivered', 'Cancelled'], default: 'Pending' },
   // Set when paymentMethod is 'qr' and the customer uploads proof of payment
   paymentProofImage: { type: String, default: null },
+  moq:       { type: Number },
+  tierLabel: { type: String },
+  buyerId:   { type: mongoose.Schema.Types.ObjectId, default: null }, // the store owner placing the order
+  buyerRole: { type: String, enum: ['user', 'store_owner'], default: 'user' },
+  supplierRole: { type: String, enum: ['store_owner', 'whole_saler', 'home_business'], default: 'store_owner' },
   createdAt: { type: Date, default: Date.now },
 });
 

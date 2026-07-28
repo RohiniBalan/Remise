@@ -128,8 +128,55 @@ const confirmQrPayment = async (req, res) => {
   }
 };
 
+// Store owner: places a direct B2B order against a wholesaler/home business.
+const createWholesaleOrder = async (req, res) => {
+  try {
+    const { supplierStoreId, supplierStoreName, supplierRole, items, notes } = req.body;
+    if (!Array.isArray(items) || !items.length) {
+      return res.status(400).json({ success: false, message: 'items array is required' });
+    }
+
+    const totalAmount = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+    const orderId = `WS-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+
+    const order = await Order.create({
+      orderId,
+      buyerId: req.user.id,
+      buyerRole: req.user.role,
+      contactEmail: req.user.email || req.body.contactEmail,
+      storeId: supplierStoreId,
+      storeName: supplierStoreName,
+      supplierRole,
+      items,
+      totalAmount,
+      paymentMethod: 'wholesale_manual',
+      paymentStatus: 'PENDING',
+      orderStatus: 'Processing',
+      shippingAddress: req.body.shippingAddress,
+      billingAddress: req.body.billingAddress,
+    });
+
+    res.status(201).json({ success: true, message: 'Order placed successfully', data: order });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to place order', error: error.message });
+  }
+};
+
+// Store owner: orders THEY placed as a buyer (mirrors getOrdersByStore but from the buyer's side)
+const getOrdersByBuyer = async (req, res) => {
+  try {
+    res.set('Cache-Control', 'no-store');
+    const orders = await Order.find({ buyerId: req.params.buyerId }).sort({ createdAt: -1 });
+    res.status(200).json({ success: true, data: orders });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to fetch your orders' });
+  }
+};
+
 module.exports = {
   createOrder, getOrderByOrderId, updatePaymentStatus,
   getAllOrders, updateOrderStatus, getMyOrders,
   getOrdersByStore, confirmQrPayment,
+  createWholesaleOrder, getOrdersByBuyer,
 };
+

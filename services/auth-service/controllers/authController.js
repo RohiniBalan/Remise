@@ -34,7 +34,7 @@ const register = async (req, res, next) => {
     }
 
     // Only allow 'user' or 'store_owner' at self-registration — never 'admin' or 'moderator'
-    const allowedRoles = ['user', 'store_owner'];
+    const allowedRoles = ['user', 'store_owner', 'whole_saler', 'home_business'];
     const assignedRole = allowedRoles.includes(role) ? role : 'user';
 
     // Generate email verification token (raw → store hashed)
@@ -245,12 +245,15 @@ const upgradeToStoreOwner = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Forbidden.' });
     }
 
-    const { userId } = req.body;
+    const { userId, role } = req.body;
     if (!userId) return res.status(400).json({ success: false, message: 'userId is required.' });
+
+    const allowedTargetRoles = ['store_owner', 'whole_saler', 'home_business'];
+    const targetRole = allowedTargetRoles.includes(role) ? role : 'store_owner';
 
     const user = await User.findByIdAndUpdate(
       userId,
-      { role: 'store_owner' },
+      { role: targetRole },
       { new: true }
     );
     if (!user) return res.status(404).json({ success: false, message: 'User not found.' });

@@ -45,4 +45,11 @@ const verifyAdmin = (req, res, next) => {
   next();
 };
 
-module.exports = { protect, authorize, verifyAdmin };
+const verifyAdminOrStoreOwner = (req, res, next) => {
+  if (!['admin', 'store_owner'].includes(req.user?.role)) {
+    return res.status(403).json({ success: false, message: 'Access denied. Store owner or admin only.' });
+  }
+  next();
+};
+
+module.exports = { protect, authorize, verifyAdmin, verifyAdminOrStoreOwner  };

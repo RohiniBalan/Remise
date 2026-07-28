@@ -31,6 +31,7 @@ interface AuthResponse {
 function redirectDestination(role: string): string {
   if (role === "admin") return "/admin/dashboard";
   if (role === "store_owner") return "/store/dashboard";
+    if (role === "whole_saler" || role === "home_business") return "/seller/dashboard";
   return "/";
 }
 
@@ -42,7 +43,9 @@ function AuthPageContent() {
   const [error, setError] = useState("");
 
   // "Register as" toggle — only visible on sign-up tab
-  const [registerAs, setRegisterAs] = useState<"user" | "store_owner">("user");
+  const [registerAs, setRegisterAs] = useState<
+    "user" | "store_owner" | "whole_saler" | "home_business"
+  >("user");
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -239,12 +242,12 @@ function AuthPageContent() {
 
       {/* Auth card */}
       <div
-        className={`relative z-10 w-full max-w-md overflow-hidden rounded-[2.5rem] bg-gray-900/40 p-8 shadow-2xl backdrop-blur-xl ring-1 ring-white/10 sm:p-10 transition-all duration-500 ${showSuccess ? "scale-95 opacity-50 blur-sm" : "scale-100 opacity-100"}`}
+        className={`relative z-10 w-full max-w-md overflow-hidden rounded-[2.5rem] bg-gray-900/40 p-6 shadow-2xl backdrop-blur-xl ring-1 ring-white/10 sm:p-8 transition-all duration-500 ${showSuccess ? "scale-95 opacity-50 blur-sm" : "scale-100 opacity-100"}`}
       >
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
 
         {/* Header */}
-        <div className="mb-8 text-center">
+        <div className="mb-5 text-center">
           <h2 className="text-3xl font-medium tracking-tight text-white/90">
             {isLogin ? "Welcome Back" : "Create Account"}
           </h2>
@@ -253,37 +256,65 @@ function AuthPageContent() {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3">
           {/* ── Register As toggle (sign-up only) ─────────────────── */}
           <div
-            className={`transition-all duration-300 ease-in-out ${!isLogin ? "max-h-24 opacity-100 mb-2" : "max-h-0 opacity-0 overflow-hidden"}`}
+            className={`grid transition-all duration-300 ease-in-out ${
+              !isLogin
+                ? "grid-rows-[1fr] opacity-100 mb-3"
+                : "grid-rows-[0fr] opacity-0"
+            }`}
           >
-            <p className="text-xs text-gray-400 mb-2 text-center tracking-wide uppercase">
-              I am registering as
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setRegisterAs("user")}
-                className={`flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-medium border transition-all ${
-                  registerAs === "user"
-                    ? "bg-[#FF0000] text-white border-[#FF0000]"
-                    : "bg-black/20 text-gray-400 border-white/10 hover:border-white/20"
-                }`}
-              >
-                🛍️ Customer
-              </button>
-              <button
-                type="button"
-                onClick={() => setRegisterAs("store_owner")}
-                className={`flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-medium border transition-all ${
-                  registerAs === "store_owner"
-                    ? "bg-[#FF0000] text-white border-[#FF0000]"
-                    : "bg-black/20 text-gray-400 border-white/10 hover:border-white/20"
-                }`}
-              >
-                🏪 Store Owner
-              </button>
+            <div className="overflow-hidden">
+              <p className="text-xs text-gray-400 mb-2 text-center tracking-wide uppercase">
+                I am registering as
+              </p>
+              <div className="grid grid-cols-2 gap-2 mb-1">
+                <button
+                  type="button"
+                  onClick={() => setRegisterAs("user")}
+                  className={`flex items-center justify-center gap-1.5 py-2.5 rounded-2xl text-xs sm:text-sm font-medium border transition-all ${
+                    registerAs === "user"
+                      ? "bg-[#FF0000] text-white border-[#FF0000]"
+                      : "bg-black/20 text-gray-400 border-white/10 hover:border-white/20"
+                  }`}
+                >
+                  🛍️ Customer
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRegisterAs("store_owner")}
+                  className={`flex items-center justify-center gap-1.5 py-2.5 rounded-2xl text-xs sm:text-sm font-medium border transition-all ${
+                    registerAs === "store_owner"
+                      ? "bg-[#FF0000] text-white border-[#FF0000]"
+                      : "bg-black/20 text-gray-400 border-white/10 hover:border-white/20"
+                  }`}
+                >
+                  🏪 Store Owner
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRegisterAs("whole_saler")}
+                  className={`flex items-center justify-center gap-1.5 py-2.5 rounded-2xl text-xs sm:text-sm font-medium border transition-all ${
+                    registerAs === "whole_saler"
+                      ? "bg-[#FF0000] text-white border-[#FF0000]"
+                      : "bg-black/20 text-gray-400 border-white/10 hover:border-white/20"
+                  }`}
+                >
+                  📦 Wholesaler
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRegisterAs("home_business")}
+                  className={`flex items-center justify-center gap-1.5 py-2.5 rounded-2xl text-xs sm:text-sm font-medium border transition-all ${
+                    registerAs === "home_business"
+                      ? "bg-[#FF0000] text-white border-[#FF0000]"
+                      : "bg-black/20 text-gray-400 border-white/10 hover:border-white/20"
+                  }`}
+                >
+                  🏠 Home Business
+                </button>
+              </div>
             </div>
           </div>
 
@@ -413,7 +444,7 @@ function AuthPageContent() {
         </form>
 
         {/* Divider */}
-        <div className="relative my-8">
+        <div className="relative my-5">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-white/10" />
           </div>
@@ -466,7 +497,7 @@ function AuthPageContent() {
           </svg>
         </button>
 
-        <p className="mt-10 text-center text-sm text-gray-500">
+        <p className="mt-6 text-center text-sm text-gray-500">
           {isLogin ? "Don't have an account? " : "Already have an account? "}
           <button
             onClick={toggleMode}
