@@ -1,7 +1,24 @@
-export type LineItem = { productTitle: string; category: string; qty: number; revenue: number; createdAt: string };
+export type LineItem = { productTitle: string; category: string; brand: string; qty: number; revenue: number; createdAt: string };
+
+// Offer titles look like "10% off Charger" — there's no productId link on the
+// Offer model, so we match by finding a product whose title appears inside
+// the offer title. Longest match wins, in case multiple product names overlap
+// (e.g. "Charger" vs "Fast Charger").
+function matchProductByOfferTitle(offerTitle: string, products: any[]) {
+  const lower = (offerTitle || '').toLowerCase();
+  let best: any = null;
+  for (const p of products) {
+    const t = (p.title || '').toLowerCase();
+    if (t && lower.includes(t)) {
+      if (!best || t.length > best.title.length) best = p;
+    }
+  }
+  return best;
+}
 
 export function extractLineItems(orders: any[], products: any[]): LineItem[] {
-  const catByTitle = new Map(products.map((p: any) => [p.title, p.category || 'Uncategorized']));
+  const catByTitle   = new Map(products.map((p: any) => [p.title, p.category || 'Uncategorized']));
+  const brandByTitle = new Map(products.map((p: any) => [p.title, p.brand || 'Unknown']));
   const items: LineItem[] = [];
 
   for (const o of orders) {
@@ -12,13 +29,18 @@ export function extractLineItems(orders: any[], products: any[]): LineItem[] {
         items.push({
           productTitle: it.title,
           category: it.category || catByTitle.get(it.title) || 'Uncategorized',
+          brand: it.brand || brandByTitle.get(it.title) || 'Unknown',
           qty, revenue: price * qty, createdAt: o.createdAt,
         });
       }
     } else {
+      // Offer order — no direct product link, so fuzzy-match the offer title
+      // (e.g. "10% off Charger") against known product titles (e.g. "Charger").
+      const matched = matchProductByOfferTitle(o.offerTitle, products);
       items.push({
         productTitle: o.offerTitle || 'Unknown',
-        category: catByTitle.get(o.offerTitle) || 'Offer',
+        category: matched?.category || catByTitle.get(o.offerTitle) || 'Offer',
+        brand: matched?.brand || brandByTitle.get(o.offerTitle) || 'Unknown',
         qty: Number(o.quantity) || 1,
         revenue: Number(o.totalAmount) || 0,
         createdAt: o.createdAt,
@@ -44,8 +66,11 @@ export function getDateRange(key: DateRangeKey, custom?: { from: string; to: str
 }
 
 export function computeAnalytics(items: LineItem[]) {
-  const byProduct = new Map<string, { qty: number; revenue: number }>();
+  // Key by "productTitle||brand" so the same product from two brands (rare,
+  // but possible via offer fuzzy-matching) doesn't get merged into one row.
+  const byProduct = new Map<string, { title: string; brand: string; qty: number; revenue: number }>();
   const byCategory = new Map<string, { qty: number; revenue: number }>();
+  const byBrand = new Map<string, { qty: number; revenue: number }>();
   const byDay = new Map<string, { qty: number; revenue: number; orders: number }>();
   const byMonth = new Map<string, number>();
   let totalProductsSold = 0, totalRevenue = 0;
@@ -53,11 +78,15 @@ export function computeAnalytics(items: LineItem[]) {
   for (const it of items) {
     totalProductsSold += it.qty; totalRevenue += it.revenue;
 
-    const p = byProduct.get(it.productTitle) || { qty: 0, revenue: 0 };
-    p.qty += it.qty; p.revenue += it.revenue; byProduct.set(it.productTitle, p);
+    const key = `${it.productTitle}||${it.brand}`;
+    const p = byProduct.get(key) || { title: it.productTitle, brand: it.brand, qty: 0, revenue: 0 };
+    p.qty += it.qty; p.revenue += it.revenue; byProduct.set(key, p);
 
     const c = byCategory.get(it.category) || { qty: 0, revenue: 0 };
     c.qty += it.qty; c.revenue += it.revenue; byCategory.set(it.category, c);
+
+    const b = byBrand.get(it.brand) || { qty: 0, revenue: 0 };
+    b.qty += it.qty; b.revenue += it.revenue; byBrand.set(it.brand, b);
 
     const dayKey = it.createdAt.slice(0, 10);
     const d = byDay.get(dayKey) || { qty: 0, revenue: 0, orders: 0 };
@@ -67,16 +96,24 @@ export function computeAnalytics(items: LineItem[]) {
     byMonth.set(monthKey, (byMonth.get(monthKey) || 0) + it.revenue);
   }
 
-  const products = [...byProduct.entries()].map(([title, v]) => ({ title, ...v }));
+  // Each row now carries its own brand — this is what feeds the merged
+  // "Top/Least Selling Products" card (product + brand together, one card).
+  const products = [...byProduct.values()];
   const topProducts    = [...products].sort((a, b) => b.qty - a.qty).slice(0, 5);
   const leastProducts  = [...products].sort((a, b) => a.qty - b.qty).slice(0, 5);
+
+  // Kept for any chart/section that still wants brand aggregated on its own
+  // (e.g. the brandWise pie/bar chart) — not used by the merged cards.
+  const brands = [...byBrand.entries()].map(([brand, v]) => ({ brand, ...v }));
+  const brandWise = [...brands].sort((a, b) => b.revenue - a.revenue).slice(0, 8);
+
   const categoryWise   = [...byCategory.entries()].map(([name, v]) => ({ name, ...v }));
   const revenueByMonth = [...byMonth.entries()].sort().map(([month, revenue]) => ({ month, revenue }));
 
   let bestDay: { date: string; revenue: number; orders: number } | null = null;
   for (const [date, v] of byDay.entries()) if (!bestDay || v.revenue > bestDay.revenue) bestDay = { date, revenue: v.revenue, orders: v.orders };
 
-  return { totalProductsSold, totalRevenue, topProducts, leastProducts, categoryWise, revenueByMonth, bestDay, byDay };
+  return { totalProductsSold, totalRevenue, topProducts, leastProducts, brandWise, categoryWise, revenueByMonth, bestDay, byDay };
 }
 
 export function buildTrend(byDay: Map<string, { qty: number; revenue: number }>, granularity: 'daily' | 'weekly' | 'monthly') {

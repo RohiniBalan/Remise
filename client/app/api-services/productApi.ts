@@ -21,6 +21,9 @@ export const productApi = {
  getSuppliers: (ownerRole: 'whole_saler' | 'home_business', params?: Record<string, string | number | undefined>) =>
   axios.get(`${BASE}/api/products`, { params: { ...params, ownerRole } }),
  
+ getGroupedSuppliers: (ownerRole: 'whole_saler' | 'home_business', params?: Record<string, string | number | undefined>) =>
+  axios.get(`${BASE}/api/products/suppliers-grouped`, { params: { ...params, ownerRole } }),
+ 
   // ── Store Owner / Admin ──────────────────────────────────────────────────────
   create: (formData: FormData, token: string) =>
     axios.post(`${BASE}/api/products`, formData, { headers: auth(token) }),

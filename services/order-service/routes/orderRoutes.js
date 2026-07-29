@@ -36,8 +36,8 @@ router.get('/internal/:orderId', getOrderByOrderId);
 router.patch('/internal/:orderId/payment-status', updatePaymentStatus);
 
 // Store owner: orders THEY placed as a buyer (mirrors getOrdersByStore, but from the buyer's side)
-router.post('/wholesale',        protect, authorize('store_owner'), createWholesaleOrder);
-router.get('/buyer/:buyerId',    protect, authorize('store_owner'), getOrdersByBuyer);
+router.post('/wholesale',        protect, authorize('user','store_owner'), createWholesaleOrder);
+router.get('/buyer/:buyerId',    protect, authorize('user','store_owner'), getOrdersByBuyer);
 
 router.patch('/:id/seller-status', protect, authorize('whole_saler', 'home_business'), updateOrderStatus);
 

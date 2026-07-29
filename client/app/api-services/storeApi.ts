@@ -22,4 +22,7 @@ export const storeApi = {
 
   getAll: () =>
     axios.get(`${BASE}/api/stores`),
+
+  getByIds: (ids: string[]) =>
+  axios.post(`${BASE}/api/stores/batch`, { ids }),
 };

@@ -48,6 +48,8 @@ const createProduct = async (req, res) => {
     // tags / images may come as JSON strings from multipart forms
     if (typeof data.tags   === 'string') try { data.tags   = JSON.parse(data.tags);   } catch { data.tags   = data.tags.split(',').map(t => t.trim()).filter(Boolean); }
     if (typeof data.images === 'string') try { data.images = JSON.parse(data.images); } catch {}
+    if (typeof data.bulkPricing === 'string') try { data.bulkPricing = JSON.parse(data.bulkPricing); } catch { data.bulkPricing = []; }
+if (data.moq !== undefined) data.moq = Number(data.moq) || 1;
 
     if (!isAdmin) {
       data.ownerId = req.user.id;
@@ -165,6 +167,8 @@ const updateProduct = async (req, res) => {
     }
     if (typeof data.tags   === 'string') try { data.tags   = JSON.parse(data.tags);   } catch { data.tags   = data.tags.split(',').map(t => t.trim()).filter(Boolean); }
     if (typeof data.images === 'string') try { data.images = JSON.parse(data.images); } catch {}
+    if (typeof data.bulkPricing === 'string') try { data.bulkPricing = JSON.parse(data.bulkPricing); } catch { data.bulkPricing = []; }
+if (data.moq !== undefined) data.moq = Number(data.moq) || 1;
 
     const product = await Product.findOneAndUpdate(filter, data, { new: true, runValidators: true });
     if (!product) return res.status(404).json({ success: false, message: 'Product not found or access denied' });
@@ -292,9 +296,73 @@ const matchCart = async (req, res) => {
   }
 };
 
+// Interim identifier for cross-supplier grouping until Product has a real
+// SKU/model field. Normalizes brand+title so "HP Laptop 15.6"" and
+// "HP  Laptop 15.6 inch" from different sellers still merge reasonably,
+// but this is a heuristic — replace with product.sku once that field exists.
+const groupKey = (p) => {
+  const norm = (s) => (s || '').toLowerCase().trim().replace(/\s+/g, ' ');
+  return `${norm(p.brand)}|${norm(p.title)}`;
+};
+
+// Public: grouped supplier catalog — one entry per distinct product
+// (by groupKey), with each supplier's listing attached under `suppliers`.
+const getGroupedSuppliers = async (req, res) => {
+  try {
+    const { ownerRole, search, category } = req.query;
+    const filter = { availability: { $ne: 'Out Of Stock' } };
+    if (ownerRole) filter.ownerRole = ownerRole;
+    if (category)  filter.category  = category;
+    if (search) filter.$or = [
+      { title: { $regex: search, $options: 'i' } },
+      { brand: { $regex: search, $options: 'i' } },
+    ];
+
+    const listings = await Product.find(filter).lean();
+
+    const groups = {};
+    for (const p of listings) {
+      const key = groupKey(p);
+      if (!groups[key]) {
+        groups[key] = {
+          groupKey: key,
+          title: p.title,
+          brand: p.brand,
+          category: p.category,
+          image: p.imageUrl || (p.images && p.images[0]) || null,
+          suppliers: [],
+        };
+      }
+      groups[key].suppliers.push({
+        productId: p._id,
+        storeId: p.storeId,
+        ownerId: p.ownerId,
+        ownerRole: p.ownerRole,
+        price: p.discountedPrice ?? p.price,
+        moq: p.moq || 1,
+        bulkPricing: p.bulkPricing || [],
+        totalStock: p.totalStock,
+      });
+    }
+
+    const data = Object.values(groups).map(g => ({
+      ...g,
+      lowestPrice: Math.min(...g.suppliers.map(s => s.price)),
+      supplierCount: g.suppliers.length,
+      suppliers: g.suppliers.sort((a, b) => a.price - b.price),
+    }));
+
+    res.status(200).json({ success: true, count: data.length, data });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to fetch grouped suppliers', error: error.message });
+  }
+};
+
 module.exports = {
   upload,
   createProduct, getProducts, getProductById, getProductsByStore,
   getProductsByIds, updateProduct, deleteProduct, deductStock,
-  matchCart,
+  matchCart, getGroupedSuppliers,
 };
+
+

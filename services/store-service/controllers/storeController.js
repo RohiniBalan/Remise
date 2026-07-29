@@ -110,10 +110,10 @@ const getMyStore = async (req, res) => {
   }
 };
 
-// ─── GET /api/stores/nearby?lat=X&lng=Y&radius=5 ─────────────────────────────
+// ─── GET /api/stores/nearby?lat=X&lng=Y&radius=5&storeType=whole_saler ──────
 const getNearbyStores = async (req, res) => {
   try {
-    const { lat, lng, radius = 10 } = req.query;
+    const { lat, lng, radius = 10, storeType } = req.query;
 
     if (!lat || !lng) {
       return res.status(400).json({ success: false, message: 'lat and lng query params are required.' });
@@ -121,7 +121,7 @@ const getNearbyStores = async (req, res) => {
 
     const radiusInMeters = parseFloat(radius) * 1000;
 
-    const stores = await Store.find({
+    const filter = {
       isActive: true,
       location: {
         $near: {
@@ -129,7 +129,10 @@ const getNearbyStores = async (req, res) => {
           $maxDistance: radiusInMeters
         }
       }
-    }).select('-ownerId').limit(50);
+    };
+    if (storeType) filter.storeType = storeType;
+
+    const stores = await Store.find(filter).select('-ownerId').limit(50);
 
     // Attach distance to each store
     const storesWithDistance = stores.map(s => {
@@ -290,7 +293,22 @@ const verifyStore = async (req, res) => {
   }
 };
 
+// ─── POST /api/stores/batch — Public: resolve multiple store names/details ──
+// Mirrors productController.getProductsByIds. Never returns ownerId/phone/email.
+const getStoresByIds = async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || !ids.length) {
+      return res.status(400).json({ success: false, message: 'ids array is required' });
+    }
+    const stores = await Store.find({ _id: { $in: ids } }).select('name logo storeType isVerified');
+    res.json({ success: true, data: stores });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 module.exports = {
   registerStore, getMyStore, getStoreById, updateStore, getAllStores, verifyStore, syncOwnerRole,
-  getNearbyStores, getStoreInternal,
+  getNearbyStores, getStoreInternal, getStoresByIds
 };

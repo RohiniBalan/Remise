@@ -116,6 +116,12 @@ export default function NavbarHome({ theme, toggleTheme }: NavbarProps) {
   const displayName = userData?.fullname || userData?.name || 'User';
   const isLight     = theme === 'light';
 
+  // Suppliers is a customer-only bulk-buy feature — only shown to plain
+  // 'user' role accounts, never store owners/wholesalers/home businesses/admins.
+  const visibleNavLinks = userData?.role === 'user'
+    ? [...NAV_LINKS.slice(0, 2), { name: 'Suppliers', path: '/suppliers' }, ...NAV_LINKS.slice(2)]
+    : NAV_LINKS;
+
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <>
@@ -234,7 +240,7 @@ export default function NavbarHome({ theme, toggleTheme }: NavbarProps) {
         <nav className={`hidden lg:block border-b ${isLight ? 'bg-white border-[#BBD5DA]' : 'bg-gray-950 border-white/10'} transition-colors duration-300`}>
           <div className="max-w-7xl mx-auto px-6">
             <div className="flex items-center gap-0 h-10">
-              {NAV_LINKS.map(link => (
+              {visibleNavLinks.map(link => (
                 <Link
                   key={link.name}
                   href={link.path}
@@ -298,7 +304,7 @@ export default function NavbarHome({ theme, toggleTheme }: NavbarProps) {
 
               {/* Nav links */}
               <div className="px-4 pb-2 space-y-0.5">
-                {NAV_LINKS.map(link => (
+                {visibleNavLinks.map(link => (
                   <Link key={link.name} href={link.path}
                     onClick={() => setIsMobileMenuOpen(false)}
                     className={`flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition ${
