@@ -46,9 +46,42 @@ function scoreMatch(requestedName, productTitle) {
   return Math.min(1, overlap / reqTokens.length);
 }
 
+// Exact-ish brand match — normalized equality, or one contains the other
+// (handles "Lifebuoy" vs "Lifebuoy Total" style variants).
+function brandMatches(requestedBrand, productBrand) {
+  const reqB  = normalizeTerm(requestedBrand);
+  const prodB = normalizeTerm(productBrand);
+  if (!reqB || !prodB) return false;
+  return reqB === prodB || prodB.includes(reqB) || reqB.includes(prodB);
+}
+
 const MIN_CONFIDENCE = 0.5;
 
-function bestMatchForItem(requestedName, candidateProducts) {
+// requestedBrand is optional. When provided:
+//   1. Prefer candidates whose brand matches — pick the best title-scoring one among those.
+//   2. If none of those clear MIN_CONFIDENCE (or no brand match exists at all),
+//      fall back to the best title match from ANY brand, and flag it as substituted.
+// Returns { product, score, brandMatched, substituted, requestedBrand } or null.
+function bestMatchForItem(requestedName, candidateProducts, requestedBrand) {
+  const hasBrandRequest = requestedBrand && String(requestedBrand).trim();
+
+  if (hasBrandRequest) {
+    let brandBest = null;
+    let brandBestScore = 0;
+    for (const p of candidateProducts) {
+      if (!brandMatches(requestedBrand, p.brand)) continue;
+      const s = scoreMatch(requestedName, p.title);
+      if (s > brandBestScore) {
+        brandBestScore = s;
+        brandBest = p;
+      }
+    }
+    if (brandBest && brandBestScore >= MIN_CONFIDENCE) {
+      return { product: brandBest, score: brandBestScore, brandMatched: true, substituted: false };
+    }
+  }
+
+  // Fallback — best title match regardless of brand
   let best = null;
   let bestScore = 0;
   for (const p of candidateProducts) {
@@ -58,7 +91,15 @@ function bestMatchForItem(requestedName, candidateProducts) {
       best = p;
     }
   }
-  return bestScore >= MIN_CONFIDENCE ? { product: best, score: bestScore } : null;
+  if (bestScore < MIN_CONFIDENCE) return null;
+
+  return {
+    product: best,
+    score: bestScore,
+    brandMatched: !hasBrandRequest, // no brand was requested, so nothing to substitute
+    substituted: !!hasBrandRequest,  // brand was requested but this doesn't match it
+    requestedBrand: hasBrandRequest ? requestedBrand : undefined,
+  };
 }
 
-module.exports = { normalizeTerm, parseQuantity, scoreMatch, bestMatchForItem, MIN_CONFIDENCE };
+module.exports = { normalizeTerm, parseQuantity, scoreMatch, brandMatches, bestMatchForItem, MIN_CONFIDENCE };

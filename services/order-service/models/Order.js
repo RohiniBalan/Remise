@@ -7,6 +7,8 @@ const orderItemSchema = new mongoose.Schema({
   price: { type: Number, required: true },
   quantity: { type: Number, required: true },
   image: { type: String },
+  moq:       { type: Number },   
+  tierLabel: { type: String },
 }, { _id: false });
 
 const addressSchema = new mongoose.Schema({

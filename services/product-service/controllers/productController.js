@@ -240,13 +240,13 @@ const matchCart = async (req, res) => {
       const unmatched = [];
 
       for (const item of items) {
-        const found = bestMatchForItem(item.name, candidates);
+  const found = bestMatchForItem(item.name, candidates, item.brand);
         if (!found) {
           unmatched.push(item.name);
           continue;
         }
 
-        const { product, score } = found;
+        const { product, score, brandMatched, substituted } = found;
         const requestedQty = parseQuantity(item.quantity);
         const unitPrice = product.discountedPrice ?? product.price;
 
@@ -262,19 +262,22 @@ const matchCart = async (req, res) => {
         }
 
         matched.push({
-          requestedName: item.name,
-          requestedQuantity: item.quantity,
-          product: {
-            id: product._id,
-            title: product.title,
-            price: unitPrice,
-            image: product.imageUrl || (product.images && product.images[0]) || null,
-          },
-          matchScore: score,
-          lineTotal: unitPrice,
-        });
+  requestedName: item.name,
+  requestedBrand: item.brand || null,
+  requestedQuantity: item.quantity,
+  product: {
+    id: product._id,
+    title: product.title,
+    brand: product.brand || null,
+    price: unitPrice,
+    image: product.imageUrl || (product.images && product.images[0]) || null,
+  },
+  matchScore: score,
+  brandMatched: found.brandMatched,
+  substituted: found.substituted,
+  lineTotal: unitPrice,
+});
       }
-
       return {
         storeId,
         matched,

@@ -1,7 +1,7 @@
 import axios from 'axios';
 const BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
-export interface CartItem { name: string; quantity: string }
+export interface CartItem { name: string; brand?: string; quantity: string }
 
 export const smartOrderApi = {
 getNearbyStores: (lat: number, lng: number, radius = 10, storeType?: string) =>

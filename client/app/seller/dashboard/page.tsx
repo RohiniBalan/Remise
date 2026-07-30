@@ -127,6 +127,49 @@ type SellerScanForm = {
   bulkTiers: { minQty: string; price: string }[];
 };
 
+function groupSellerProductsByType(products: any[]) {
+  const byTitle: Record<
+    string,
+    {
+      title: string;
+      image: string;
+      category: string;
+      items: any[];
+    }
+  > = {};
+
+  for (const p of products) {
+    const key = (p.title || "")
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, " ");
+
+    if (!byTitle[key]) {
+      byTitle[key] = {
+        title: p.title,
+        image: p.imageUrl || p.images?.[0] || "",
+        category: p.category || "",
+        items: [],
+      };
+    }
+
+    byTitle[key].items.push(p);
+  }
+
+  return Object.values(byTitle).map((v) => ({
+    typeKey: v.title.toLowerCase().trim().replace(/\s+/g, " "),
+    title: v.title,
+    image: v.image,
+    category: v.category,
+    items: v.items,
+    brandCount: v.items.length,
+    totalStock: v.items.reduce(
+      (s: number, p: any) => s + (p.totalStock || 0),
+      0
+    ),
+  }));
+}
+
 // Shared by SellerSmartUploadModal and SellerBulkSmartUploadModal — same
 // field set as SellerProductModal's manual form (title, price, moq,
 // bulkPricing tiers etc.), so scanned/voice-filled products get the same
@@ -253,6 +296,8 @@ function SellerProductModal({
   token,
   onClose,
   onSaved,
+  initialTitle,
+  initialCategory,
 }: {
   product?: any;
   categories: any[];
@@ -260,14 +305,16 @@ function SellerProductModal({
   token: string;
   onClose: () => void;
   onSaved: (p: any) => void;
+  initialTitle?: string;
+  initialCategory?: string;
 }) {
   const isEdit = !!product;
   const [form, setForm] = useState({
-    title: product?.title || "",
+    title: product?.title || initialTitle || "",
     description: product?.description || "",
     price: product?.price || "",
     discountedPrice: product?.discountedPrice || "",
-    category: product?.category || "",
+    category: product?.category || initialCategory || "",
     brand: product?.brand || "",
     totalStock: product?.totalStock || "",
     availability: product?.availability || "In Stock",
@@ -1758,6 +1805,7 @@ function SellerProductsTab({
   const [showScan, setShowScan] = useState(false);
   const [showBulkScan, setShowBulkScan] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [selectedTypeKey, setSelectedTypeKey] = useState<string | null>(null);
 
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this product? This cannot be undone.")) return;
@@ -1779,6 +1827,131 @@ function SellerProductsTab({
       (p.brand || "").toLowerCase().includes(search.toLowerCase()),
   );
 
+  const productTypes = groupSellerProductsByType(filtered);
+  const selectedType = productTypes.find((t) => t.typeKey === selectedTypeKey) || null;
+
+  // ── Brand-management view (inside a product type) ──────────────────────
+  if (selectedType) {
+    return (
+      <div>
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setSelectedTypeKey(null)}
+              className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-teal-700 font-medium transition"
+            >
+              <ArrowLeft size={15} /> Back
+            </button>
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">{selectedType.title}</h2>
+              <p className="text-xs text-gray-400">
+                {selectedType.brandCount} brand{selectedType.brandCount !== 1 ? "s" : ""} · {selectedType.totalStock} total stock
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowAdd(true)}
+            className="flex items-center gap-2 bg-[#FF0000] hover:bg-[#e00000] text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition shrink-0"
+          >
+            <Plus size={15} /> Add Brand
+          </button>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-[#BBD5DA] shadow-sm overflow-hidden">
+          {selectedType.items.map((p: any, idx: number) => {
+            const img = p.imageUrl
+              ? p.imageUrl.startsWith("http")
+                ? p.imageUrl
+                : `${API}${p.imageUrl}`
+              : p.images?.[0] || "";
+            return (
+              <div
+                key={p._id}
+                className={`flex items-center gap-4 px-5 py-4 ${idx !== 0 ? "border-t border-[#F5F5F5]" : ""}`}
+              >
+                <div className="w-14 h-14 rounded-xl bg-[#F5F5F5] shrink-0 overflow-hidden">
+                  {img ? (
+                    <img src={img} alt={p.brand || p.title} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Package size={20} className="text-gray-300" />
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-gray-900 text-sm truncate">
+                    {p.brand || "Unbranded"}
+                  </p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-teal-700 font-bold text-sm">
+                      ₹{p.discountedPrice || p.price}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-0.5">
+                    MOQ: {p.moq || 1} · {p.bulkPricing?.length || 0} tier
+                    {p.bulkPricing?.length === 1 ? "" : "s"}
+                  </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span
+                      className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                        p.availability === "In Stock"
+                          ? "bg-green-50 text-green-700 border-green-200"
+                          : p.availability === "Out Of Stock"
+                            ? "bg-red-50 text-[#FF0000] border-red-200"
+                            : "bg-amber-50 text-amber-700 border-amber-200"
+                      }`}
+                    >
+                      {p.availability}
+                    </span>
+                    <span className={`text-[10px] font-medium ${p.totalStock < 5 ? "text-amber-600 font-bold" : "text-gray-400"}`}>
+                      Stock {p.totalStock}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => setEditProd(p)}
+                    className="text-gray-500 hover:text-teal-700 hover:bg-[#DFF1F1] p-2 rounded-lg transition"
+                  >
+                    <Edit2 size={16} />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(p._id)}
+                    disabled={deleting === p._id}
+                    className="text-gray-500 hover:text-[#FF0000] hover:bg-red-50 p-2 rounded-lg transition"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {(showAdd || editProd) && (
+          <SellerProductModal
+            product={editProd}
+            categories={categories}
+            storeId={storeId}
+            token={token}
+            initialTitle={!editProd ? selectedType.title : undefined}
+            initialCategory={!editProd ? selectedType.category : undefined}
+            onClose={() => {
+              setShowAdd(false);
+              setEditProd(null);
+            }}
+            onSaved={() => {
+              setShowAdd(false);
+              setEditProd(null);
+              onRefresh();
+            }}
+          />
+        )}
+      </div>
+    );
+  }
+
+  // ── Default view: product-type grid ─────────────────────────────────────
   return (
     <div>
       <div className="flex flex-col sm:flex-row gap-3 mb-5">
@@ -1814,7 +1987,7 @@ function SellerProductsTab({
         </button>
       </div>
 
-      {filtered.length === 0 ? (
+      {productTypes.length === 0 ? (
         <div className="bg-white rounded-2xl border border-[#BBD5DA] py-20 text-center shadow-sm">
           <Package size={40} className="mx-auto text-gray-200 mb-4" />
           <p className="text-lg font-semibold text-gray-700 mb-1">
@@ -1834,79 +2007,39 @@ function SellerProductsTab({
         </div>
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filtered.map((p: any) => {
-            const img = p.imageUrl
-              ? p.imageUrl.startsWith("http")
-                ? p.imageUrl
-                : `${API}${p.imageUrl}`
-              : p.images?.[0] || "";
+          {productTypes.map((pt) => {
+            const img = pt.image
+              ? pt.image.startsWith("http")
+                ? pt.image
+                : `${API}${pt.image}`
+              : "";
             return (
               <div
-                key={p._id}
-                className="bg-white rounded-2xl border border-[#BBD5DA] overflow-hidden shadow-sm hover:shadow-md transition group"
+                key={pt.typeKey}
+                className="bg-white rounded-2xl border border-[#BBD5DA] overflow-hidden shadow-sm hover:shadow-md transition"
               >
                 <div className="relative aspect-square bg-[#F5F5F5]">
                   {img ? (
-                    <img
-                      src={img}
-                      alt={p.title}
-                      className="w-full h-full object-cover"
-                    />
+                    <img src={img} alt={pt.title} className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
                       <Package size={36} className="text-gray-200" />
                     </div>
                   )}
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
-                    <button
-                      onClick={() => setEditProd(p)}
-                      className="bg-white text-gray-800 p-2 rounded-lg shadow hover:bg-[#DFF1F1] transition"
-                    >
-                      <Edit2 size={15} />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(p._id)}
-                      disabled={deleting === p._id}
-                      className="bg-white text-[#FF0000] p-2 rounded-lg shadow hover:bg-red-50 transition"
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                  </div>
                 </div>
                 <div className="p-3">
-                  <p className="text-xs text-gray-400 mb-0.5">
-                    {p.category || "—"}
+                  <p className="text-xs text-gray-400 mb-0.5">{pt.category || "—"}</p>
+                  <p className="font-semibold text-gray-900 text-sm truncate">{pt.title}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {pt.brandCount} Brand{pt.brandCount !== 1 ? "s" : ""}
                   </p>
-                  <p className="font-semibold text-gray-900 text-sm truncate">
-                    {p.title}
-                  </p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-teal-700 font-bold text-base">
-                      ₹{p.discountedPrice || p.price}
-                    </span>
-                  </div>
-                  <p className="text-[10px] text-gray-400 mt-1">
-                    MOQ: {p.moq || 1} · {p.bulkPricing?.length || 0} tier
-                    {p.bulkPricing?.length === 1 ? "" : "s"}
-                  </p>
-                  <div className="flex items-center justify-between mt-2">
-                    <span
-                      className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
-                        p.availability === "In Stock"
-                          ? "bg-green-50 text-green-700 border-green-200"
-                          : p.availability === "Out Of Stock"
-                            ? "bg-red-50 text-[#FF0000] border-red-200"
-                            : "bg-amber-50 text-amber-700 border-amber-200"
-                      }`}
-                    >
-                      {p.availability}
-                    </span>
-                    <span
-                      className={`text-[10px] font-medium ${p.totalStock < 5 ? "text-amber-600 font-bold" : "text-gray-400"}`}
-                    >
-                      {p.totalStock} in stock
-                    </span>
-                  </div>
+                  <p className="text-xs text-gray-400">Total Stock: {pt.totalStock}</p>
+                  <button
+                    onClick={() => setSelectedTypeKey(pt.typeKey)}
+                    className="w-full mt-2 text-xs font-semibold bg-teal-600 hover:bg-teal-700 text-white py-2 rounded-lg transition"
+                  >
+                    Manage Brands →
+                  </button>
                 </div>
               </div>
             );

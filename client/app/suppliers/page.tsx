@@ -21,6 +21,10 @@ import SupplierCompareDrawer, {
   GroupedSupplier,
 } from "../components-main/SupplierCompareDrawer";
 import SupplierCartOrderModal from "../components-main/SupplierCartOrderModal";
+import SupplierBrandListDrawer, {
+  TitleGroup,
+  groupByTitle,
+} from "../components-main/SupplierBrandListDrawer";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -100,6 +104,8 @@ export default function SuppliersPage() {
   const [view, setView] = useState<"browse" | "orders">("browse");
   const [compareGroup, setCompareGroup] = useState<ProductGroup | null>(null);
   const [showCartOrderFlow, setShowCartOrderFlow] = useState(false);
+  const [selectedTitleGroup, setSelectedTitleGroup] =
+    useState<TitleGroup | null>(null);
 
   useEffect(() => {
     productApi
@@ -178,6 +184,8 @@ export default function SuppliersPage() {
   const supplierCategories = Array.from(
     new Set(allCategories.map((c: any) => c.name).filter(Boolean)),
   ) as string[];
+
+  const titleGroups = groupByTitle(groups);
 
   const handleAddToCart = (
     supplier: GroupedSupplier,
@@ -346,22 +354,22 @@ export default function SuppliersPage() {
                   </div>
                 ) : (
                   <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {groups.map((g) => {
-                      const img = g.image
-                        ? g.image.startsWith("http")
-                          ? g.image
-                          : `${API}${g.image}`
+                    {titleGroups.map((tg) => {
+                      const img = tg.image
+                        ? tg.image.startsWith("http")
+                          ? tg.image
+                          : `${API}${tg.image}`
                         : "";
                       return (
                         <div
-                          key={g.groupKey}
+                          key={tg.titleKey}
                           className={`rounded-2xl border overflow-hidden shadow-sm ${isLight ? "bg-white border-[#BBD5DA]" : "bg-white/5 border-white/10"}`}
                         >
                           <div className="aspect-[4/3] bg-[#F5F5F5]">
                             {img ? (
                               <img
                                 src={img}
-                                alt={g.title}
+                                alt={tg.title}
                                 className="w-full h-full object-cover"
                               />
                             ) : (
@@ -374,31 +382,27 @@ export default function SuppliersPage() {
                             <p
                               className={`font-semibold text-sm truncate ${isLight ? "text-gray-900" : "text-white"}`}
                             >
-                              {g.title}
+                              {tg.title}
+                            </p>
+                            <p className="text-[11px] text-gray-500">
+                              Available Brands{" "}
+                              <span className="font-semibold">
+                                ({tg.brandCount})
+                              </span>
                             </p>
                             <p className="text-[10px] text-gray-400">
-                              Lowest Price
+                              Starting from
                             </p>
                             <div className="flex items-baseline gap-2">
                               <span className="text-teal-600 font-bold text-base">
-                                ₹{g.lowestPrice}
-                              </span>
-                              <span className="text-[10px] text-gray-400">
-                                / unit
+                                ₹{tg.lowestPrice}
                               </span>
                             </div>
-                            <p className="text-[11px] text-gray-500">
-                              Available from{" "}
-                              <span className="font-semibold">
-                                {g.supplierCount}
-                              </span>{" "}
-                              supplier{g.supplierCount !== 1 ? "s" : ""}
-                            </p>
                             <button
-                              onClick={() => setCompareGroup(g)}
+                              onClick={() => setSelectedTitleGroup(tg)}
                               className="w-full mt-1 text-xs font-semibold bg-teal-600 hover:bg-teal-700 text-white py-2 rounded-lg transition"
                             >
-                              Compare Suppliers →
+                              View Brands →
                             </button>
                           </div>
                         </div>
@@ -521,6 +525,17 @@ export default function SuppliersPage() {
           )}
         </div>
       </div>
+
+      {selectedTitleGroup && (
+        <SupplierBrandListDrawer
+          titleGroup={selectedTitleGroup}
+          onClose={() => setSelectedTitleGroup(null)}
+          onCompareBrand={(brandGroup) => {
+            setCompareGroup(brandGroup);
+            setSelectedTitleGroup(null);
+          }}
+        />
+      )}
 
       {compareGroup && (
         <SupplierCompareDrawer
