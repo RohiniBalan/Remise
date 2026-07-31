@@ -17,7 +17,8 @@ const createOffer = async (req, res) => {
     const {
       storeId, storeName, title, description, category,
       originalPrice, offerPrice, validUntil,
-      latitude, longitude           // radius is no longer accepted from client
+      latitude, longitude, 
+      targetCustomerId, targetCustomerName           
     } = req.body;
 
     if (!storeId || !latitude || !longitude) {
@@ -47,7 +48,7 @@ const createOffer = async (req, res) => {
       storeName,
       storeLocation: {
         type: 'Point',
-        coordinates: [lng, lat]    // GeoJSON: [longitude, latitude]
+        coordinates: [lng, lat]   
       },
       title,
       description,
@@ -57,23 +58,37 @@ const createOffer = async (req, res) => {
       offerPrice:      parseFloat(offerPrice),
       discountPercent: discount,
       validUntil:      new Date(validUntil),
-      notificationRadius: NOTIFICATION_RADIUS_KM   // stored for reference, set by server
+      notificationRadius: NOTIFICATION_RADIUS_KM, 
+      targetCustomerId: targetCustomerId || null,
+      targetCustomerName: targetCustomerName || null,
     });
 
-    // Fire-and-forget: trigger geo push notifications
-    axios.post(`${NOTIFICATION_SERVICE}/api/notifications/internal/send-offer`, {
-      offerId:            offer._id.toString(),
-      storeId,
-      storeName,
-      title:              `🏷️ ${storeName}: ${title}`,
-      body:               `${discount}% off — valid until ${new Date(validUntil).toLocaleDateString()}`,
-      image:              offer.image,
-      url:                `/nearby?offer=${offer._id}`,
-      longitude:          lng,
-      latitude:           lat,
-      notificationRadius: NOTIFICATION_RADIUS_KM
-    }).catch(err => console.error('[Offers] Notification dispatch failed:', err.message));
-
+    // Fire-and-forget: notify either the one targeted customer, or everyone nearby
+    if (targetCustomerId) {
+      axios.post(`${NOTIFICATION_SERVICE}/api/notifications/internal/create`, {
+        userId:  targetCustomerId,
+        offerId: offer._id.toString(),
+        storeId,
+        type:    'offer',
+        title:   `🏷️ ${storeName}: ${title}`,
+        body:    `${discount}% off, just for you — valid until ${new Date(validUntil).toLocaleDateString()}`,
+        image:   offer.image,
+        url:     `/nearby?offer=${offer._id}`,
+      }).catch(err => console.error('[Offers] Direct notification dispatch failed:', err.message));
+    } else {
+      axios.post(`${NOTIFICATION_SERVICE}/api/notifications/internal/send-offer`, {
+        offerId:            offer._id.toString(),
+        storeId,
+        storeName,
+        title:              `🏷️ ${storeName}: ${title}`,
+        body:               `${discount}% off — valid until ${new Date(validUntil).toLocaleDateString()}`,
+        image:              offer.image,
+        url:                `/nearby?offer=${offer._id}`,
+        longitude:          lng,
+        latitude:           lat,
+        notificationRadius: NOTIFICATION_RADIUS_KM
+      }).catch(err => console.error('[Offers] Notification dispatch failed:', err.message));
+    }
     res.status(201).json({ success: true, message: 'Offer published!', data: offer });
   } catch (err) {
     console.error('createOffer error:', err);
@@ -84,7 +99,7 @@ const createOffer = async (req, res) => {
 // ─── GET /api/offers/nearby?lat=X&lng=Y&radius=5 ─────────────────────────────
 const getNearbyOffers = async (req, res) => {
   try {
-    const { lat, lng, radius = 10 } = req.query;
+    const { lat, lng, radius = 10, viewerId } = req.query;
 
     if (!lat || !lng) {
       return res.status(400).json({ success: false, message: 'lat and lng query params are required.' });
@@ -95,6 +110,10 @@ const getNearbyOffers = async (req, res) => {
     const offers = await Offer.find({
       isActive:   true,
       validUntil: { $gte: new Date() },
+      $or: [
+        { targetCustomerId: null },
+        ...(viewerId ? [{ targetCustomerId: viewerId }] : []),
+      ],
       storeLocation: {
         $near: {
           $geometry:    { type: 'Point', coordinates: [parseFloat(lng), parseFloat(lat)] },
@@ -122,6 +141,28 @@ const getNearbyOffers = async (req, res) => {
     res.json({ success: true, count: offersWithDistance.length, data: offersWithDistance });
   } catch (err) {
     console.error('getNearbyOffers error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ─── GET /api/offers/active?limit=5 — top active offers for the Home hero ───
+const getActiveOffers = async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 5;
+    const now = new Date();
+
+    const offers = await Offer.find({
+      isActive:  true,
+      validFrom: { $lte: now },
+      validUntil: { $gte: now },
+    })
+      .sort({ discountPercent: -1, createdAt: -1 })
+      .limit(limit);
+
+    res.set('Cache-Control', 'no-store');
+    res.json({ success: true, count: offers.length, data: offers });
+  } catch (err) {
+    console.error('getActiveOffers error:', err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
@@ -201,4 +242,4 @@ const deleteOffer = async (req, res) => {
   }
 };
 
-module.exports = { createOffer, getNearbyOffers, getStoreOffers, getOfferById, updateOffer, deleteOffer };
+module.exports = { createOffer, getNearbyOffers, getStoreOffers, getOfferById, updateOffer, deleteOffer, getActiveOffers };

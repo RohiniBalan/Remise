@@ -18,6 +18,9 @@ export const offersApi = {
   getById: (id: string) =>
     axios.get(`${BASE}/api/offers/${id}`),
 
+  getActive: (limit = 5) =>
+  axios.get(`${BASE}/api/offers/active`, { params: { limit } }),
+
   update: (id: string, formData: FormData, token: string) =>
     axios.put(`${BASE}/api/offers/${id}`, formData, {
       headers: authHeaders(token)

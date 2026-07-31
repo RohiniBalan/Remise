@@ -15,6 +15,9 @@ export const storeApi = {
   getById: (id: string) =>
     axios.get(`${BASE}/api/stores/${id}`),
 
+  getStoresByOwnerIds: (ownerIds: string[], token: string) =>
+  axios.post(`${BASE}/api/stores/by-owners`, { ownerIds }, { headers: authHeaders(token) }),
+
   update: (id: string, formData: FormData, token: string) =>
     axios.put(`${BASE}/api/stores/${id}`, formData, {
       headers: authHeaders(token)

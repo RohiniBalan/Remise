@@ -6,7 +6,7 @@ const router  = express.Router();
 const {
   registerStore, getMyStore, getStoreById,
   updateStore, getAllStores, verifyStore, syncOwnerRole,
-  getNearbyStores, getStoreInternal, getStoresByIds
+  getNearbyStores, getStoreInternal, getStoresByIds, getStoresByOwnerIds
 } = require('../controllers/storeController');
 const { protect, verifyAdmin } = require('../middleware/authMiddleware');
 
@@ -32,6 +32,7 @@ router.get('/me/my-store',  protect, getMyStore);
 router.post('/me/sync-role', protect, syncOwnerRole);
 router.post('/',            protect, upload.single('logo'), registerStore);
 router.post('/batch', getStoresByIds);
+router.post('/by-owners', protect, getStoresByOwnerIds);
 router.put('/:id',        protect, upload.single('logo'), updateStore);
 
 // Public — nearby search (must be before /:id)

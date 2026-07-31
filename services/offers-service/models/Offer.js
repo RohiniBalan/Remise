@@ -24,6 +24,10 @@ const offerSchema = new mongoose.Schema({
   image:       { type: String, required: true },   
   category:    { type: String, default: 'General' },
 
+  // Private-offer targeting
+  targetCustomerId: { type: String, default: null, index: true},
+  targetCustomerName: { type: String, default: null},
+
   // Pricing
   originalPrice: { type: Number, required: true, min: 0 },
   offerPrice:    { type: Number, required: true, min: 0 },

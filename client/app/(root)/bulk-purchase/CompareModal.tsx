@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useContext, useEffect } from "react";
+import { useState, useContext, useEffect, useCallback } from "react";
 import {
   X,
   MapPin,
@@ -14,10 +14,14 @@ import {
   Truck,
   QrCode,
   Wallet,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { AuthContext } from "../../context/AuthContext";
 import { smartOrderApi, CartItem } from "../../api-services/smartOrderApi";
 import { storeApi } from "../../api-services/storeApi";
+import { productApi } from "../../api-services/productApi";
+import { indianStates, getCities } from "../../utils/indiaLocation";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -71,6 +75,12 @@ type Step =
 
 const RADIUS_OPTIONS = [2, 5, 10, 15, 20];
 
+// Normalizes a title the same way as the store dashboard's groupByTitle /
+// groupProductsByType, so a store's product catalog and the customer's
+// requested item names line up regardless of casing/whitespace.
+const normalizeTitle = (s?: string) =>
+  (s || "").toLowerCase().trim().replace(/\s+/g, " ");
+
 export default function CompareModal({
   items,
   onClose,
@@ -94,9 +104,21 @@ export default function CompareModal({
     null,
   );
 
-  const [deliveryMethod, setDeliveryMethod] = useState<
-    "pickup" | "delivery" | null
-  >(null);
+  // ── Carousel (one store card at a time) ────────────────────────────────
+  const [carouselIndex, setCarouselIndex] = useState(0);
+
+  // ── View Brands: per-store product catalog + user brand overrides ─────
+  const [viewBrandsStoreId, setViewBrandsStoreId] = useState<string | null>(
+    null,
+  );
+  const [brandOptionsByStore, setBrandOptionsByStore] = useState<Record<string, Record<string, any[]>>>({});
+  const [brandLoading, setBrandLoading] = useState<Record<string, boolean>>(
+    {},
+  );
+  // overrides[storeId][requestedName] = the product the customer picked instead
+  const [overrides, setOverrides] = useState<Record<string, Record<string, any>>>({});
+
+const [deliveryMethod, setDeliveryMethod] = useState<"pickup" | "delivery" | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<"cod" | "qr" | null>(null);
   const [storeQr, setStoreQr] = useState<string | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
@@ -144,6 +166,30 @@ export default function CompareModal({
   });
   const setField = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
+  // ── City/State dropdowns + auto-pincode (same pattern used elsewhere) ──
+  const [cities, setCities] = useState<any[]>([]);
+
+  const normalize = (s: string) =>
+    (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+
+  const findState = useCallback((value: string) => {
+    const v = normalize(value);
+    if (!v) return undefined;
+    return indianStates.find(
+      (s) => normalize(s.name) === v || normalize(s.isoCode) === v,
+    );
+  }, []);
+
+  useEffect(() => {
+    if (!form.state) return;
+    const state = findState(form.state);
+    if (state) {
+      setCities(getCities(state.isoCode));
+    } else {
+      setCities([]);
+    }
+  }, [form.state, findState]);
+
   const effectiveRadius = customRadius ? parseFloat(customRadius) : radius;
 
   const runSearch = async () => {
@@ -173,6 +219,7 @@ export default function CompareModal({
           const stores: any[] = storesRes.data.data || [];
           if (!stores.length) {
             setResults([]);
+            setCarouselIndex(0);
             setStep("results");
             return;
           }
@@ -193,6 +240,9 @@ export default function CompareModal({
           }));
 
           setResults(merged);
+          setCarouselIndex(0);
+          setViewBrandsStoreId(null);
+          setOverrides({});
           setStep("results");
         } catch (err: any) {
           setErrorMsg(
@@ -209,6 +259,87 @@ export default function CompareModal({
         setStep("radius");
       },
     );
+  };
+
+  // ── View Brands: fetch a store's catalog once, group by normalized title ─
+  const fetchBrandOptions = async (storeId: string) => {
+    if (brandOptionsByStore[storeId] || brandLoading[storeId]) return;
+    setBrandLoading((b) => ({ ...b, [storeId]: true }));
+    try {
+      const res = await productApi.getByStore(storeId);
+      const products: any[] = res.data?.data || [];
+      const byTitle: Record<string, any[]> = {};
+      products.forEach((p) => {
+        const key = normalizeTitle(p.title);
+        (byTitle[key] = byTitle[key] || []).push(p);
+      });
+      Object.values(byTitle).forEach((arr) =>
+        arr.sort(
+          (a, b) =>
+            (a.discountedPrice || a.price) - (b.discountedPrice || b.price),
+        ),
+      );
+      setBrandOptionsByStore((s) => ({ ...s, [storeId]: byTitle }));
+    } catch {
+      setBrandOptionsByStore((s) => ({ ...s, [storeId]: {} }));
+    } finally {
+      setBrandLoading((b) => ({ ...b, [storeId]: false }));
+    }
+  };
+
+  const toggleViewBrands = (storeId: string) => {
+    if (viewBrandsStoreId === storeId) {
+      setViewBrandsStoreId(null);
+      return;
+    }
+    setViewBrandsStoreId(storeId);
+    fetchBrandOptions(storeId);
+  };
+
+  const selectBrandOption = (storeId: string, requestedName: string, product: any) => {
+    setOverrides((o) => ({
+      ...o,
+      [storeId]: { ...(o[storeId] || {}), [requestedName]: product },
+    }));
+  };
+
+  // Applies any brand overrides on top of a store's original matched lines,
+  // preserving each line's implied quantity multiplier (lineTotal / unitPrice)
+  // since raw quantity isn't available separately on MatchedLine.
+  const getDisplayMatched = (r: StoreResult): MatchedLine[] => {
+    const storeOverrides = overrides[r.storeId] || {};
+    return r.matched.map((m) => {
+      const ov = storeOverrides[m.requestedName];
+      if (!ov) return m;
+      const price = ov.discountedPrice || ov.price;
+      const multiplier = m.product.price > 0 ? m.lineTotal / m.product.price : 1;
+      return {
+        ...m,
+        product: {
+          id: ov._id,
+          title: ov.title,
+          brand: ov.brand,
+          price,
+          image: ov.imageUrl
+            ? ov.imageUrl.startsWith("http")
+              ? ov.imageUrl
+              : `${API}${ov.imageUrl}`
+            : null,
+        },
+        substituted: (ov.brand || "") !== (m.requestedBrand || ""),
+        lineTotal: price * multiplier,
+      };
+    });
+  };
+
+  const getDisplayTotal = (r: StoreResult) =>
+    getDisplayMatched(r).reduce((sum, m) => sum + m.lineTotal, 0);
+
+  const handleSelectStore = (r: StoreResult) => {
+    const displayMatched = getDisplayMatched(r);
+    const displayTotal = getDisplayTotal(r);
+    setChosen({ ...r, matched: displayMatched, totalAmount: displayTotal });
+    setStep("confirming");
   };
 
   const handleConfirmDetails = (e: React.FormEvent) => {
@@ -267,6 +398,11 @@ export default function CompareModal({
     }
   };
 
+  const total = results.length;
+  const goPrev = () => setCarouselIndex((i) => (i - 1 + total) % total);
+  const goNext = () => setCarouselIndex((i) => (i + 1) % total);
+  const r = results[carouselIndex];
+
   return (
     <div className="fixed inset-0 bg-black/50 z-[200] flex items-end sm:items-center justify-center p-4">
       <div className="bg-white rounded-2xl w-full max-w-lg border border-[#BBD5DA] shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
@@ -303,21 +439,21 @@ export default function CompareModal({
                 Choose how far we should search for stores near you.
               </p>
               <div className="flex flex-wrap gap-2">
-                {RADIUS_OPTIONS.map((r) => (
+                {RADIUS_OPTIONS.map((rad) => (
                   <button
-                    key={r}
+                    key={rad}
                     type="button"
                     onClick={() => {
-                      setRadius(r);
+                      setRadius(rad);
                       setCustomRadius("");
                     }}
                     className={`px-4 py-1.5 rounded-full text-sm font-semibold transition ${
-                      radius === r && !customRadius
+                      radius === rad && !customRadius
                         ? "bg-[#DFF1F1] text-teal-700 border border-teal-400"
                         : "bg-[#F5F5F5] text-gray-500 border border-transparent hover:border-[#BBD5DA]"
                     }`}
                   >
-                    {r} km
+                    {rad} km
                   </button>
                 ))}
                 <input
@@ -349,7 +485,7 @@ export default function CompareModal({
             </div>
           )}
 
-          {/* ── Step: results ───────────────────────────────────────────── */}
+          {/* ── Step: results (carousel — one store card at a time) ─────── */}
           {step === "results" && (
             <div className="space-y-3">
               {results.length === 0 && (
@@ -370,80 +506,205 @@ export default function CompareModal({
                 </div>
               )}
 
-              {results.map((r, idx) => (
-                <div
-                  key={r.storeId}
-                  className={`rounded-xl border p-4 ${idx === 0 ? "border-teal-400 ring-2 ring-teal-100 bg-teal-50/30" : "border-[#BBD5DA] bg-white"}`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="font-semibold text-gray-900">
-                          {r.storeName}
+              {results.length > 0 && r && (
+                <div className="flex items-start gap-2">
+                  {/* Prev arrow */}
+                  <button
+                    onClick={goPrev}
+                    disabled={total <= 1}
+                    aria-label="Previous store"
+                    className="shrink-0 mt-16 w-9 h-9 rounded-full border border-[#BBD5DA] bg-white text-gray-500 hover:bg-[#F5F5F5] hover:text-teal-700 disabled:opacity-30 disabled:hover:bg-white flex items-center justify-center transition"
+                  >
+                    <ChevronLeft size={18} />
+                  </button>
+
+                  {/* Card */}
+                  <div className="flex-1 min-w-0">
+                    <div
+                      className={`rounded-xl border p-4 ${
+                        carouselIndex === 0
+                          ? "border-teal-400 ring-2 ring-teal-100 bg-teal-50/30"
+                          : "border-[#BBD5DA] bg-white"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-gray-900 break-words">
+                            {r.storeName}
+                          </p>
+                          {carouselIndex === 0 && (
+                            <span className="inline-block text-xs font-bold text-teal-700 bg-teal-100 px-2 py-0.5 rounded-full mt-1">
+                              Best match
+                            </span>
+                          )}
+                          <p className="text-xs text-gray-400 flex items-center gap-1 mt-1">
+                            <MapPin size={11} /> {r.distanceKm} km away ·{" "}
+                            {r.matchedCount}/{r.totalRequested} items available
+                          </p>
+                        </div>
+                        <p className="font-bold text-teal-700 text-lg whitespace-nowrap shrink-0">
+                          ₹{getDisplayTotal(r).toFixed(0)}
                         </p>
-                        {idx === 0 && (
-                          <span className="text-xs font-bold text-teal-700 bg-teal-100 px-2 py-0.5 rounded-full">
-                            Best match
-                          </span>
-                        )}
                       </div>
-                      <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
-                        <MapPin size={11} /> {r.distanceKm} km away ·{" "}
-                        {r.matchedCount}/{r.totalRequested} items available
-                      </p>
+
+                      {getDisplayMatched(r).length > 0 && (
+                        <ul className="mt-2 text-xs text-gray-600 space-y-0.5">
+                          {getDisplayMatched(r).map((m) => (
+                            <li
+                              key={m.requestedName}
+                              className="flex items-center gap-1.5 flex-wrap"
+                            >
+                              <PackageCheck
+                                size={11}
+                                className="text-teal-600 shrink-0"
+                              />
+                              {m.product.title}
+                              {m.product.brand ? ` (${m.product.brand})` : ""} — ₹
+                              {m.product.price}
+                              {m.substituted && (
+                                <span className="text-[10px] text-amber-600 font-semibold">
+                                  — different brand than requested
+                                </span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      {(r.insufficientStock.length > 0 ||
+                        r.unmatched.length > 0) && (
+                        <p className="mt-1.5 text-xs text-amber-600 flex items-start gap-1.5">
+                          <AlertCircle size={11} className="shrink-0 mt-0.5" />
+                          Not available:{" "}
+                          {[
+                            ...r.insufficientStock.map((i) => i.requestedName),
+                            ...r.unmatched,
+                          ].join(", ")}
+                        </p>
+                      )}
+
+                      {/* View Brands toggle */}
+                      <button
+                        type="button"
+                        onClick={() => toggleViewBrands(r.storeId)}
+                        className="w-full mt-2 text-xs font-semibold text-teal-700 border border-teal-200 bg-teal-50 hover:bg-teal-100 py-2 rounded-lg transition"
+                      >
+                        {viewBrandsStoreId === r.storeId
+                          ? "Hide Brands ▲"
+                          : "View Brands ▾"}
+                      </button>
+
+                      {viewBrandsStoreId === r.storeId && (
+                        <div className="mt-3 border-t border-[#F5F5F5] pt-3 space-y-3">
+                          {brandLoading[r.storeId] ? (
+                            <p className="text-xs text-gray-400 flex items-center gap-2">
+                              <RefreshCw size={12} className="animate-spin" />{" "}
+                              Loading brands…
+                            </p>
+                          ) : (
+                            items.map((item) => {
+                              const key = normalizeTitle(item.name);
+                              const options =
+                                brandOptionsByStore[r.storeId]?.[key] || [];
+                              const currentOverride =
+                                overrides[r.storeId]?.[item.name];
+                              const matchedLine = r.matched.find(
+                                (m) => m.requestedName === item.name,
+                              );
+                              const currentProductId =
+                                currentOverride?._id || matchedLine?.product.id;
+                              return (
+                                <div key={item.name}>
+                                  <p className="text-xs font-semibold text-gray-700 mb-1">
+                                    {item.name}
+                                    {item.brand ? ` (wanted: ${item.brand})` : ""}
+                                  </p>
+                                  {options.length === 0 ? (
+                                    <p className="text-xs text-gray-400">
+                                      No brands available at this store.
+                                    </p>
+                                  ) : (
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {options.map((opt) => {
+                                        const price =
+                                          opt.discountedPrice || opt.price;
+                                        const isSelected =
+                                          opt._id === currentProductId;
+                                        return (
+                                          <button
+                                            key={opt._id}
+                                            type="button"
+                                            onClick={() =>
+                                              selectBrandOption(
+                                                r.storeId,
+                                                item.name,
+                                                opt,
+                                              )
+                                            }
+                                            className={`text-left border rounded-lg px-2.5 py-1.5 text-xs transition ${
+                                              isSelected
+                                                ? "border-teal-500 bg-teal-50 ring-1 ring-teal-200"
+                                                : "border-[#BBD5DA] bg-white hover:border-teal-300"
+                                            }`}
+                                          >
+                                            <span className="font-semibold text-gray-800 block">
+                                              {opt.brand || "Unbranded"}
+                                            </span>
+                                            <span className="block text-gray-500">
+                                              ₹{price} · Stock {opt.totalStock}
+                                            </span>
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      )}
+
+                      <button
+                        onClick={() => handleSelectStore(r)}
+                        className="w-full mt-3 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold py-2 rounded-lg transition"
+                      >
+                        Select this store
+                      </button>
                     </div>
-                    <p className="font-bold text-teal-700 text-lg whitespace-nowrap">
-                      ₹{r.totalAmount.toFixed(0)}
+
+                    {/* Dot indicators */}
+                    {total > 1 && (
+                      <div className="flex items-center justify-center gap-1.5 mt-4">
+                        {results.map((_, i) => (
+                          <button
+                            key={i}
+                            onClick={() => setCarouselIndex(i)}
+                            aria-label={`Go to store ${i + 1}`}
+                            className={`h-1.5 rounded-full transition-all ${
+                              i === carouselIndex
+                                ? "w-5 bg-teal-600"
+                                : "w-1.5 bg-[#BBD5DA]"
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    )}
+                    <p className="text-center text-xs text-gray-400 mt-1.5">
+                      {carouselIndex + 1} of {total}
                     </p>
                   </div>
 
-                  {r.matched.length > 0 && (
-                    <ul className="mt-2 text-xs text-gray-600 space-y-0.5">
-                      {r.matched.map((m) => (
-                        <li
-                          key={m.requestedName}
-                          className="flex items-center gap-1.5"
-                        >
-                          <PackageCheck
-                            size={11}
-                            className="text-teal-600 shrink-0"
-                          />
-                          {m.product.title}
-                          {m.product.brand ? ` (${m.product.brand})` : ""} — ₹
-                          {m.product.price}
-                          {m.substituted && (
-                            <span className="text-[10px] text-amber-600 font-semibold">
-                              — "{m.requestedBrand}" unavailable, showing{" "}
-                              {m.product.brand || "another brand"}
-                            </span>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  {(r.insufficientStock.length > 0 ||
-                    r.unmatched.length > 0) && (
-                    <p className="mt-1.5 text-xs text-amber-600 flex items-start gap-1.5">
-                      <AlertCircle size={11} className="shrink-0 mt-0.5" />
-                      Not available:{" "}
-                      {[
-                        ...r.insufficientStock.map((i) => i.requestedName),
-                        ...r.unmatched,
-                      ].join(", ")}
-                    </p>
-                  )}
-
+                  {/* Next arrow */}
                   <button
-                    onClick={() => {
-                      setChosen(r);
-                      setStep("confirming");
-                    }}
-                    className="w-full mt-3 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold py-2 rounded-lg transition"
+                    onClick={goNext}
+                    disabled={total <= 1}
+                    aria-label="Next store"
+                    className="shrink-0 mt-16 w-9 h-9 rounded-full border border-[#BBD5DA] bg-white text-gray-500 hover:bg-[#F5F5F5] hover:text-teal-700 disabled:opacity-30 disabled:hover:bg-white flex items-center justify-center transition"
                   >
-                    Select this store
+                    <ChevronRight size={18} />
                   </button>
                 </div>
-              ))}
+              )}
 
               {results.length > 0 && (
                 <button
@@ -535,20 +796,68 @@ export default function CompareModal({
                 />
               </div>
               <div className="grid grid-cols-3 gap-3">
-                <input
+                <select
                   required
-                  placeholder="City"
                   value={form.city}
-                  onChange={(e) => setField("city", e.target.value)}
-                  className="bg-white border border-[#BBD5DA] rounded-xl px-3 py-2 text-sm outline-none focus:border-teal-400"
-                />
-                <input
+                  disabled={!form.state}
+                  onChange={async (e) => {
+                    const city = e.target.value;
+                    setField("city", city);
+                    if (!city) return;
+                    try {
+                      const res = await fetch(
+                        `https://api.postalpincode.in/postoffice/${encodeURIComponent(city)}`,
+                      );
+                      const data = await res.json();
+                      if (
+                        data[0]?.Status === "Success" &&
+                        data[0].PostOffice?.length > 0
+                      ) {
+                        setField("pinCode", data[0].PostOffice[0].Pincode);
+                      }
+                    } catch {
+                      /* pincode lookup is best-effort */
+                    }
+                  }}
+                  className="bg-white border border-[#BBD5DA] rounded-xl px-3 py-2 text-sm outline-none focus:border-teal-400 disabled:opacity-50"
+                >
+                  <option value="">Select City</option>
+                  {cities.map((c) => (
+                    <option key={c.name} value={c.name}>
+                      {c.name}
+                    </option>
+                  ))}
+                  {form.state && cities.length === 0 && (
+                    <option value="" disabled>
+                      No cities found for this state
+                    </option>
+                  )}
+                </select>
+
+                <select
                   required
-                  placeholder="State"
-                  value={form.state}
-                  onChange={(e) => setField("state", e.target.value)}
+                  value={findState(form.state)?.isoCode || ""}
+                  onChange={(e) => {
+                    const code = e.target.value;
+                    const state = indianStates.find((s) => s.isoCode === code);
+                    setForm((f) => ({
+                      ...f,
+                      state: state?.name || "",
+                      city: "",
+                      pinCode: "",
+                    }));
+                    setCities(getCities(code));
+                  }}
                   className="bg-white border border-[#BBD5DA] rounded-xl px-3 py-2 text-sm outline-none focus:border-teal-400"
-                />
+                >
+                  <option value="">Select State</option>
+                  {indianStates.map((state) => (
+                    <option key={state.isoCode} value={state.isoCode}>
+                      {state.name}
+                    </option>
+                  ))}
+                </select>
+
                 <input
                   required
                   placeholder="Pin Code"

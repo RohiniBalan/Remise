@@ -27,6 +27,7 @@ import {
   CheckCircle2,
   Mic,
   MicOff,
+  BarChart2, QrCode
 } from "lucide-react";
 import {
   useSpeechRecognition,
@@ -39,10 +40,13 @@ import { productApi } from "../../api-services/productApi";
 import { orderApi } from "../../api-services/orderApi";
 import UserAvatarMenu from "../../components-main/UserAvatarMenu";
 import NotificationBell from "../../components-main/NotificationBell";
+import SellerOverviewTab from "./SellerOverviewTab";
+import { SellerOrder } from "./seller-analytics";
+import TargetRevenueCard from "../../components-main/TargetRevenueCard";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
-type Tab = "products" | "orders" | "settings";
+type Tab = "overview" | "products" | "orders" | "settings";
 
 const ORDER_STATUSES = [
   "Processing",
@@ -139,10 +143,7 @@ function groupSellerProductsByType(products: any[]) {
   > = {};
 
   for (const p of products) {
-    const key = (p.title || "")
-      .toLowerCase()
-      .trim()
-      .replace(/\s+/g, " ");
+    const key = (p.title || "").toLowerCase().trim().replace(/\s+/g, " ");
 
     if (!byTitle[key]) {
       byTitle[key] = {
@@ -165,7 +166,7 @@ function groupSellerProductsByType(products: any[]) {
     brandCount: v.items.length,
     totalStock: v.items.reduce(
       (s: number, p: any) => s + (p.totalStock || 0),
-      0
+      0,
     ),
   }));
 }
@@ -1791,6 +1792,12 @@ function SellerBulkSmartUploadModal({
   );
 }
 
+const STATUS_COLORS: Record<string, string> = {
+  PENDING: "text-amber-600 bg-amber-50 border-amber-200",
+  PAID: "text-green-600 bg-green-50 border-green-200",
+  FAILED: "text-[#FF0000] bg-red-50 border-red-200",
+};
+
 // ── Products Tab ──────────────────────────────────────────────────────────────
 function SellerProductsTab({
   products,
@@ -1828,7 +1835,8 @@ function SellerProductsTab({
   );
 
   const productTypes = groupSellerProductsByType(filtered);
-  const selectedType = productTypes.find((t) => t.typeKey === selectedTypeKey) || null;
+  const selectedType =
+    productTypes.find((t) => t.typeKey === selectedTypeKey) || null;
 
   // ── Brand-management view (inside a product type) ──────────────────────
   if (selectedType) {
@@ -1843,9 +1851,13 @@ function SellerProductsTab({
               <ArrowLeft size={15} /> Back
             </button>
             <div>
-              <h2 className="text-lg font-bold text-gray-900">{selectedType.title}</h2>
+              <h2 className="text-lg font-bold text-gray-900">
+                {selectedType.title}
+              </h2>
               <p className="text-xs text-gray-400">
-                {selectedType.brandCount} brand{selectedType.brandCount !== 1 ? "s" : ""} · {selectedType.totalStock} total stock
+                {selectedType.brandCount} brand
+                {selectedType.brandCount !== 1 ? "s" : ""} ·{" "}
+                {selectedType.totalStock} total stock
               </p>
             </div>
           </div>
@@ -1871,7 +1883,11 @@ function SellerProductsTab({
               >
                 <div className="w-14 h-14 rounded-xl bg-[#F5F5F5] shrink-0 overflow-hidden">
                   {img ? (
-                    <img src={img} alt={p.brand || p.title} className="w-full h-full object-cover" />
+                    <img
+                      src={img}
+                      alt={p.brand || p.title}
+                      className="w-full h-full object-cover"
+                    />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
                       <Package size={20} className="text-gray-300" />
@@ -1903,7 +1919,9 @@ function SellerProductsTab({
                     >
                       {p.availability}
                     </span>
-                    <span className={`text-[10px] font-medium ${p.totalStock < 5 ? "text-amber-600 font-bold" : "text-gray-400"}`}>
+                    <span
+                      className={`text-[10px] font-medium ${p.totalStock < 5 ? "text-amber-600 font-bold" : "text-gray-400"}`}
+                    >
                       Stock {p.totalStock}
                     </span>
                   </div>
@@ -2020,7 +2038,11 @@ function SellerProductsTab({
               >
                 <div className="relative aspect-square bg-[#F5F5F5]">
                   {img ? (
-                    <img src={img} alt={pt.title} className="w-full h-full object-cover" />
+                    <img
+                      src={img}
+                      alt={pt.title}
+                      className="w-full h-full object-cover"
+                    />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
                       <Package size={36} className="text-gray-200" />
@@ -2028,12 +2050,18 @@ function SellerProductsTab({
                   )}
                 </div>
                 <div className="p-3">
-                  <p className="text-xs text-gray-400 mb-0.5">{pt.category || "—"}</p>
-                  <p className="font-semibold text-gray-900 text-sm truncate">{pt.title}</p>
+                  <p className="text-xs text-gray-400 mb-0.5">
+                    {pt.category || "—"}
+                  </p>
+                  <p className="font-semibold text-gray-900 text-sm truncate">
+                    {pt.title}
+                  </p>
                   <p className="text-xs text-gray-500 mt-1">
                     {pt.brandCount} Brand{pt.brandCount !== 1 ? "s" : ""}
                   </p>
-                  <p className="text-xs text-gray-400">Total Stock: {pt.totalStock}</p>
+                  <p className="text-xs text-gray-400">
+                    Total Stock: {pt.totalStock}
+                  </p>
                   <button
                     onClick={() => setSelectedTypeKey(pt.typeKey)}
                     className="w-full mt-2 text-xs font-semibold bg-teal-600 hover:bg-teal-700 text-white py-2 rounded-lg transition"
@@ -2220,14 +2248,26 @@ function SellerSettingsTab({ store, token, onRefresh }: any) {
     city: store?.address?.city || "",
     state: store?.address?.state || "",
     pinCode: store?.address?.pinCode || "",
+    targetRevenue: store?.targetRevenue ? String(store.targetRevenue) : "",
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
+  const [upiId, setUpiId] = useState(store?.upiId || "");
+  const UPI_ID_REGEX = /^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}$/;
+  const upiError =
+    upiId.trim() && !UPI_ID_REGEX.test(upiId.trim())
+      ? "Invalid UPI ID format (expected e.g. name@bank)."
+      : "";
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (upiError) {              
+      setError(upiError);
+      return;
+    }
     setSaving(true);
     setError("");
     setSaved(false);
@@ -2241,6 +2281,7 @@ function SellerSettingsTab({ store, token, onRefresh }: any) {
       fd.append("address[city]", form.city);
       fd.append("address[state]", form.state);
       fd.append("address[pinCode]", form.pinCode);
+      fd.append("targetRevenue", form.targetRevenue);
       await storeApi.update(store._id, fd, token);
       setSaved(true);
       onRefresh();
@@ -2273,6 +2314,17 @@ function SellerSettingsTab({ store, token, onRefresh }: any) {
               value={form.name}
               onChange={(e) => set("name", e.target.value)}
               required
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <Input
+              label="Monthly Revenue Target (₹)"
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="e.g. 50000"
+              value={form.targetRevenue}
+              onChange={(e) => set("targetRevenue", e.target.value)}
             />
           </div>
           <div className="sm:col-span-2">
@@ -2314,7 +2366,49 @@ function SellerSettingsTab({ store, token, onRefresh }: any) {
             value={form.state}
             onChange={(e) => set("state", e.target.value)}
           />
+          
         </div>
+
+        {/* ── NEW: UPI Payment QR Code ── */}
+        <div className="pt-2 border-t border-[#F5F5F5]">
+          <p className="text-sm font-semibold text-gray-800 mb-1">
+            UPI Payment QR Code
+          </p>
+          <p className="text-xs text-gray-400 mb-3">
+            Enter your UPI ID to generate a scannable QR code for order
+            payments.
+          </p>
+          <div className="flex items-start gap-4">
+            <div className="w-24 h-24 rounded-xl border-2 border-dashed border-[#BBD5DA] bg-[#F5F5F5] flex items-center justify-center overflow-hidden shrink-0">
+              {store?.qrCodeImage ? (
+                <img
+                  src={store.qrCodeImage}
+                  alt="UPI QR code"
+                  className="w-full h-full object-contain bg-white"
+                />
+              ) : (
+                <QrCode size={22} className="text-gray-300" />
+              )}
+            </div>
+            <div className="flex-1">
+              <Input
+                label="UPI ID"
+                placeholder="merchant@upi"
+                value={upiId}
+                onChange={(e) => setUpiId(e.target.value)}
+              />
+              {upiError && (
+                <p className="text-xs text-[#FF0000] mt-1">{upiError}</p>
+              )}
+              <p className="text-xs text-gray-400 mt-1">
+                {store?.qrCodeImage
+                  ? "Save changes to regenerate the QR code."
+                  : "Save a valid UPI ID to generate your QR code."}
+              </p>
+            </div>
+          </div>
+        </div>
+
         <div className="flex items-center gap-3 pt-2">
           <button
             type="submit"
@@ -2344,6 +2438,7 @@ function SellerSettingsTab({ store, token, onRefresh }: any) {
 
 // ── Tab config ────────────────────────────────────────────────────────────────
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
+  { id: "overview", label: "Overview", icon: <BarChart2 size={15} /> },
   { id: "products", label: "Products", icon: <Package size={15} /> },
   { id: "orders", label: "Incoming Orders", icon: <ShoppingBag size={15} /> },
   { id: "settings", label: "Settings", icon: <Settings size={15} /> },
@@ -2372,10 +2467,13 @@ export default function SellerDashboard() {
   const [orders, setOrders] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
-  const [tab, setTab] = useState<Tab>("products");
+  const [tab, setTab] = useState<Tab>("overview");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [noStore, setNoStore] = useState(false);
+  const [storeNameByOwnerId, setStoreNameByOwnerId] = useState<
+    Record<string, string>
+  >({});
 
   // Role guard — only whole_saler / home_business belong here
   useEffect(() => {
@@ -2432,8 +2530,31 @@ export default function SellerDashboard() {
         setProducts(prodRes.value.data.data || []);
       if (catRes.status === "fulfilled")
         setCategories(catRes.value.data.data || []);
-      if (ordRes.status === "fulfilled")
-        setOrders((ordRes.value as any).data || []);
+
+      let loadedOrders: any[] = [];
+      if (ordRes.status === "fulfilled") {
+        loadedOrders = (ordRes.value as any).data || [];
+        setOrders(loadedOrders);
+      }
+
+      // Resolve buyerId -> store name using only the owners this seller
+      // actually sold to (GET /api/stores is admin-only, so it can't be
+      // used here — see storeApi.getStoresByOwnerIds instead).
+      const ownerIds = Array.from(
+        new Set(loadedOrders.map((o: any) => o.buyerId).filter(Boolean)),
+      );
+      if (ownerIds.length) {
+        try {
+          const storesRes = await storeApi.getStoresByOwnerIds(ownerIds, token);
+          const map: Record<string, string> = {};
+          (storesRes.data.data || []).forEach((st: any) => {
+            map[st.ownerId] = st.name;
+          });
+          setStoreNameByOwnerId(map);
+        } catch {
+          /* non-fatal — buyers just show as "Unknown Store" */
+        }
+      }
 
       const failed = [prodRes, catRes, ordRes].filter(
         (r) => r.status === "rejected",
@@ -2617,6 +2738,15 @@ export default function SellerDashboard() {
               </div>
             )}
 
+            {tab === "overview" && (
+              <SellerOverviewTab
+                orders={orders as SellerOrder[]}
+                products={products}
+                storeNameByOwnerId={storeNameByOwnerId}
+                store={store}
+                onGoToSettings={() => setTab("settings")}
+              />
+            )}
             {tab === "products" && (
               <SellerProductsTab
                 products={products}

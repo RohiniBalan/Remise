@@ -1,5 +1,15 @@
 export type LineItem = { productTitle: string; category: string; brand: string; qty: number; revenue: number; createdAt: string };
 
+function topProductFromMap(m?: Map<string, number>): string | undefined {
+  if (!m || m.size === 0) return undefined;
+  let best: string | undefined;
+  let bestQty = -Infinity;
+  for (const [k, v] of m.entries()) {
+    if (v > bestQty) { bestQty = v; best = k; }
+  }
+  return best;
+}
+
 // Offer titles look like "10% off Charger" — there's no productId link on the
 // Offer model, so we match by finding a product whose title appears inside
 // the offer title. Longest match wins, in case multiple product names overlap
@@ -72,7 +82,9 @@ export function computeAnalytics(items: LineItem[]) {
   const byCategory = new Map<string, { qty: number; revenue: number }>();
   const byBrand = new Map<string, { qty: number; revenue: number }>();
   const byDay = new Map<string, { qty: number; revenue: number; orders: number }>();
+  const byDayProduct = new Map<string, Map<string, number>>();
   const byMonth = new Map<string, number>();
+  const byMonthProduct = new Map<string, Map<string, number>>();
   let totalProductsSold = 0, totalRevenue = 0;
 
   for (const it of items) {
@@ -92,15 +104,35 @@ export function computeAnalytics(items: LineItem[]) {
     const d = byDay.get(dayKey) || { qty: 0, revenue: 0, orders: 0 };
     d.qty += it.qty; d.revenue += it.revenue; d.orders += 1; byDay.set(dayKey, d);
 
+    const dayProd = byDayProduct.get(dayKey) || new Map<string, number>();
+    dayProd.set(it.productTitle, (dayProd.get(it.productTitle) || 0) + it.qty);
+    byDayProduct.set(dayKey, dayProd);
+
     const monthKey = it.createdAt.slice(0, 7);
     byMonth.set(monthKey, (byMonth.get(monthKey) || 0) + it.revenue);
+
+    const monthProd = byMonthProduct.get(monthKey) || new Map<string, number>();
+    monthProd.set(it.productTitle, (monthProd.get(it.productTitle) || 0) + it.qty);
+    byMonthProduct.set(monthKey, monthProd);
   }
 
   // Each row now carries its own brand — this is what feeds the merged
   // "Top/Least Selling Products" card (product + brand together, one card).
   const products = [...byProduct.values()];
-  const topProducts    = [...products].sort((a, b) => b.qty - a.qty).slice(0, 5);
-  const leastProducts  = [...products].sort((a, b) => a.qty - b.qty).slice(0, 5);
+
+  // Sort once, lowest qty first.
+  const sortedByQtyAsc = [...products].sort((a, b) => a.qty - b.qty);
+  const n = sortedByQtyAsc.length;
+
+  // Split the SAME sorted list into two disjoint halves instead of taking
+  // an independent "top 5" and "bottom 5" slice — two independent slices
+  // overlap whenever there are 10 or fewer products (e.g. exactly 2 brands:
+  // both would land in "top 5" and none would be left for "least 5").
+  const leastCount = Math.min(5, Math.floor(n / 2));
+  const topCount   = Math.min(5, n - leastCount);
+
+  const leastProducts = sortedByQtyAsc.slice(0, leastCount);           // lowest qty first
+  const topProducts   = sortedByQtyAsc.slice(n - topCount).reverse();  // highest qty first
 
   // Kept for any chart/section that still wants brand aggregated on its own
   // (e.g. the brandWise pie/bar chart) — not used by the merged cards.
@@ -108,25 +140,56 @@ export function computeAnalytics(items: LineItem[]) {
   const brandWise = [...brands].sort((a, b) => b.revenue - a.revenue).slice(0, 8);
 
   const categoryWise   = [...byCategory.entries()].map(([name, v]) => ({ name, ...v }));
-  const revenueByMonth = [...byMonth.entries()].sort().map(([month, revenue]) => ({ month, revenue }));
+  const revenueByMonth = [...byMonth.entries()]
+    .sort()
+    .map(([month, revenue]) => ({
+      month,
+      revenue,
+      topProduct: topProductFromMap(byMonthProduct.get(month)),
+    }));
 
   let bestDay: { date: string; revenue: number; orders: number } | null = null;
   for (const [date, v] of byDay.entries()) if (!bestDay || v.revenue > bestDay.revenue) bestDay = { date, revenue: v.revenue, orders: v.orders };
 
-  return { totalProductsSold, totalRevenue, topProducts, leastProducts, brandWise, categoryWise, revenueByMonth, bestDay, byDay };
+  return { totalProductsSold, totalRevenue, topProducts, leastProducts, brandWise, categoryWise, revenueByMonth, bestDay, byDay, byDayProduct };
 }
 
-export function buildTrend(byDay: Map<string, { qty: number; revenue: number }>, granularity: 'daily' | 'weekly' | 'monthly') {
+export function buildTrend(
+  byDay: Map<string, { qty: number; revenue: number }>,
+  byDayProduct: Map<string, Map<string, number>>,
+  granularity: 'daily' | 'weekly' | 'monthly'
+) {
   const entries = [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b));
-  if (granularity === 'daily') return entries.map(([date, v]) => ({ label: date, ...v }));
-  const grouped = new Map<string, { qty: number; revenue: number }>();
+
+  if (granularity === 'daily') {
+    return entries.map(([date, v]) => ({
+      label: date,
+      ...v,
+      topProduct: topProductFromMap(byDayProduct.get(date)),
+    }));
+  }
+
+  const grouped = new Map<string, { qty: number; revenue: number; products: Map<string, number> }>();
   for (const [date, v] of entries) {
     const d = new Date(date);
     const key = granularity === 'monthly'
       ? date.slice(0, 7)
       : (() => { const ws = new Date(d); ws.setDate(d.getDate() - d.getDay()); return ws.toISOString().slice(0, 10); })();
-    const g = grouped.get(key) || { qty: 0, revenue: 0 };
-    g.qty += v.qty; g.revenue += v.revenue; grouped.set(key, g);
+
+    const g = grouped.get(key) || { qty: 0, revenue: 0, products: new Map<string, number>() };
+    g.qty += v.qty;
+    g.revenue += v.revenue;
+
+    const dayProd = byDayProduct.get(date);
+    if (dayProd) for (const [p, q] of dayProd.entries()) g.products.set(p, (g.products.get(p) || 0) + q);
+
+    grouped.set(key, g);
   }
-  return [...grouped.entries()].map(([label, v]) => ({ label, ...v }));
+
+  return [...grouped.entries()].map(([label, v]) => ({
+    label,
+    qty: v.qty,
+    revenue: v.revenue,
+    topProduct: topProductFromMap(v.products),
+  }));
 }

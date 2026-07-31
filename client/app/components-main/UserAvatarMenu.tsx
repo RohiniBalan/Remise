@@ -88,6 +88,7 @@ export default function UserAvatarMenu({ theme = 'light', compact = false }: Pro
 
   const displayName  = userData.fullname || userData.name || 'User';
   const isStoreOwner = userData.role === 'store_owner';
+  const isSeller      = userData.role === 'whole_saler' || userData.role === 'home_business';
   // treat `undefined` as verified (legacy accounts without the field)
   const isVerified   = userData.isEmailVerified !== false;
 
@@ -197,12 +198,20 @@ export default function UserAvatarMenu({ theme = 'light', compact = false }: Pro
                   className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-[#F5F5F5] transition">
                   <User size={15} className="text-gray-400 shrink-0" /> My Profile
                 </Link>
-                <Link href="/orders" onClick={() => setIsOpen(false)}
-                  className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-[#F5F5F5] transition">
-                  <Package size={15} className="text-gray-400 shrink-0" /> My Orders
-                </Link>
+                {!isSeller && (
+                  <Link href="/orders" onClick={() => setIsOpen(false)}
+                    className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-[#F5F5F5] transition">
+                    <Package size={15} className="text-gray-400 shrink-0" /> My Orders
+                  </Link>
+                )}
                 {isStoreOwner && (
                   <Link href="/store/dashboard" onClick={() => setIsOpen(false)}
+                    className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-[#F5F5F5] transition">
+                    <Store size={15} className="text-gray-400 shrink-0" /> My Store
+                  </Link>
+                )}
+                {isSeller && (
+                  <Link href="/seller/dashboard" onClick={() => setIsOpen(false)}
                     className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-[#F5F5F5] transition">
                     <Store size={15} className="text-gray-400 shrink-0" /> My Store
                   </Link>
@@ -234,6 +243,7 @@ export default function UserAvatarMenu({ theme = 'light', compact = false }: Pro
                   <LogOut size={15} className="shrink-0" /> Sign Out
                 </button>
               </div>
+
             </motion.div>
           )}
         </AnimatePresence>

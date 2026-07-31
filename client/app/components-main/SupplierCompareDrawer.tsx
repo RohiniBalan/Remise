@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Package, Star, MapPin, CheckCircle2 } from 'lucide-react';
+import { X, Package, Star, MapPin, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export interface GroupedSupplier {
   productId: string;
@@ -41,9 +41,14 @@ export default function SupplierCompareDrawer({
   onClose: () => void;
   onAddToCart: (supplier: GroupedSupplier, qty: number, price: number, tierLabel: string | null) => void;
 }) {
+  const [carouselIndex, setCarouselIndex] = useState(0);
   const [selected, setSelected] = useState<GroupedSupplier | null>(null);
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
+
+  const total = group.suppliers.length;
+  const goPrev = () => setCarouselIndex((i) => (i - 1 + total) % total);
+  const goNext = () => setCarouselIndex((i) => (i + 1) % total);
 
   const handleSelect = (s: GroupedSupplier) => {
     setSelected(s);
@@ -59,6 +64,8 @@ export default function SupplierCompareDrawer({
     setAdded(true);
     setTimeout(onClose, 900);
   };
+
+  const s = group.suppliers[carouselIndex];
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4">
@@ -76,30 +83,79 @@ export default function SupplierCompareDrawer({
 
         <div className="overflow-y-auto px-6 py-5 space-y-3">
 
-          {!selected && group.suppliers.map((s, idx) => (
-            <div key={s.productId}
-              className={`rounded-xl border p-4 ${idx === 0 ? 'border-teal-400 ring-2 ring-teal-100 bg-teal-50/30' : 'border-[#BBD5DA] bg-white'}`}>
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <p className="font-semibold text-gray-900">{s.storeName}</p>
-                    {idx === 0 && <span className="text-xs font-bold text-teal-700 bg-teal-100 px-2 py-0.5 rounded-full">Best price</span>}
+          {!selected && total > 0 && (
+            <div className="flex items-center gap-2">
+              {/* Prev arrow */}
+              <button
+                onClick={goPrev}
+                disabled={total <= 1}
+                aria-label="Previous supplier"
+                className="shrink-0 w-9 h-9 rounded-full border border-[#BBD5DA] bg-white text-gray-500 hover:bg-[#F5F5F5] hover:text-teal-700 disabled:opacity-30 disabled:hover:bg-white flex items-center justify-center transition"
+              >
+                <ChevronLeft size={18} />
+              </button>
+
+              {/* Card */}
+              <div className="flex-1 min-w-0">
+                <div
+                  className={`rounded-xl border p-4 ${carouselIndex === 0 ? 'border-teal-400 ring-2 ring-teal-100 bg-teal-50/30' : 'border-[#BBD5DA] bg-white'}`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+  <div className="min-w-0">
+    <p className="font-semibold text-gray-900 break-words">{s.storeName}</p>
+    {carouselIndex === 0 && (
+      <span className="inline-block text-xs font-bold text-teal-700 bg-teal-100 px-2 py-0.5 rounded-full mt-1">
+        Best price
+      </span>
+    )}
+    <p className="text-xs text-gray-400 mt-1">MOQ: {s.moq} units · Stock: {s.totalStock}</p>
+  </div>
+  <p className="font-bold text-teal-700 text-lg whitespace-nowrap shrink-0">₹{s.price}</p>
+</div>
+                  {s.bulkPricing?.length > 0 && (
+                    <div className="mt-1.5 text-xs text-gray-400 space-y-0.5">
+                      {s.bulkPricing.map((t, i) => <p key={i}>{t.minQty}+ units — ₹{t.price}</p>)}
+                    </div>
+                  )}
+                  <button
+                    onClick={() => handleSelect(s)}
+                    className="w-full mt-3 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold py-2 rounded-lg transition"
+                  >
+                    Select Supplier
+                  </button>
+                </div>
+
+                {/* Dot indicators */}
+                {total > 1 && (
+                  <div className="flex items-center justify-center gap-1.5 mt-4">
+                    {group.suppliers.map((_, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setCarouselIndex(i)}
+                        aria-label={`Go to supplier ${i + 1}`}
+                        className={`h-1.5 rounded-full transition-all ${
+                          i === carouselIndex ? 'w-5 bg-teal-600' : 'w-1.5 bg-[#BBD5DA]'
+                        }`}
+                      />
+                    ))}
                   </div>
-                  <p className="text-xs text-gray-400 mt-0.5">MOQ: {s.moq} units · Stock: {s.totalStock}</p>
-                </div>
-                <p className="font-bold text-teal-700 text-lg whitespace-nowrap">₹{s.price}</p>
+                )}
+                <p className="text-center text-xs text-gray-400 mt-1.5">
+                  {carouselIndex + 1} of {total}
+                </p>
               </div>
-              {s.bulkPricing?.length > 0 && (
-                <div className="mt-1.5 text-xs text-gray-400 space-y-0.5">
-                  {s.bulkPricing.map((t, i) => <p key={i}>{t.minQty}+ units — ₹{t.price}</p>)}
-                </div>
-              )}
-              <button onClick={() => handleSelect(s)}
-                className="w-full mt-3 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold py-2 rounded-lg transition">
-                Select Supplier
+
+              {/* Next arrow */}
+              <button
+                onClick={goNext}
+                disabled={total <= 1}
+                aria-label="Next supplier"
+                className="shrink-0 w-9 h-9 rounded-full border border-[#BBD5DA] bg-white text-gray-500 hover:bg-[#F5F5F5] hover:text-teal-700 disabled:opacity-30 disabled:hover:bg-white flex items-center justify-center transition"
+              >
+                <ChevronRight size={18} />
               </button>
             </div>
-          ))}
+          )}
 
           {selected && !added && (
             <div className="space-y-4">

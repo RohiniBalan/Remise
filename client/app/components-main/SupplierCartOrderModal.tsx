@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   ShoppingBag,
   CheckCircle,
@@ -14,6 +14,7 @@ import {
 import { smartOrderApi } from "../api-services/smartOrderApi";
 import { storeApi } from "../api-services/storeApi";
 import { orderApi } from "../api-services/orderApi";
+import { indianStates, getCities } from "../utils/indiaLocation";
 
 interface CartOrderItem {
   productId: string;
@@ -101,6 +102,9 @@ export default function SupplierCartOrderModal({
     state: prefill?.state || "",
     pinCode: prefill?.pinCode || "",
   });
+  
+  const [cities, setCities] = useState<any[]>([]);
+
   const setField = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
   const resetForNextGroup = () => {
@@ -112,6 +116,32 @@ export default function SupplierCartOrderModal({
     setErrorMsg("");
     setStep("delivery");
   };
+
+  const normalize = (s: string) =>
+      (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  
+    const findState = useCallback((value: string) => {
+      const v = normalize(value);
+      if (!v) return undefined;
+      return indianStates.find(
+        (s) => normalize(s.name) === v || normalize(s.isoCode) === v,
+      );
+    }, []);
+  
+    useEffect(() => {
+      if (!form.state) return;
+      const state = findState(form.state);
+      if (state) {
+        setCities(getCities(state.isoCode));
+      } else {
+        console.warn(
+          "State mismatch — saved value:",
+          JSON.stringify(form.state),
+          "→ no match found in indianStates",
+        );
+        setCities([]);
+      }
+    }, [form.state, findState]);
 
   const handleConfirmDetails = (e: React.FormEvent) => {
     e.preventDefault();
@@ -286,28 +316,73 @@ export default function SupplierCartOrderModal({
                 />
               </div>
               <div className="grid grid-cols-3 gap-3">
-                <input
-                  required
-                  placeholder="City"
-                  value={form.city}
-                  onChange={(e) => setField("city", e.target.value)}
-                  className="bg-white border border-[#BBD5DA] rounded-xl px-3 py-2 text-sm outline-none focus:border-teal-400"
-                />
-                <input
-                  required
-                  placeholder="State"
-                  value={form.state}
-                  onChange={(e) => setField("state", e.target.value)}
-                  className="bg-white border border-[#BBD5DA] rounded-xl px-3 py-2 text-sm outline-none focus:border-teal-400"
-                />
-                <input
-                  required
-                  placeholder="Pin Code"
-                  value={form.pinCode}
-                  onChange={(e) => setField("pinCode", e.target.value)}
-                  className="bg-white border border-[#BBD5DA] rounded-xl px-3 py-2 text-sm outline-none focus:border-teal-400"
-                />
-              </div>
+  <select
+    required
+    value={form.city}
+    disabled={!form.state}
+    onChange={async (e) => {
+      const city = e.target.value;
+      setField("city", city);
+      if (!city) return;
+      try {
+        const res = await fetch(
+          `https://api.postalpincode.in/postoffice/${encodeURIComponent(city)}`,
+        );
+        const data = await res.json();
+        if (data[0]?.Status === "Success" && data[0].PostOffice?.length > 0) {
+          setField("pinCode", data[0].PostOffice[0].Pincode);
+        }
+      } catch {
+        /* pincode lookup is best-effort — leave existing value on failure */
+      }
+    }}
+    className="bg-white border border-[#BBD5DA] rounded-xl px-3 py-2 text-sm outline-none focus:border-teal-400 disabled:opacity-50"
+  >
+    <option value="">Select City</option>
+    {cities.map((c) => (
+      <option key={c.name} value={c.name}>
+        {c.name}
+      </option>
+    ))}
+    {form.state && cities.length === 0 && (
+      <option value="" disabled>
+        No cities found for this state
+      </option>
+    )}
+  </select>
+
+  <select
+    required
+    value={findState(form.state)?.isoCode || ""}
+    onChange={(e) => {
+      const code = e.target.value;
+      const state = indianStates.find((s) => s.isoCode === code);
+      setForm((f) => ({
+        ...f,
+        state: state?.name || "",
+        city: "",
+        pinCode: "",
+      }));
+      setCities(getCities(code));
+    }}
+    className="bg-white border border-[#BBD5DA] rounded-xl px-3 py-2 text-sm outline-none focus:border-teal-400"
+  >
+    <option value="">Select State</option>
+    {indianStates.map((state) => (
+      <option key={state.isoCode} value={state.isoCode}>
+        {state.name}
+      </option>
+    ))}
+  </select>
+
+  <input
+    required
+    placeholder="Pin Code"
+    value={form.pinCode}
+    onChange={(e) => setField("pinCode", e.target.value)}
+    className="bg-white border border-[#BBD5DA] rounded-xl px-3 py-2 text-sm outline-none focus:border-teal-400"
+  />
+</div>
 
               <button
                 type="submit"
@@ -320,134 +395,72 @@ export default function SupplierCartOrderModal({
           )}
 
           {step === "delivery" && (
-            <div className="space-y-3">
-              <p className="text-sm text-gray-600">
-                How would you like to receive your order from{" "}
-                <strong>{chosen.storeName}</strong>?
-              </p>
+  <div className="space-y-3">
+    <p className="text-sm text-gray-600">
+      Your order from <strong>{chosen.storeName}</strong> will be delivered
+      to your store.
+    </p>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setDeliveryMethod("pickup");
-                  setStep("payment");
-                }}
-                className="w-full text-left border border-[#BBD5DA] hover:border-teal-400 rounded-xl p-4 transition flex items-center gap-3"
-              >
-                <Store size={20} className="text-teal-600 shrink-0" />
-                <div>
-                  <p className="font-semibold text-gray-900">Self Pickup</p>
-                  <p className="text-xs text-gray-400">
-                    Collect the stock yourself from the supplier.
-                  </p>
-                </div>
-              </button>
+    <button
+      type="button"
+      onClick={() => {
+        setDeliveryMethod("delivery");
+        setStep("payment");
+      }}
+      className="w-full text-left border border-[#BBD5DA] hover:border-teal-400 rounded-xl p-4 transition flex items-center gap-3"
+    >
+      <Truck size={20} className="text-teal-600 shrink-0" />
+      <div>
+        <p className="font-semibold text-gray-900">Delivery</p>
+        <p className="text-xs text-gray-400">
+          {chosen.storeName} will deliver the stock to your store.
+        </p>
+      </div>
+    </button>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setDeliveryMethod("delivery");
-                  setStep("payment");
-                }}
-                className="w-full text-left border border-[#BBD5DA] hover:border-teal-400 rounded-xl p-4 transition flex items-center gap-3"
-              >
-                <Truck size={20} className="text-teal-600 shrink-0" />
-                <div>
-                  <p className="font-semibold text-gray-900">Delivery</p>
-                  <p className="text-xs text-gray-400">
-                    {chosen.storeName} will deliver the stock to your store.
-                  </p>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setStep("confirming")}
-                className="text-xs text-gray-400 hover:text-teal-600 transition"
-              >
-                ← Back
-              </button>
-            </div>
-          )}
+    <button
+      type="button"
+      onClick={() => setStep("confirming")}
+      className="text-xs text-gray-400 hover:text-teal-600 transition"
+    >
+      ← Back
+    </button>
+  </div>
+)}
 
           {step === "payment" && (
             <div className="space-y-3">
               {!paymentMethod && (
-                <>
-                  <p className="text-sm text-gray-600">
-                    How would you like to pay?
-                  </p>
+  <>
+    <p className="text-sm text-gray-600">
+      How would you like to pay?
+    </p>
 
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod("qr")}
-                    className="w-full text-left border border-[#BBD5DA] hover:border-teal-400 rounded-xl p-4 transition flex items-center gap-3"
-                  >
-                    <QrCode size={20} className="text-teal-600 shrink-0" />
-                    <div>
-                      <p className="font-semibold text-gray-900">
-                        QR Code Payment
-                      </p>
-                      <p className="text-xs text-gray-400">
-                        Scan {chosen.storeName}'s QR code and pay instantly.
-                      </p>
-                    </div>
-                  </button>
+    <button
+      type="button"
+      onClick={() => setPaymentMethod("qr")}
+      className="w-full text-left border border-[#BBD5DA] hover:border-teal-400 rounded-xl p-4 transition flex items-center gap-3"
+    >
+      <QrCode size={20} className="text-teal-600 shrink-0" />
+      <div>
+        <p className="font-semibold text-gray-900">
+          QR Code Payment
+        </p>
+        <p className="text-xs text-gray-400">
+          Scan {chosen.storeName}'s QR code and pay instantly.
+        </p>
+      </div>
+    </button>
 
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod("cod")}
-                    className="w-full text-left border border-[#BBD5DA] hover:border-teal-400 rounded-xl p-4 transition flex items-center gap-3"
-                  >
-                    <Wallet size={20} className="text-teal-600 shrink-0" />
-                    <div>
-                      <p className="font-semibold text-gray-900">
-                        Cash / Invoice
-                      </p>
-                      <p className="text-xs text-gray-400">
-                        {deliveryMethod === "pickup"
-                          ? "Pay at pickup."
-                          : "Pay on delivery or by invoice."}
-                      </p>
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setStep("delivery")}
-                    className="text-xs text-gray-400 hover:text-teal-600 transition"
-                  >
-                    ← Back
-                  </button>
-                </>
-              )}
-
-              {paymentMethod === "cod" && (
-                <div className="space-y-3">
-                  <div className="bg-[#F5F5F5] border border-[#BBD5DA] rounded-xl p-4 text-sm text-gray-600">
-                    {deliveryMethod === "pickup"
-                      ? "You will pay when you pick up the stock."
-                      : "You will pay the supplier on delivery or via invoice."}
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setPaymentMethod(null)}
-                      className="px-4 py-3 rounded-xl text-sm font-semibold text-gray-600 bg-[#F5F5F5] border border-[#BBD5DA] hover:bg-white transition"
-                    >
-                      Back
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handlePlaceOrder}
-                      className="flex-1 bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 rounded-xl transition flex items-center justify-center gap-2"
-                    >
-                      <ShoppingBag size={16} /> Confirm & Order — ₹
-                      {chosen.totalAmount.toFixed(0)}
-                    </button>
-                  </div>
-                </div>
-              )}
+    <button
+      type="button"
+      onClick={() => setStep("delivery")}
+      className="text-xs text-gray-400 hover:text-teal-600 transition"
+    >
+      ← Back
+    </button>
+  </>
+)}
 
               {paymentMethod === "qr" && (
                 <div className="space-y-3">

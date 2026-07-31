@@ -63,6 +63,8 @@ const storeSchema = new mongoose.Schema({
   totalOffers:    { type: Number, default: 0 },
   totalOrders:    { type: Number, default: 0 },
 
+  targetRevenue: { type: Number, default: 0 },
+  
   createdAt: { type: Date, default: Date.now }
 });
 

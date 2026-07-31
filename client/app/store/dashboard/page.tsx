@@ -85,6 +85,9 @@ import SupplierBrandListDrawer, {
   TitleGroup,
   groupByTitle,
 } from "../../components-main/SupplierBrandListDrawer";
+import ConfirmModal from "../../components-main/ConfirmModal";
+import { indianStates, getCities } from "../../utils/indiaLocation";
+import TargetRevenueCard from "../../components-main/TargetRevenueCard";
 
 type CartLine = {
   productId: string;
@@ -110,6 +113,7 @@ type Tab =
   | "categories"
   | "orders"
   | "offers"
+  | "customers"
   | "suppliers"
   | "settings";
 
@@ -147,6 +151,7 @@ function normalizeSmartOrder(o: any) {
       o.contactEmail,
     customerPhone: addr.phone,
     customerEmail: o.contactEmail,
+    customerId: o.userId || null,
     deliveryAddress: [addr.address, addr.city, addr.state, addr.pinCode]
       .filter(Boolean)
       .join(", "),
@@ -162,6 +167,80 @@ function normalizeSmartOrder(o: any) {
     rawItems: items,
     _source: "smartOrder" as const,
   };
+}
+
+// Groups the merged orders array (offer orders + smart orders) by customer
+// identity, then looks for products the same customer bought in 2+ different
+// calendar months — a simple, no-backend signal for "recurring buyer."
+function buildCustomerInsights(orders: any[]) {
+  const byCustomer: Record<string, any> = {};
+
+  for (const o of orders) {
+    const key =
+      o.customerId ||
+      o.userId ||
+      o.customerPhone ||
+      o.customerEmail ||
+      o.customerName ||
+      o._id;
+    if (!byCustomer[key]) {
+      byCustomer[key] = {
+        key,
+        name: o.customerName || "Unknown",
+        phone: o.customerPhone || null,
+        email: o.customerEmail || null,
+        customerId: o.customerId || o.userId || null,
+        orders: [] as any[],
+      };
+    }
+    byCustomer[key].orders.push(o);
+  }
+
+  return Object.values(byCustomer)
+    .map((c: any) => {
+      const totalOrders = c.orders.length;
+      const totalSpent = c.orders.reduce(
+        (s: number, o: any) => s + (o.totalAmount || 0),
+        0,
+      );
+      const lastOrderDate = c.orders.reduce(
+        (latest: string, o: any) =>
+          !latest || new Date(o.createdAt) > new Date(latest)
+            ? o.createdAt
+            : latest,
+        "",
+      );
+
+      // productTitle -> set of "YYYY-MM" months it was bought in
+      const productMonths: Record<string, Set<string>> = {};
+      for (const o of c.orders) {
+        const month = (o.createdAt || "").slice(0, 7);
+        const titles: string[] =
+          o._source === "smartOrder" && o.rawItems?.length
+            ? o.rawItems.map((it: any) => it.title)
+            : [o.offerTitle];
+        for (const t of titles) {
+          if (!t) continue;
+          if (!productMonths[t]) productMonths[t] = new Set();
+          productMonths[t].add(month);
+        }
+      }
+
+      const recurringProducts = Object.entries(productMonths)
+        .filter(([, months]) => months.size >= 2)
+        .map(([title, months]) => ({ title, monthCount: months.size }))
+        .sort((a, b) => b.monthCount - a.monthCount);
+
+      return {
+        ...c,
+        totalOrders,
+        totalSpent,
+        lastOrderDate,
+        recurringProducts,
+        isRecurring: recurringProducts.length > 0,
+      };
+    })
+    .sort((a: any, b: any) => b.totalOrders - a.totalOrders);
 }
 
 // ── Small UI helpers ──────────────────────────────────────────────────────────
@@ -642,6 +721,90 @@ const PIE_COLORS = [
   "#ec4899",
 ];
 
+function SalesTrendTooltip({ active, payload, label }: any) {
+  if (!active || !payload || !payload.length) return null;
+  const data = payload[0].payload;
+  return (
+    <div className="bg-white border border-[#BBD5DA] rounded-xl shadow-lg px-3 py-2 text-xs">
+      <p className="font-semibold text-gray-800 mb-1">{label}</p>
+      <p className="text-teal-700 font-medium">
+        revenue : ₹
+        {Number(data.revenue).toLocaleString("en-IN", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })}
+      </p>
+      {data.topProduct && (
+        <p className="text-gray-500 mt-1">
+          Top product:{" "}
+          <span className="font-semibold text-gray-700">{data.topProduct}</span>
+        </p>
+      )}
+    </div>
+  );
+}
+
+// Brand-wise Revenue tooltip — shows the currently selected date range
+function BrandRevenueTooltip({ active, payload, from, to }: any) {
+  if (!active || !payload || !payload.length) return null;
+  const data = payload[0].payload; // { brand, qty, revenue }
+  return (
+    <div className="bg-white border border-[#BBD5DA] rounded-xl shadow-lg px-3 py-2 text-xs">
+      <p className="font-semibold text-gray-800 mb-1">{data.brand}</p>
+      <p className="text-teal-700 font-medium">
+        revenue : ₹
+        {Number(data.revenue).toLocaleString("en-IN", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })}
+      </p>
+      {from && to && (
+        <p className="text-gray-500 mt-1">
+          Period: {formatPeriodLabel(from, to)}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// Revenue by Month tooltip
+function RevenueByMonthTooltip({ active, payload, label }: any) {
+  if (!active || !payload || !payload.length) return null;
+  const data = payload[0].payload;
+  return (
+    <div className="bg-white border border-[#BBD5DA] rounded-xl shadow-lg px-3 py-2 text-xs">
+      <p className="font-semibold text-gray-800 mb-1">{label}</p>
+      <p className="text-teal-700 font-medium">
+        revenue : ₹
+        {Number(data.revenue).toLocaleString("en-IN", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })}
+      </p>
+      {data.topProduct && (
+        <p className="text-gray-500 mt-1">
+          Top product:{" "}
+          <span className="font-semibold text-gray-700">{data.topProduct}</span>
+        </p>
+      )}
+    </div>
+  );
+}
+
+function formatPeriodLabel(from: Date, to: Date) {
+  const days = Math.max(
+    1,
+    Math.round((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24)) + 1,
+  );
+  const fmt = (d: Date) =>
+    d.toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  return `${fmt(from)} – ${fmt(to)} (${days} day${days !== 1 ? "s" : ""})`;
+}
+
 function OverviewTab({
   store,
   offers,
@@ -670,7 +833,19 @@ function OverviewTab({
     items = items.filter((i) => i.productTitle === productFilter);
 
   const analytics = computeAnalytics(items);
-  const trend = buildTrend(analytics.byDay, granularity);
+  const trend = buildTrend(
+    analytics.byDay,
+    analytics.byDayProduct,
+    granularity,
+  );
+
+  // ── Target revenue: current calendar month, Delivered orders only ──
+  const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  const monthDeliveredRevenue = orders
+    .filter(
+      (o: any) => o.status === "Delivered" && new Date(o.createdAt) >= monthStart,
+    )
+    .reduce((s: number, o: any) => s + (o.totalAmount || 0), 0);
 
   const handleExportPdf = async () => {
     const res = await fetch("/api/store-analytics-pdf", {
@@ -690,6 +865,9 @@ function OverviewTab({
   // ── Original stats (based on ALL orders, unaffected by the analytics filters above) ──
   const totalRevenue = orders
     .filter((o: any) => o.status === "Delivered")
+    .reduce((s: number, o: any) => s + (o.totalAmount || 0), 0);
+  const offerRevenue = orders
+    .filter((o: any) => o.status === "Delivered" && o._source !== "smartOrder")
     .reduce((s: number, o: any) => s + (o.totalAmount || 0), 0);
   const activeOffers = offers.filter(
     (o: any) => o.isActive && new Date(o.validUntil) > new Date(),
@@ -741,6 +919,14 @@ function OverviewTab({
       color: pendingOrders > 0 ? "text-[#FF0000]" : "text-gray-600",
       bg: pendingOrders > 0 ? "bg-red-50" : "bg-[#F5F5F5]",
       border: pendingOrders > 0 ? "border-red-200" : "border-[#BBD5DA]",
+    },
+    {
+      label: "Offer Revenue (₹)",
+      value: `₹${offerRevenue.toLocaleString("en-IN")}`,
+      icon: <IndianRupee size={20} />,
+      color: "text-green-600",
+      bg: "bg-green-50",
+      border: "border-green-100",
     },
     {
       label: "Low Stock",
@@ -827,6 +1013,12 @@ function OverviewTab({
         </button>
       </div>
 
+      <TargetRevenueCard
+        targetRevenue={store?.targetRevenue || 0}
+        achievedRevenue={monthDeliveredRevenue}
+        onGoToSettings={() => onTabSwitch("settings")}
+      />
+      
       {/* ── Stats grid: original 6 cards + Total Products Sold ── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         <div className="bg-white rounded-2xl border border-purple-100 p-4 shadow-sm">
@@ -975,7 +1167,7 @@ function OverviewTab({
             <CartesianGrid strokeDasharray="3 3" stroke="#F5F5F5" />
             <XAxis dataKey="label" tick={{ fontSize: 11 }} />
             <YAxis tick={{ fontSize: 11 }} />
-            <Tooltip />
+            <Tooltip content={<SalesTrendTooltip />} />
             <Line
               type="monotone"
               dataKey="revenue"
@@ -1057,6 +1249,7 @@ function OverviewTab({
                 width={90}
               />
               <Tooltip
+                content={<BrandRevenueTooltip from={from} to={to} />}
                 formatter={(value) => {
                   if (typeof value === "number") {
                     return `₹${value.toLocaleString("en-IN")}`;
@@ -1101,7 +1294,7 @@ function OverviewTab({
               <CartesianGrid strokeDasharray="3 3" stroke="#F5F5F5" />
               <XAxis dataKey="month" tick={{ fontSize: 11 }} />
               <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip />
+              <Tooltip content={<RevenueByMonthTooltip />} />
               <Bar dataKey="revenue" fill="#0d9488" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
@@ -1179,10 +1372,7 @@ function groupProductsByType(products: any[]) {
   > = {};
 
   for (const p of products) {
-    const key = (p.title || "")
-      .toLowerCase()
-      .trim()
-      .replace(/\s+/g, " ");
+    const key = (p.title || "").toLowerCase().trim().replace(/\s+/g, " ");
 
     if (!byTitle[key]) {
       byTitle[key] = {
@@ -1205,7 +1395,7 @@ function groupProductsByType(products: any[]) {
     brandCount: v.items.length,
     totalStock: v.items.reduce(
       (s: number, p: any) => s + (p.totalStock || 0),
-      0
+      0,
     ),
   }));
 }
@@ -2354,6 +2544,168 @@ function BulkSmartUploadModal({
   );
 }
 
+// ── Categories Tab ────────────────────────────────────────────────────────────
+function CategoriesTab({ categories, products, token, onRefresh }: any) {
+  const [name, setName] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<any>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const countByCategory = (products || []).reduce(
+    (acc: Record<string, number>, p: any) => {
+      if (p.category) acc[p.category] = (acc[p.category] || 0) + 1;
+      return acc;
+    },
+    {},
+  );
+
+  const handleAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+    setSaving(true);
+    setError("");
+    try {
+      await productApi.createCategory(name.trim(), token);
+      setName("");
+      onRefresh();
+    } catch (err: any) {
+      const status = err?.response?.status;
+      const msg = err?.response?.data?.message;
+      if (!err.response) {
+        setError(
+          "Product service is not reachable. Make sure it is running on port 3003.",
+        );
+      } else if (status === 403) {
+        setError(
+          msg ||
+            "Access denied. Your account role may need updating — try signing out and back in.",
+        );
+      } else {
+        setError(msg || `Failed to create category (HTTP ${status}).`);
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = (category: any) => {
+    setSelectedCategory(category);
+    setDeleteModalOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!selectedCategory) return;
+
+    setDeleting(true);
+
+    try {
+      await productApi.deleteCategory(selectedCategory._id, token);
+
+      setDeleteModalOpen(false);
+      setSelectedCategory(null);
+
+      onRefresh();
+    } catch {
+      alert("Failed to delete category.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <div className="max-w-xl space-y-5">
+      {/* Add form */}
+      <div className="bg-white rounded-2xl border border-[#BBD5DA] p-5 shadow-sm">
+        <h3 className="text-sm font-bold text-gray-900 mb-4">
+          Add New Category
+        </h3>
+        <form onSubmit={handleAdd} className="flex gap-3">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Skincare"
+            className="flex-1 bg-white border border-[#BBD5DA] rounded-xl px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 transition placeholder-gray-400"
+          />
+          <button
+            type="submit"
+            disabled={saving || !name.trim()}
+            className="flex items-center gap-2 bg-[#FF0000] hover:bg-[#e00000] disabled:opacity-50 text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition"
+          >
+            {saving ? (
+              <RefreshCw size={14} className="animate-spin" />
+            ) : (
+              <Plus size={14} />
+            )}{" "}
+            Add
+          </button>
+        </form>
+        {error && <p className="text-xs text-[#FF0000] mt-2">{error}</p>}
+      </div>
+
+      {/* Categories list */}
+      <div className="bg-white rounded-2xl border border-[#BBD5DA] shadow-sm overflow-hidden">
+        <div className="px-5 py-3 border-b border-[#BBD5DA] bg-[#F9F9F9]">
+          <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+            All Categories ({categories.length})
+          </p>
+        </div>
+        {categories.length === 0 ? (
+          <p className="text-gray-400 text-sm text-center py-10">
+            No categories yet. Add one above.
+          </p>
+        ) : (
+          <ul className="divide-y divide-[#F5F5F5]">
+            {categories.map((c: any) => (
+              <li
+                key={c._id}
+                className="flex items-center justify-between px-5 py-3.5 hover:bg-[#F9F9F9] transition"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-[#DFF1F1] flex items-center justify-center">
+                    <Layers size={14} className="text-teal-600" />
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <span className="text-sm font-semibold text-gray-900">
+                      {c.name}
+                    </span>
+                    <span className="text-[11px] font-semibold text-teal-700 bg-[#DFF1F1] border border-[#BBD5DA] px-2 py-0.5 rounded-full">
+                      {countByCategory[c.name] || 0} product
+                      {(countByCategory[c.name] || 0) !== 1 ? "s" : ""}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleDelete(c)}
+                  className="text-gray-300 hover:text-[#FF0000] hover:bg-red-50 p-2 rounded-lg transition"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <ConfirmModal
+        open={deleteModalOpen}
+        title="Delete Category"
+        message={`Are you sure you want to delete "${selectedCategory?.name}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        loading={deleting}
+        onCancel={() => {
+          setDeleteModalOpen(false);
+          setSelectedCategory(null);
+        }}
+        onConfirm={confirmDelete}
+      />
+    </div>
+  );
+}
+
+// ── Products Tab ────────────────────────────────────────────────────────────
 function ProductsTab({ products, categories, storeId, token, onRefresh }: any) {
   const [search, setSearch] = useState("");
   const [catFilter, setCatFilter] = useState("");
@@ -2387,7 +2739,8 @@ function ProductsTab({ products, categories, storeId, token, onRefresh }: any) {
   });
 
   const productTypes = groupProductsByType(filtered);
-  const selectedType = productTypes.find((t) => t.typeKey === selectedTypeKey) || null;
+  const selectedType =
+    productTypes.find((t) => t.typeKey === selectedTypeKey) || null;
 
   // ── Brand-management view (inside a product type) ──────────────────────
   if (selectedType) {
@@ -2402,9 +2755,13 @@ function ProductsTab({ products, categories, storeId, token, onRefresh }: any) {
               <ArrowLeft size={15} /> Back
             </button>
             <div>
-              <h2 className="text-lg font-bold text-gray-900">{selectedType.title}</h2>
+              <h2 className="text-lg font-bold text-gray-900">
+                {selectedType.title}
+              </h2>
               <p className="text-xs text-gray-400">
-                {selectedType.brandCount} brand{selectedType.brandCount !== 1 ? "s" : ""} · {selectedType.totalStock} total stock
+                {selectedType.brandCount} brand
+                {selectedType.brandCount !== 1 ? "s" : ""} ·{" "}
+                {selectedType.totalStock} total stock
               </p>
             </div>
           </div>
@@ -2430,7 +2787,11 @@ function ProductsTab({ products, categories, storeId, token, onRefresh }: any) {
               >
                 <div className="w-14 h-14 rounded-xl bg-[#F5F5F5] shrink-0 overflow-hidden">
                   {img ? (
-                    <img src={img} alt={p.brand || p.title} className="w-full h-full object-cover" />
+                    <img
+                      src={img}
+                      alt={p.brand || p.title}
+                      className="w-full h-full object-cover"
+                    />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
                       <Package size={20} className="text-gray-300" />
@@ -2446,7 +2807,9 @@ function ProductsTab({ products, categories, storeId, token, onRefresh }: any) {
                       ₹{p.discountedPrice || p.price}
                     </span>
                     {p.discountedPrice && (
-                      <span className="text-gray-400 text-xs line-through">₹{p.price}</span>
+                      <span className="text-gray-400 text-xs line-through">
+                        ₹{p.price}
+                      </span>
                     )}
                   </div>
                   <div className="flex items-center gap-2 mt-1">
@@ -2461,7 +2824,9 @@ function ProductsTab({ products, categories, storeId, token, onRefresh }: any) {
                     >
                       {p.availability}
                     </span>
-                    <span className={`text-[10px] font-medium ${p.totalStock < 5 ? "text-amber-600 font-bold" : "text-gray-400"}`}>
+                    <span
+                      className={`text-[10px] font-medium ${p.totalStock < 5 ? "text-amber-600 font-bold" : "text-gray-400"}`}
+                    >
                       Stock {p.totalStock}
                     </span>
                   </div>
@@ -2584,6 +2949,15 @@ function ProductsTab({ products, categories, storeId, token, onRefresh }: any) {
                 ? pt.image
                 : `${API}${pt.image}`
               : "";
+
+            const brandRows = pt.items
+              .map((p: any) => ({
+                brand: p.brand || "Unbranded",
+                stock: p.totalStock || 0,
+              }))
+              .sort((a, b) => b.stock - a.stock);
+            const visibleBrands = brandRows.slice(0, 3);
+            const extraCount = brandRows.length - visibleBrands.length;
             return (
               <div
                 key={pt.typeKey}
@@ -2591,7 +2965,11 @@ function ProductsTab({ products, categories, storeId, token, onRefresh }: any) {
               >
                 <div className="relative aspect-square bg-[#F5F5F5]">
                   {img ? (
-                    <img src={img} alt={pt.title} className="w-full h-full object-cover" />
+                    <img
+                      src={img}
+                      alt={pt.title}
+                      className="w-full h-full object-cover"
+                    />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
                       <Package size={36} className="text-gray-200" />
@@ -2599,15 +2977,45 @@ function ProductsTab({ products, categories, storeId, token, onRefresh }: any) {
                   )}
                 </div>
                 <div className="p-3">
-                  <p className="text-xs text-gray-400 mb-0.5">{pt.category || "—"}</p>
-                  <p className="font-semibold text-gray-900 text-sm truncate">{pt.title}</p>
+                  <p className="text-xs text-gray-400 mb-0.5">
+                    {pt.category || "—"}
+                  </p>
+                  <p className="font-semibold text-gray-900 text-sm truncate">
+                    {pt.title}
+                  </p>
                   <p className="text-xs text-gray-500 mt-1">
                     {pt.brandCount} Brand{pt.brandCount !== 1 ? "s" : ""}
                   </p>
-                  <p className="text-xs text-gray-400">Total Stock: {pt.totalStock}</p>
+                  <p className="text-xs text-gray-400">
+                    Total Stock: {pt.totalStock}
+                  </p>
+                  <div className="mt-2 pt-2 border-t border-[#F5F5F5] space-y-1">
+                    {visibleBrands.map((b, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center justify-between text-[11px]"
+                      >
+                        <span className="text-gray-600 truncate pr-2">
+                          {b.brand}
+                        </span>
+                        <span
+                          className={`font-semibold shrink-0 ${
+                            b.stock < 5 ? "text-amber-600" : "text-gray-700"
+                          }`}
+                        >
+                          {b.stock}
+                        </span>
+                      </div>
+                    ))}
+                    {extraCount > 0 && (
+                      <p className="text-[11px] text-gray-400">
+                        +{extraCount} more
+                      </p>
+                    )}
+                  </div>
                   <button
                     onClick={() => setSelectedTypeKey(pt.typeKey)}
-                    className="w-full mt-2 text-xs font-semibold bg-teal-600 hover:bg-teal-700 text-white py-2 rounded-lg transition"
+                    className="w-full mt-3 text-xs font-semibold bg-teal-600 hover:bg-teal-700 text-white py-2 rounded-lg transition"
                   >
                     Manage Brands →
                   </button>
@@ -2653,122 +3061,6 @@ function ProductsTab({ products, categories, storeId, token, onRefresh }: any) {
           onCreated={onRefresh}
         />
       )}
-    </div>
-  );
-}
-
-// ── Categories Tab ────────────────────────────────────────────────────────────
-function CategoriesTab({ categories, token, onRefresh }: any) {
-  const [name, setName] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-
-  const handleAdd = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) return;
-    setSaving(true);
-    setError("");
-    try {
-      await productApi.createCategory(name.trim(), token);
-      setName("");
-      onRefresh();
-    } catch (err: any) {
-      const status = err?.response?.status;
-      const msg = err?.response?.data?.message;
-      if (!err.response) {
-        setError(
-          "Product service is not reachable. Make sure it is running on port 3003.",
-        );
-      } else if (status === 403) {
-        setError(
-          msg ||
-            "Access denied. Your account role may need updating — try signing out and back in.",
-        );
-      } else {
-        setError(msg || `Failed to create category (HTTP ${status}).`);
-      }
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDelete = async (id: string, catName: string) => {
-    if (!confirm(`Delete category "${catName}"?`)) return;
-    try {
-      await productApi.deleteCategory(id, token);
-      onRefresh();
-    } catch {
-      alert("Failed to delete category.");
-    }
-  };
-
-  return (
-    <div className="max-w-xl space-y-5">
-      {/* Add form */}
-      <div className="bg-white rounded-2xl border border-[#BBD5DA] p-5 shadow-sm">
-        <h3 className="text-sm font-bold text-gray-900 mb-4">
-          Add New Category
-        </h3>
-        <form onSubmit={handleAdd} className="flex gap-3">
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Skincare"
-            className="flex-1 bg-white border border-[#BBD5DA] rounded-xl px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 transition placeholder-gray-400"
-          />
-          <button
-            type="submit"
-            disabled={saving || !name.trim()}
-            className="flex items-center gap-2 bg-[#FF0000] hover:bg-[#e00000] disabled:opacity-50 text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition"
-          >
-            {saving ? (
-              <RefreshCw size={14} className="animate-spin" />
-            ) : (
-              <Plus size={14} />
-            )}{" "}
-            Add
-          </button>
-        </form>
-        {error && <p className="text-xs text-[#FF0000] mt-2">{error}</p>}
-      </div>
-
-      {/* Categories list */}
-      <div className="bg-white rounded-2xl border border-[#BBD5DA] shadow-sm overflow-hidden">
-        <div className="px-5 py-3 border-b border-[#BBD5DA] bg-[#F9F9F9]">
-          <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-            All Categories ({categories.length})
-          </p>
-        </div>
-        {categories.length === 0 ? (
-          <p className="text-gray-400 text-sm text-center py-10">
-            No categories yet. Add one above.
-          </p>
-        ) : (
-          <ul className="divide-y divide-[#F5F5F5]">
-            {categories.map((c: any) => (
-              <li
-                key={c._id}
-                className="flex items-center justify-between px-5 py-3.5 hover:bg-[#F9F9F9] transition"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-[#DFF1F1] flex items-center justify-center">
-                    <Layers size={14} className="text-teal-600" />
-                  </div>
-                  <span className="text-sm font-semibold text-gray-900">
-                    {c.name}
-                  </span>
-                </div>
-                <button
-                  onClick={() => handleDelete(c._id, c.name)}
-                  className="text-gray-300 hover:text-[#FF0000] hover:bg-red-50 p-2 rounded-lg transition"
-                >
-                  <Trash2 size={14} />
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
     </div>
   );
 }
@@ -2867,10 +3159,10 @@ function OrdersTab({ orders, token, onRefresh }: any) {
                         · {o.customerPhone}
                       </span>
                     )}
-                    {o.customerEmail && (
+                    {(o.customerId || o.userId || o.userID) && (
                       <span className="text-gray-400">
                         {" "}
-                        · {o.customerEmail}
+                        · Customer ID: {o.customerId || o.userId || o.userID}
                       </span>
                     )}
                   </p>
@@ -2926,7 +3218,7 @@ function OrdersTab({ orders, token, onRefresh }: any) {
                 <span className="text-xs text-gray-400 font-mono">
                   #{o._id.slice(-6).toUpperCase()}
                 </span>
-                {o._source === "smartOrder" ? (
+                {o._source === "smartOrder" || o.status === "Delivered" ? (
                   <span
                     className={`ml-auto text-xs font-semibold px-3 py-1.5 rounded-xl border ${STATUS_STYLE[o.status] || "bg-gray-100 text-gray-600 border-gray-200"}`}
                   >
@@ -3023,6 +3315,11 @@ function OffersTab({ offers, token, onRefresh }: any) {
                       {offer.discountPercent}% OFF
                     </span>
                   )}
+                  {offer.targetCustomerId && (
+                    <span className="absolute top-2 right-2 bg-purple-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-lg shadow">
+                      Private · {offer.targetCustomerName}
+                    </span>
+                  )}
                   {expired && (
                     <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
                       <span className="bg-gray-800 text-white text-xs font-bold px-3 py-1 rounded-full">
@@ -3072,6 +3369,145 @@ function OffersTab({ offers, token, onRefresh }: any) {
               </div>
             );
           })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Customers Tab ─────────────────────────────────────────────────────────────
+function CustomersTab({ orders }: any) {
+  const [search, setSearch] = useState("");
+  const [onlyRecurring, setOnlyRecurring] = useState(false);
+
+  const customers = buildCustomerInsights(orders);
+
+  const filtered = customers.filter((c: any) => {
+    const matchSearch =
+      !search ||
+      c.name?.toLowerCase().includes(search.toLowerCase()) ||
+      c.phone?.includes(search) ||
+      c.email?.toLowerCase().includes(search.toLowerCase());
+    const matchRecurring = !onlyRecurring || c.isRecurring;
+    return matchSearch && matchRecurring;
+  });
+
+  const recurringCount = customers.filter((c: any) => c.isRecurring).length;
+
+  return (
+    <div>
+      {/* Toolbar */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-5">
+        <div className="relative flex-1">
+          <Search
+            size={15}
+            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"
+          />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name, phone or email…"
+            className="w-full pl-9 pr-4 py-2.5 bg-white border border-[#BBD5DA] rounded-xl text-sm outline-none focus:border-teal-400 transition"
+          />
+        </div>
+        <button
+          onClick={() => setOnlyRecurring((v) => !v)}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition shrink-0 ${
+            onlyRecurring
+              ? "bg-teal-600 text-white border-teal-600"
+              : "bg-white text-gray-600 border-[#BBD5DA]"
+          }`}
+        >
+          <Star size={14} /> Recurring only ({recurringCount})
+        </button>
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-[#BBD5DA] py-20 text-center shadow-sm">
+          <Users size={40} className="mx-auto text-gray-200 mb-4" />
+          <p className="text-lg font-semibold text-gray-700">
+            No customers found
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map((c: any) => (
+            <div
+              key={c.key}
+              className="bg-white rounded-2xl border border-[#BBD5DA] p-5 shadow-sm hover:shadow-md transition"
+            >
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <p className="font-bold text-gray-900">{c.name}</p>
+                    {c.isRecurring && (
+                      <span className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border bg-amber-50 text-amber-700 border-amber-200">
+                        <Star size={10} /> Recurring buyer
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-gray-600 text-sm">
+                    {c.phone && <span>{c.phone}</span>}
+                    {c.email && (
+                      <span className="text-gray-400"> · {c.email}</span>
+                    )}
+                    {c.customerId && (
+                      <span className="text-gray-400">
+                        {" "}
+                        · Customer ID: {c.customerId}
+                      </span>
+                    )}
+                  </p>
+                  {c.lastOrderDate && (
+                    <p className="text-gray-400 text-xs mt-1">
+                      Last order:{" "}
+                      {new Date(c.lastOrderDate).toLocaleDateString("en-IN", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}
+                    </p>
+                  )}
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-xl font-bold text-teal-700">
+                    ₹
+                    {c.totalSpent.toLocaleString("en-IN", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </p>
+                  <p className="text-gray-400 text-xs">
+                    {c.totalOrders} order{c.totalOrders !== 1 ? "s" : ""}
+                  </p>
+                </div>
+              </div>
+
+              {c.isRecurring && (
+                <div className="mt-4 pt-4 border-t border-[#F5F5F5]">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                    Buys repeatedly
+                  </p>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {c.recurringProducts.map((p: any) => (
+                      <span
+                        key={p.title}
+                        className="text-xs font-medium px-2.5 py-1 rounded-full bg-[#DFF1F1] text-teal-700 border border-[#BBD5DA]"
+                      >
+                        {p.title} · {p.monthCount} months
+                      </span>
+                    ))}
+                  </div>
+                  <Link
+                    href={`/store/offers/new?customerId=${encodeURIComponent(c.customerId || c.key)}&customerName=${encodeURIComponent(c.name)}`}
+                    className="inline-flex items-center gap-2 bg-[#FF0000] hover:bg-[#e00000] text-white px-4 py-2 rounded-xl text-xs font-semibold transition"
+                  >
+                    <Tag size={13} /> Create Offer →
+                  </Link>
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -3521,10 +3957,13 @@ function SettingsTab({ store, token, onRefresh }: any) {
     city: store?.address?.city || "",
     state: store?.address?.state || "",
     pinCode: store?.address?.pinCode || "",
+    targetRevenue: store?.targetRevenue ? String(store.targetRevenue) : "",
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
+  const [cities, setCities] = useState<any[]>([]);
+
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
   const [upiId, setUpiId] = useState(store?.upiId || "");
@@ -3533,6 +3972,32 @@ function SettingsTab({ store, token, onRefresh }: any) {
     upiId.trim() && !UPI_ID_REGEX.test(upiId.trim())
       ? "Invalid UPI ID format (expected e.g. name@bank)."
       : "";
+
+  const normalize = (s: string) =>
+    (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+
+  const findState = useCallback((value: string) => {
+    const v = normalize(value);
+    if (!v) return undefined;
+    return indianStates.find(
+      (s) => normalize(s.name) === v || normalize(s.isoCode) === v,
+    );
+  }, []);
+
+  useEffect(() => {
+    if (!form.state) return;
+    const state = findState(form.state);
+    if (state) {
+      setCities(getCities(state.isoCode));
+    } else {
+      console.warn(
+        "State mismatch — saved value:",
+        JSON.stringify(form.state),
+        "→ no match found in indianStates",
+      );
+      setCities([]);
+    }
+  }, [form.state, findState]);
 
   const STORE_CATEGORIES = [
     "Food & Beverages",
@@ -3567,6 +4032,7 @@ function SettingsTab({ store, token, onRefresh }: any) {
       fd.append("address[city]", form.city);
       fd.append("address[state]", form.state);
       fd.append("address[pinCode]", form.pinCode);
+      fd.append("targetRevenue", form.targetRevenue);
       fd.append("upiId", upiId.trim());
       await storeApi.update(store._id, fd, token);
       setSaved(true);
@@ -3602,6 +4068,17 @@ function SettingsTab({ store, token, onRefresh }: any) {
               value={form.name}
               onChange={(e) => set("name", e.target.value)}
               required
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <Input
+              label="Monthly Revenue Target (₹)"
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="e.g. 100000"
+              value={form.targetRevenue}
+              onChange={(e) => set("targetRevenue", e.target.value)}
             />
           </div>
           <div className="sm:col-span-2">
@@ -3644,16 +4121,65 @@ function SettingsTab({ store, token, onRefresh }: any) {
             value={form.street}
             onChange={(e) => set("street", e.target.value)}
           />
-          <Input
+          <Select
             label="City"
             value={form.city}
-            onChange={(e) => set("city", e.target.value)}
-          />
-          <Input
+            disabled={!form.state}
+            onChange={async (e) => {
+              const city = e.target.value;
+              set("city", city);
+              if (!city) return;
+
+              try {
+                const res = await fetch(
+                  `https://api.postalpincode.in/postoffice/${encodeURIComponent(city)}`,
+                );
+                const data = await res.json();
+                if (
+                  data[0]?.Status === "Success" &&
+                  data[0].PostOffice?.length > 0
+                ) {
+                  set("pinCode", data[0].PostOffice[0].Pincode);
+                }
+              } catch {
+                /* pincode lookup is best-effort — leave existing value on failure */
+              }
+            }}
+          >
+            <option value="">Select City</option>
+            {cities.map((c) => (
+              <option key={c.name} value={c.name}>
+                {c.name}
+              </option>
+            ))}
+            {form.state && cities.length === 0 && (
+              <option value="" disabled>
+                No cities found for this state
+              </option>
+            )}
+          </Select>
+          <Select
             label="State"
-            value={form.state}
-            onChange={(e) => set("state", e.target.value)}
-          />
+            value={findState(form.state)?.isoCode || ""}
+            onChange={(e) => {
+              const code = e.target.value;
+              const state = indianStates.find((s) => s.isoCode === code);
+              setForm((f) => ({
+                ...f,
+                state: state?.name || "",
+                city: "",
+                pinCode: "",
+              }));
+              setCities(getCities(code));
+            }}
+          >
+            <option value="">Select State</option>
+            {indianStates.map((state) => (
+              <option key={state.isoCode} value={state.isoCode}>
+                {state.name}
+              </option>
+            ))}
+          </Select>
         </div>
 
         <div className="pt-2 border-t border-[#F5F5F5]">
@@ -3758,11 +4284,12 @@ function SettingsTab({ store, token, onRefresh }: any) {
 // ── Tab config ────────────────────────────────────────────────────────────────
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "overview", label: "Overview", icon: <BarChart2 size={15} /> },
-  { id: "products", label: "Products", icon: <Package size={15} /> },
   { id: "categories", label: "Categories", icon: <Layers size={15} /> },
+  { id: "products", label: "Products", icon: <Package size={15} /> },
   { id: "orders", label: "Orders", icon: <ShoppingBag size={15} /> },
   { id: "suppliers", label: "Order Stock", icon: <Truck size={15} /> },
   { id: "offers", label: "Offers", icon: <Tag size={15} /> },
+  { id: "customers", label: "Customers", icon: <Users size={15} /> },
   { id: "settings", label: "Settings", icon: <Settings size={15} /> },
 ];
 
@@ -3962,6 +4489,10 @@ export default function StoreDashboard() {
 
   const pendingOrders = orders.filter((o) => o.status === "Pending").length;
 
+  const recurringCustomers = buildCustomerInsights(orders).filter(
+    (c: any) => c.isRecurring,
+  ).length;
+
   return (
     <div className="min-h-screen bg-[#F5F5F5]">
       {/* ── Header ────────────────────────────────────────────────────────── */}
@@ -4030,6 +4561,11 @@ export default function StoreDashboard() {
                       {pendingOrders}
                     </span>
                   )}
+                  {t.id === "customers" && recurringCustomers > 0 && (
+                    <span className="ml-auto bg-amber-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                      {recurringCustomers}
+                    </span>
+                  )}
                 </button>
               ))}
             </nav>
@@ -4053,6 +4589,11 @@ export default function StoreDashboard() {
                   {t.id === "orders" && pendingOrders > 0 && (
                     <span className="bg-[#FF0000] text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
                       {pendingOrders}
+                    </span>
+                  )}
+                  {t.id === "customers" && recurringCustomers > 0 && (
+                    <span className="bg-amber-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                      {recurringCustomers}
                     </span>
                   )}
                 </button>
@@ -4107,18 +4648,19 @@ export default function StoreDashboard() {
                 onTabSwitch={setTab}
               />
             )}
+            {tab === "categories" && (
+              <CategoriesTab
+                categories={categories}
+                products={products}
+                token={token!}
+                onRefresh={loadData}
+              />
+            )}
             {tab === "products" && (
               <ProductsTab
                 products={products}
                 categories={categories}
                 storeId={store?._id}
-                token={token!}
-                onRefresh={loadData}
-              />
-            )}
-            {tab === "categories" && (
-              <CategoriesTab
-                categories={categories}
                 token={token!}
                 onRefresh={loadData}
               />
@@ -4136,6 +4678,7 @@ export default function StoreDashboard() {
             {tab === "offers" && (
               <OffersTab offers={offers} token={token!} onRefresh={loadData} />
             )}
+            {tab === "customers" && <CustomersTab orders={orders} />}
             {tab === "settings" && (
               <SettingsTab store={store} token={token!} onRefresh={loadData} />
             )}

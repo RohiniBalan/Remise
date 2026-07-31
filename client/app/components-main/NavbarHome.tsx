@@ -24,9 +24,9 @@ const NAV_LINKS = [
   { name: 'Home',                path: '/' },
   { name: 'Monthly / Bulk Buy',  path: '/bulk-purchase' },
   { name: 'Nearby Offers',       path: '/nearby' },
-  { name: 'Our Services',        path: '/services' },
-  { name: 'About Us',            path: '/about' },
-  { name: 'Testimonials',        path: '/testimonials' },
+  // { name: 'Our Services',        path: '/services' },
+  // { name: 'About Us',            path: '/about' },
+  // { name: 'Testimonials',        path: '/testimonials' },
 ];
 
 // ── Toast ───────────────────────────────────────────────────────────────────
@@ -119,7 +119,7 @@ export default function NavbarHome({ theme, toggleTheme }: NavbarProps) {
   // Suppliers is a customer-only bulk-buy feature — only shown to plain
   // 'user' role accounts, never store owners/wholesalers/home businesses/admins.
   const visibleNavLinks = userData?.role === 'user'
-    ? [...NAV_LINKS.slice(0, 2), { name: 'Suppliers', path: '/suppliers' }, ...NAV_LINKS.slice(2)]
+    ? [...NAV_LINKS.slice(0, 2), { name: 'Home Seller', path: '/suppliers' }, ...NAV_LINKS.slice(2)]
     : NAV_LINKS;
 
   // ── Render ────────────────────────────────────────────────────────────────
