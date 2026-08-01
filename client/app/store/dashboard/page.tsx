@@ -840,10 +840,15 @@ function OverviewTab({
   );
 
   // ── Target revenue: current calendar month, Delivered orders only ──
-  const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  const monthStart = new Date(
+    new Date().getFullYear(),
+    new Date().getMonth(),
+    1,
+  );
   const monthDeliveredRevenue = orders
     .filter(
-      (o: any) => o.status === "Delivered" && new Date(o.createdAt) >= monthStart,
+      (o: any) =>
+        o.status === "Delivered" && new Date(o.createdAt) >= monthStart,
     )
     .reduce((s: number, o: any) => s + (o.totalAmount || 0), 0);
 
@@ -1018,7 +1023,7 @@ function OverviewTab({
         achievedRevenue={monthDeliveredRevenue}
         onGoToSettings={() => onTabSwitch("settings")}
       />
-      
+
       {/* ── Stats grid: original 6 cards + Total Products Sold ── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         <div className="bg-white rounded-2xl border border-purple-100 p-4 shadow-sm">
@@ -3306,7 +3311,11 @@ function OffersTab({ offers, token, onRefresh }: any) {
               >
                 <div className="relative aspect-video bg-[#F5F5F5]">
                   <img
-                    src={`${API}${offer.image}`}
+                    src={
+                      offer.image?.startsWith("http")
+                        ? offer.image
+                        : `${API}${offer.image}`
+                    }
                     alt={offer.title}
                     className="w-full h-full object-cover"
                   />
@@ -3702,7 +3711,7 @@ function SuppliersTab({ token, store, categories }: any) {
                     setSupplierType("whole_saler");
                     setCategoryFilter("");
                   }}
-                  className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold border transition ${supplierType === "whole_saler" ? "bg-teal-600 text-white border-teal-600" : "bg-white text-gray-600 border-[#BBD5DA]"}`}
+                  className={`flex-1 h-11 px-4 rounded-xl text-sm font-semibold border transition flex items-center justify-center gap-1 ${supplierType === "whole_saler" ? "bg-teal-600 text-white border-teal-600" : "bg-white text-gray-600 border-[#BBD5DA]"}`}
                 >
                   📦 Wholesalers
                 </button>
@@ -3711,7 +3720,7 @@ function SuppliersTab({ token, store, categories }: any) {
                     setSupplierType("home_business");
                     setCategoryFilter("");
                   }}
-                  className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold border transition ${supplierType === "home_business" ? "bg-teal-600 text-white border-teal-600" : "bg-white text-gray-600 border-[#BBD5DA]"}`}
+                  className={`flex-1 h-11 px-4 rounded-xl text-sm font-semibold border transition flex items-center justify-center gap-1 ${supplierType === "home_business" ? "bg-teal-600 text-white border-teal-600" : "bg-white text-gray-600 border-[#BBD5DA]"}`}
                 >
                   🏠 Home Business
                 </button>
@@ -3719,7 +3728,7 @@ function SuppliersTab({ token, store, categories }: any) {
               <select
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
-                className="w-40 shrink-0 bg-white border border-[#BBD5DA] rounded-xl px-3 py-2.5 text-sm text-gray-800 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 transition cursor-pointer"
+                className="w-40 shrink-0 h-11 bg-white border border-[#BBD5DA] rounded-xl px-3 text-sm text-gray-800 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 transition cursor-pointer"
               >
                 <option value="">Select Category</option>
                 {supplierCategories.map((c) => (
@@ -3728,7 +3737,7 @@ function SuppliersTab({ token, store, categories }: any) {
                   </option>
                 ))}
               </select>
-              <div className="relative w-full sm:w-56 shrink-0">
+              <div className="relative w-full sm:w-56 shrink-0 h-11">
                 <Search
                   size={15}
                   className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
@@ -3737,7 +3746,7 @@ function SuppliersTab({ token, store, categories }: any) {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search products…"
-                  className="w-full bg-white border border-[#BBD5DA] rounded-xl pl-9 pr-3 py-2.5 text-sm text-gray-800 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 transition placeholder-gray-400"
+                  className="w-full h-11 bg-white border border-[#BBD5DA] rounded-xl pl-9 pr-3 text-sm text-gray-800 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 transition placeholder-gray-400"
                 />
               </div>
             </div>
