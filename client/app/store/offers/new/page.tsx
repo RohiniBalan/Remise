@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef, useContext, useEffect } from "react";
+import { Suspense ,useState, useRef, useContext, useEffect } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -316,7 +316,7 @@ function OfferScanModal({
   );
 }
 
-export default function NewOfferPage() {
+function NewOfferPageContent() {
   const ctx = useContext(AuthContext) as any;
   const token: string | null =
     ctx?.token ??
@@ -858,5 +858,19 @@ const targetCustomerName = searchParams.get("customerName");
         />
       )}
     </div>
+  );
+}
+
+export default function NewOfferPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          Loading...
+        </div>
+      }
+    >
+      <NewOfferPageContent />
+    </Suspense>
   );
 }
