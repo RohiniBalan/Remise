@@ -27,6 +27,7 @@ import {
   normalizeAuthErrorMessage,
   validatePasswordChangeForm,
 } from "../utils/authValidation";
+import NotificationBell from "../components-main/NotificationBell";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 interface UserData {
@@ -591,21 +592,40 @@ function SettingsContent() {
     <div className="min-h-screen bg-[#F5F5F5]">
       {/* Header */}
       <header className="bg-white border-b border-[#BBD5DA] sticky top-0 z-30 shadow-sm">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center gap-3">
-          <Link
-            href="/"
-            className="flex items-center gap-2 text-sm text-gray-500 hover:text-teal-700 font-medium transition"
-          >
-            <ArrowLeft size={16} /> Back
-          </Link>
-          <h1 className="text-base font-bold text-gray-900 hidden sm:block ml-2">
-            Settings
-          </h1>
-          <div className="ml-auto">
-            <UserAvatarMenu theme="light" compact />
-          </div>
-        </div>
-      </header>
+  <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+    <Link
+      href="/"
+      className="flex items-center gap-2 text-sm text-gray-500 hover:text-teal-700 transition font-medium shrink-0"
+    >
+      <ArrowLeft size={16} /> Home
+    </Link>
+
+    <div className="flex items-center gap-2 min-w-0">
+      <div className="w-8 h-8 rounded-lg bg-[#DFF1F1] flex items-center justify-center shrink-0 overflow-hidden">
+        <span className="text-xs font-bold text-teal-700">
+          {(user?.fullname || user?.name || user?.email || "U")
+            .charAt(0)
+            .toUpperCase()}
+        </span>
+      </div>
+      <span className="text-sm font-bold text-gray-900 truncate hidden sm:block">
+        My Settings
+      </span>
+      {user?.role === "store_owner" && (
+        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#DFF1F1] text-teal-700 border border-[#BBD5DA] shrink-0">
+          Store Owner
+        </span>
+      )}
+    </div>
+
+    <div className="flex items-center gap-2 shrink-0">
+      <div className="bg-gray-900 rounded-full">
+        <NotificationBell />
+      </div>
+      <UserAvatarMenu theme="light" />
+    </div>
+  </div>
+</header>
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
         <div className="flex flex-col lg:flex-row gap-6">

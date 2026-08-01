@@ -160,6 +160,9 @@ app.use('/uploads/stores',
 app.use('/uploads/payment-proofs',
   makeProxy(SERVICES.order, '/uploads/payment-proofs')
 );
+app.use('/uploads/offers',                              
+  makeProxy(SERVICES.offers, '/uploads/offers')          
+); 
 // Static product images served by product-service
 app.use('/uploads',
   makeProxy(SERVICES.product, '/uploads')

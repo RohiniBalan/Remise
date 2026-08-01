@@ -26,6 +26,8 @@ import {
   Eye,
   EyeOff,
 } from "lucide-react";
+import UserAvatarMenu from "../components-main/UserAvatarMenu";
+import NotificationBell from "../components-main/NotificationBell";
 
 type TabKey = "overview" | "addresses" | "security" | "store";
 
@@ -340,17 +342,43 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-[#F5F5F5]">
-      <header className="border-b border-[#BBD5DA] bg-white shadow-sm">
-        <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 sm:px-6">
-          <Link
-            href="/"
-            className="flex items-center gap-2 text-sm font-medium text-gray-500 transition hover:text-teal-700"
-          >
-            <ArrowLeft size={16} /> Back
-          </Link>
-          <h1 className="ml-2 text-base font-bold text-gray-900">My Profile</h1>
-        </div>
-      </header>
+      <header className="bg-white border-b border-[#BBD5DA] sticky top-0 z-30 shadow-sm">
+  <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+    <Link
+      href="/"
+      className="flex items-center gap-2 text-sm text-gray-500 hover:text-teal-700 transition font-medium shrink-0"
+    >
+      <ArrowLeft size={16} /> Home
+    </Link>
+
+    <div className="flex items-center gap-2 min-w-0">
+      <div className="w-8 h-8 rounded-lg bg-[#DFF1F1] flex items-center justify-center shrink-0 overflow-hidden">
+        {form.avatar ? (
+          <img src={form.avatar} alt="" className="w-full h-full object-cover" />
+        ) : (
+          <span className="text-xs font-bold text-teal-700">
+            {(form.fullname || user?.email || "U").charAt(0).toUpperCase()}
+          </span>
+        )}
+      </div>
+      <span className="text-sm font-bold text-gray-900 truncate hidden sm:block">
+        My Profile
+      </span>
+      {isStoreOwner && (
+        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#DFF1F1] text-teal-700 border border-[#BBD5DA] shrink-0">
+          Store Owner
+        </span>
+      )}
+    </div>
+
+    <div className="flex items-center gap-2 shrink-0">
+      <div className="bg-gray-900 rounded-full">
+        <NotificationBell />
+      </div>
+      <UserAvatarMenu theme="light" />
+    </div>
+  </div>
+</header>
 
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
         <div className="rounded-3xl border border-[#BBD5DA] bg-white p-5 shadow-sm sm:p-7">

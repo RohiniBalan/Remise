@@ -242,4 +242,23 @@ const deleteOffer = async (req, res) => {
   }
 };
 
-module.exports = { createOffer, getNearbyOffers, getStoreOffers, getOfferById, updateOffer, deleteOffer, getActiveOffers };
+// ─── GET /api/offers/my — private offers targeted at the logged-in customer ─
+const getMyPrivateOffers = async (req, res) => {
+  try {
+    const customerId = req.user.id;
+
+    const offers = await Offer.find({
+      targetCustomerId: customerId,
+      isActive: true,
+      validUntil: { $gte: new Date() },
+    }).sort({ createdAt: -1 });
+
+    res.set('Cache-Control', 'no-store');
+    res.json({ success: true, count: offers.length, data: offers });
+  } catch (err) {
+    console.error('getMyPrivateOffers error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+module.exports = { createOffer, getNearbyOffers, getStoreOffers, getOfferById, updateOffer, deleteOffer, getActiveOffers, getMyPrivateOffers };

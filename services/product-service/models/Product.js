@@ -39,6 +39,9 @@ const productSchema = new mongoose.Schema(
         price: { type: Number, required: true },
       },
     ],
+    lowStockThreshold: { type: Number, default: 5 },
+    lowStockNotifiedAt: { type: Date, default: null },
+
     createdAt: { type: Date, default: Date.now },
   },
   { timestamps: true },

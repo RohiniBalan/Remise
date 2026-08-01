@@ -43,4 +43,7 @@ export const offersApi = {
 
   updateOrderStatus: (orderId: string, status: string, token: string) =>
     axios.patch(`${BASE}/api/offers/orders/${orderId}/status`, { status }, { headers: authHeaders(token) }),
+
+getMyOffers: (token: string) =>
+  axios.get(`${BASE}/api/offers/my`, { headers: authHeaders(token) }),
 };

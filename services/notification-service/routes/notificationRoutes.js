@@ -4,7 +4,7 @@ const {
   subscribe, updateLocation,
   sendOfferNotification, createDirectNotification,
   getMyNotifications, markAsRead, markAllAsRead,
-  getVapidPublicKey
+  getVapidPublicKey, sendLowStockAlert 
 } = require('../controllers/notificationController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -23,5 +23,7 @@ router.post('/internal/send-offer', sendOfferNotification);
 
 // Internal route — called by payment-service only (not exposed via gateway)
 router.post('/internal/create', createDirectNotification);
+
+router.post('/low-stock', sendLowStockAlert);
 
 module.exports = router;

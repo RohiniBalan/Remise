@@ -5,7 +5,7 @@ const fs      = require('fs');
 const router  = express.Router();
 const {
   createOffer, getNearbyOffers, getStoreOffers,
-  getOfferById, updateOffer, deleteOffer, getActiveOffers
+  getOfferById, updateOffer, deleteOffer, getActiveOffers, getMyPrivateOffers
 } = require('../controllers/offerController');
 const {
   placeOfferOrder, getStoreOrders, getMyOfferOrders, updateOrderStatus
@@ -32,7 +32,8 @@ const upload = multer({
 // ── Offer CRUD ───────────────────────────────────────────────────────────────
 router.get('/nearby',              getNearbyOffers); 
 router.get('/active',              getActiveOffers);                        // public
-router.get('/store/:storeId',      getStoreOffers);                         // public
+router.get('/store/:storeId',      getStoreOffers); 
+router.get('/my',       protect,  getMyPrivateOffers);                         // public
 router.get('/:id',                 getOfferById);                           // public
 router.post('/',    protect,       upload.single('image'), createOffer);    // store owner
 router.put('/:id',  protect,       upload.single('image'), updateOffer);    // store owner

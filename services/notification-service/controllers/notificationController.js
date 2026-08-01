@@ -1,6 +1,11 @@
+const axios = require('axios');
+const twilio = require('twilio')(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
+
 const webpush        = require('web-push');
 const PushSubscription = require('../models/PushSubscription');
 const Notification    = require('../models/Notification');
+
+const STORE_SERVICE_URL = process.env.STORE_SERVICE_URL;
 
 // Set VAPID keys once at startup
 webpush.setVapidDetails(
@@ -203,6 +208,28 @@ const getVapidPublicKey = (req, res) => {
   res.json({ success: true, publicKey: process.env.VAPID_PUBLIC_KEY });
 };
 
+const sendLowStockAlert = async (req, res) => {
+  try {
+    const { storeId, productTitle, currentStock } = req.body;
+
+    // fetch store phone number — internal service-to-service call
+    const storeRes = await axios.get(`${STORE_SERVICE_URL}/api/stores/${storeId}`);
+    const store = storeRes.data.data;
+    if (!store?.phone) return res.status(200).json({ success: true, skipped: 'no phone on file' });
+
+    await twilio.messages.create({
+      from: 'whatsapp:+14155238886', // your Twilio WhatsApp sender
+      to: `whatsapp:${store.phone}`,
+      body: `⚠️ Low stock alert: "${productTitle}" has only ${currentStock} left. Restock soon.`,
+    });
+
+    res.status(200).json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to send low stock alert', error: error.message });
+  }
+};
+
+
 module.exports = {
   subscribe,
   updateLocation,
@@ -211,5 +238,5 @@ module.exports = {
   getMyNotifications,
   markAsRead,
   markAllAsRead,
-  getVapidPublicKey
+  getVapidPublicKey, sendLowStockAlert
 };

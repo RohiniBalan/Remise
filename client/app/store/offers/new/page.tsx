@@ -17,12 +17,14 @@ import {
   Sparkles,
   X,
   Plus,
+  Store,
 } from "lucide-react";
 import UserAvatarMenu from "../../../components-main/UserAvatarMenu";
 import { AuthContext } from "../../../context/AuthContext";
 import { storeApi } from "../../../api-services/storeApi";
 import { offersApi } from "../../../api-services/offersApi";
 import { useRouter, useSearchParams } from "next/navigation";
+import NotificationBell from "../../../components-main/NotificationBell";
 
 // Palette: #F5F5F5 bg · #DFF1F1 mint · #BBD5DA steel border · #FF0000 danger
 
@@ -511,28 +513,43 @@ const targetCustomerName = searchParams.get("customerName");
   return (
     <div className="min-h-screen bg-[#F5F5F5]">
       {/* ── Top bar ──────────────────────────────────────────────────────── */}
-      <header className="bg-white border-b border-[#BBD5DA] sticky top-0 z-20 shadow-sm">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 h-16 flex items-center gap-4">
-          <Link
-            href="/store/dashboard"
-            className="flex items-center gap-2 text-sm text-gray-500 hover:text-teal-700 font-medium transition"
-          >
-            <ArrowLeft size={16} /> Dashboard
-          </Link>
-          <div className="flex items-center gap-3 ml-auto">
-            {/* <button
-              onClick={() => setShowScan(true)}
-              className="flex items-center gap-1.5 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition"
-            >
-              <ScanLine size={15} /> Scan Paper
-            </button> */}
-            <span className="text-sm font-semibold text-gray-700 hidden sm:block">
-              Publish New Offer
-            </span>
-            <UserAvatarMenu theme="light" compact />
-          </div>
-        </div>
-      </header>
+      <header className="bg-white border-b border-[#BBD5DA] sticky top-0 z-30 shadow-sm">
+  <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+    <Link
+      href="/"
+      className="flex items-center gap-2 text-sm text-gray-500 hover:text-teal-700 transition font-medium shrink-0"
+    >
+      <ArrowLeft size={16} /> Home
+    </Link>
+
+    <div className="flex items-center gap-2 min-w-0">
+      <div className="w-8 h-8 rounded-lg bg-[#DFF1F1] flex items-center justify-center shrink-0 overflow-hidden">
+        {store?.logo ? (
+          <img
+            src={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"}${store.logo}`}
+            alt=""
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <Store size={16} className="text-teal-600" />
+        )}
+      </div>
+      <span className="text-sm font-bold text-gray-900 truncate hidden sm:block">
+        {store?.name}
+      </span>
+      {store?.isVerified && (
+        <CheckCircle size={14} className="text-teal-600 shrink-0" />
+      )}
+    </div>
+
+    <div className="flex items-center gap-2 shrink-0">
+      <div className="bg-gray-900 rounded-full">
+        <NotificationBell />
+      </div>
+      <UserAvatarMenu theme="light" />
+    </div>
+  </div>
+</header>
 
       <main className="max-w-7xl mx-auto px-6 py-8">
         {/* Hero text */}

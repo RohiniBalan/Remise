@@ -158,20 +158,24 @@ const updateProduct = async (req, res) => {
   try {
     const isAdmin = req.user?.role === 'admin';
     const filter  = { _id: req.params.id };
-    if (!isAdmin) filter.ownerId = req.user.id; // store owners can only update their own
+    if (!isAdmin) filter.ownerId = req.user.id;
 
     const data = { ...req.body };
     if (req.file) {
       data.imageUrl = `/uploads/products/${req.file.filename}`;
-      // prepend new image to front of images array
     }
     if (typeof data.tags   === 'string') try { data.tags   = JSON.parse(data.tags);   } catch { data.tags   = data.tags.split(',').map(t => t.trim()).filter(Boolean); }
     if (typeof data.images === 'string') try { data.images = JSON.parse(data.images); } catch {}
     if (typeof data.bulkPricing === 'string') try { data.bulkPricing = JSON.parse(data.bulkPricing); } catch { data.bulkPricing = []; }
-if (data.moq !== undefined) data.moq = Number(data.moq) || 1;
+    if (data.moq !== undefined) data.moq = Number(data.moq) || 1;
 
     const product = await Product.findOneAndUpdate(filter, data, { new: true, runValidators: true });
     if (!product) return res.status(404).json({ success: false, message: 'Product not found or access denied' });
+
+    // ── NEW: check low stock after update ──
+    const { checkLowStock } = require('../utils/lowStockAlert');
+    checkLowStock(product); // fire-and-forget, don't await/block the response
+
     res.status(200).json({ success: true, message: 'Product updated successfully', data: product });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to update product', error: error.message });
@@ -195,6 +199,7 @@ const deleteProduct = async (req, res) => {
 // Internal: deduct stock after successful payment (called by payment-service)
 const deductStock = async (req, res) => {
   try {
+    const { checkLowStock } = require('../utils/lowStockAlert'); // move to top of file
     const { items } = req.body;
     const results   = [];
     for (const item of items) {
@@ -202,7 +207,14 @@ const deductStock = async (req, res) => {
       if (!product) { results.push({ productId: item.productId, success: false, message: 'Not found' }); continue; }
       const newStock       = Math.max(0, product.totalStock - item.quantity);
       const newAvailability = newStock === 0 ? 'Out Of Stock' : product.availability;
-      await Product.updateOne({ _id: item.productId }, { $set: { totalStock: newStock, availability: newAvailability } });
+      const updated = await Product.findOneAndUpdate(
+        { _id: item.productId },
+        { $set: { totalStock: newStock, availability: newAvailability } },
+        { new: true } 
+      );
+
+      checkLowStock(updated); // fire-and-forget
+
       results.push({ productId: item.productId, success: true, newStock });
     }
     res.status(200).json({ success: true, results });
