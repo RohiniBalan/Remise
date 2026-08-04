@@ -221,21 +221,50 @@ function NearbyContent() {
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [theme, setTheme] = useState<"dark" | "light">("light");
 
+  const applyTheme = useCallback((nextTheme: "dark" | "light") => {
+    const root = document.documentElement;
+    root.setAttribute("data-theme", nextTheme);
+    root.classList.toggle("dark", nextTheme === "dark");
+    root.style.colorScheme = nextTheme;
+  }, []);
+
   useEffect(() => {
-    const handleThemeChange = (event: CustomEvent) => {
-      if (event.detail) setTheme(event.detail as "dark" | "light");
+    const syncTheme = () => {
+      const storedTheme = localStorage.getItem("theme");
+      const rootTheme = document.documentElement.getAttribute("data-theme");
+      const initialTheme =
+        storedTheme === "dark" || storedTheme === "light"
+          ? storedTheme
+          : rootTheme;
+      const resolvedTheme =
+        initialTheme === "dark" || initialTheme === "light"
+          ? initialTheme
+          : window.matchMedia("(prefers-color-scheme: dark)").matches
+            ? "dark"
+            : "light";
+
+      setTheme(resolvedTheme);
+      applyTheme(resolvedTheme);
     };
+
+    const handleThemeChange = (event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      const nextTheme = typeof detail === "string" ? detail : detail?.theme;
+
+      if (nextTheme === "dark" || nextTheme === "light") {
+        setTheme(nextTheme);
+        applyTheme(nextTheme);
+      }
+    };
+
+    syncTheme();
     window.addEventListener("theme-change", handleThemeChange as EventListener);
-    const currentTheme = document.documentElement.getAttribute("data-theme") as
-      | "dark"
-      | "light";
-    if (currentTheme) setTheme(currentTheme);
     return () =>
       window.removeEventListener(
         "theme-change",
         handleThemeChange as EventListener,
       );
-  }, []);
+  }, [applyTheme]);
 
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
@@ -293,7 +322,15 @@ function NearbyContent() {
       >
         <NavbarHome
           theme={theme}
-          toggleTheme={() => setTheme(theme === "light" ? "dark" : "light")}
+          toggleTheme={() => {
+            const nextTheme = theme === "light" ? "dark" : "light";
+            setTheme(nextTheme);
+            applyTheme(nextTheme);
+            localStorage.setItem("theme", nextTheme);
+            window.dispatchEvent(
+              new CustomEvent("theme-change", { detail: nextTheme }),
+            );
+          }}
         />
 
         <main className="max-w-5xl mx-auto px-4 sm:px-6 pt-[80px] sm:pt-[112px] lg:pt-[152px] pb-8">
@@ -518,7 +555,7 @@ function NearbyContent() {
                       <button
                         onClick={() => {
                           if (!isAuthenticated()) {
-                            redirectToLogin('/nearby');
+                            redirectToLogin("/nearby");
                             return;
                           }
                           setSelectedOffer(offer);
