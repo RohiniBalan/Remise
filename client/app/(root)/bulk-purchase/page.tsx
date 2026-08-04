@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import {
   ScanLine,
   Plus,
@@ -259,6 +259,7 @@ let idCounter = 0;
 const uid = () => `item-${++idCounter}-${Date.now()}`;
 
 export default function BulkPurchasePage() {
+  const [theme, setTheme] = useState<"dark" | "light">("light");
   const [items, setItems] = useState<BulkItem[]>([]);
   const [showScan, setShowScan] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
@@ -271,6 +272,22 @@ export default function BulkPurchasePage() {
   const [voiceParsing, setVoiceParsing] = useState(false);
   const [voiceError, setVoiceError] = useState("");
   const printRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleThemeChange = (event: CustomEvent) => {
+      if (event.detail) setTheme(event.detail as "dark" | "light");
+    };
+    window.addEventListener("theme-change", handleThemeChange as EventListener);
+    const currentTheme = document.documentElement.getAttribute("data-theme") as
+      | "dark"
+      | "light";
+    if (currentTheme) setTheme(currentTheme);
+    return () =>
+      window.removeEventListener(
+        "theme-change",
+        handleThemeChange as EventListener,
+      );
+  }, []);
 
   const addFromScan = (
     raw: { name: string; quantity: string; brand?: string }[],
@@ -431,20 +448,23 @@ export default function BulkPurchasePage() {
   };
 
   const checkedCount = items.filter((i) => i.checked).length;
+  const isLight = theme === "light";
 
   return (
-    <div className="min-h-screen bg-[#F5F5F5] pt-[80px] sm:pt-[112px] lg:pt-[152px] pb-20">
+    <div
+      className={`min-h-screen pt-[80px] sm:pt-[112px] lg:pt-[152px] pb-20 ${isLight ? "bg-[#F5F5F5]" : "bg-[#0a0a0a]"}`}
+    >
       {/* ── Hero banner ───────────────────────────────────────────────────── */}
-      <div className="bg-white border-b border-[#BBD5DA]">
+      <div className={isLight ? "bg-white border-b border-[#BBD5DA]" : "bg-gray-900 border-b border-white/10"}>
         <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10 flex flex-col sm:flex-row items-start sm:items-center gap-6">
-          <div className="w-14 h-14 rounded-2xl bg-[#DFF1F1] flex items-center justify-center shrink-0">
-            <ShoppingBasket size={28} className="text-teal-600" />
+          <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 ${isLight ? "bg-[#DFF1F1]" : "bg-teal-900/30"}`}>
+            <ShoppingBasket size={28} className="text-teal-500" />
           </div>
           <div className="flex-1">
-            <h1 className="text-2xl font-bold text-gray-900">
+            <h1 className={`text-2xl font-bold ${isLight ? "text-gray-900" : "text-white"}`}>
               Monthly / Bulk Purchase
             </h1>
-            <p className="text-gray-500 text-sm mt-1">
+            <p className={`text-sm mt-1 ${isLight ? "text-gray-500" : "text-gray-400"}`}>
               Scan a handwritten or printed list — items and quantities are
               extracted automatically in any Indian language.
             </p>
@@ -460,7 +480,7 @@ export default function BulkPurchasePage() {
 
       <div className="max-w-2xl mx-auto px-4 sm:px-6 pt-6 space-y-4">
         {/* ── Voice entry ──────────────────────────────────────────────────── */}
-        <div className="bg-white border border-[#BBD5DA] rounded-2xl p-4 space-y-2 shadow-sm">
+        <div className={`rounded-2xl p-4 space-y-2 shadow-sm border ${isLight ? "bg-white border-[#BBD5DA]" : "bg-gray-900 border-white/10"}`}>
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-2 flex-wrap">
               {VOICE_LANGUAGES.map((l) => (
@@ -472,7 +492,9 @@ export default function BulkPurchasePage() {
                   className={`px-2.5 py-1 rounded-full text-xs font-semibold transition disabled:opacity-50 ${
                     voiceLang.code === l.code
                       ? "bg-teal-600 text-white"
-                      : "bg-[#F5F5F5] text-gray-600 border border-[#BBD5DA]"
+                      : isLight
+                        ? "bg-[#F5F5F5] text-gray-600 border border-[#BBD5DA]"
+                        : "bg-white/5 text-gray-300 border border-white/10"
                   }`}
                 >
                   {l.label}
@@ -508,12 +530,12 @@ export default function BulkPurchasePage() {
             </button>
           </div>
           {!voice.supported && (
-            <p className="text-xs text-gray-400">
+            <p className={`text-xs ${isLight ? "text-gray-400" : "text-gray-500"}`}>
               Voice input isn't supported in this browser — try Chrome or Edge.
             </p>
           )}
           {voice.listening && (
-            <p className="text-xs text-teal-700">
+            <p className="text-xs text-teal-500">
               Listening… "{voice.interimTranscript || voice.transcript || "…"}"
             </p>
           )}
@@ -527,10 +549,10 @@ export default function BulkPurchasePage() {
 
         {/* ── Empty state ──────────────────────────────────────────────────── */}
         {items.length === 0 && (
-          <div className="bg-white rounded-2xl border border-[#BBD5DA] p-12 text-center shadow-sm">
-            <ListChecks size={48} className="text-[#BBD5DA] mx-auto mb-4" />
-            <p className="font-semibold text-gray-700 mb-1">No items yet</p>
-            <p className="text-sm text-gray-400 mb-6">
+          <div className={`rounded-2xl p-12 text-center shadow-sm border ${isLight ? "bg-white border-[#BBD5DA]" : "bg-gray-900 border-white/10"}`}>
+            <ListChecks size={48} className={`mx-auto mb-4 ${isLight ? "text-[#BBD5DA]" : "text-gray-700"}`} />
+            <p className={`font-semibold mb-1 ${isLight ? "text-gray-700" : "text-gray-200"}`}>No items yet</p>
+            <p className={`text-sm mb-6 ${isLight ? "text-gray-400" : "text-gray-500"}`}>
               Scan a paper list or add items manually
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -542,7 +564,11 @@ export default function BulkPurchasePage() {
               </button>
               <button
                 onClick={addBlank}
-                className="flex items-center justify-center gap-2 bg-[#F5F5F5] hover:bg-[#DFF1F1] border border-[#BBD5DA] text-gray-700 text-sm font-semibold px-6 py-2.5 rounded-xl transition"
+                className={`flex items-center justify-center gap-2 text-sm font-semibold px-6 py-2.5 rounded-xl transition border ${
+                  isLight
+                    ? "bg-[#F5F5F5] hover:bg-[#DFF1F1] border-[#BBD5DA] text-gray-700"
+                    : "bg-white/5 hover:bg-white/10 border-white/10 text-gray-200"
+                }`}
               >
                 <Plus size={15} /> Add Manually
               </button>
@@ -555,13 +581,13 @@ export default function BulkPurchasePage() {
           <>
             {/* Toolbar */}
             <div className="flex items-center justify-between gap-3 flex-wrap">
-              <p className="text-sm text-gray-500">
-                <span className="font-semibold text-gray-800">
+              <p className={`text-sm ${isLight ? "text-gray-500" : "text-gray-400"}`}>
+                <span className={`font-semibold ${isLight ? "text-gray-800" : "text-gray-200"}`}>
                   {items.length}
                 </span>{" "}
                 item{items.length !== 1 ? "s" : ""}
                 {checkedCount > 0 && (
-                  <span className="ml-2 text-teal-600">
+                  <span className="ml-2 text-teal-500">
                     · {checkedCount} checked
                   </span>
                 )}
@@ -581,13 +607,21 @@ export default function BulkPurchasePage() {
                 </button>
                 <button
                   onClick={addBlank}
-                  className="flex items-center gap-1.5 text-xs font-semibold bg-white hover:bg-[#DFF1F1] border border-[#BBD5DA] text-gray-700 px-3 py-2 rounded-xl transition"
+                  className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl transition border ${
+                    isLight
+                      ? "bg-white hover:bg-[#DFF1F1] border-[#BBD5DA] text-gray-700"
+                      : "bg-white/5 hover:bg-white/10 border-white/10 text-gray-200"
+                  }`}
                 >
                   <Plus size={12} /> Add Item
                 </button>
                 <button
                   onClick={handleCopy}
-                  className="flex items-center gap-1.5 text-xs font-semibold bg-white hover:bg-[#DFF1F1] border border-[#BBD5DA] text-gray-700 px-3 py-2 rounded-xl transition"
+                  className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl transition border ${
+                    isLight
+                      ? "bg-white hover:bg-[#DFF1F1] border-[#BBD5DA] text-gray-700"
+                      : "bg-white/5 hover:bg-white/10 border-white/10 text-gray-200"
+                  }`}
                 >
                   {copied ? (
                     <Check size={12} className="text-green-600" />
@@ -598,7 +632,11 @@ export default function BulkPurchasePage() {
                 </button>
                 <button
                   onClick={handlePrint}
-                  className="flex items-center gap-1.5 text-xs font-semibold bg-white hover:bg-[#DFF1F1] border border-[#BBD5DA] text-gray-700 px-3 py-2 rounded-xl transition"
+                  className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl transition border ${
+                    isLight
+                      ? "bg-white hover:bg-[#DFF1F1] border-[#BBD5DA] text-gray-700"
+                      : "bg-white/5 hover:bg-white/10 border-white/10 text-gray-200"
+                  }`}
                 >
                   <Printer size={12} /> Print
                 </button>
@@ -606,17 +644,17 @@ export default function BulkPurchasePage() {
             </div>
 
             {/* Items table */}
-            <div className="bg-white rounded-2xl border border-[#BBD5DA] shadow-sm overflow-hidden">
+            <div className={`rounded-2xl shadow-sm overflow-hidden border ${isLight ? "bg-white border-[#BBD5DA]" : "bg-gray-900 border-white/10"}`}>
               {/* Header */}
-              <div className="grid grid-cols-[2rem_1fr_7rem_7rem_2.5rem] gap-2 items-center px-4 py-2.5 bg-[#F5F5F5] border-b border-[#BBD5DA]">
+              <div className={`grid grid-cols-[2rem_1fr_7rem_7rem_2.5rem] gap-2 items-center px-4 py-2.5 border-b ${isLight ? "bg-[#F5F5F5] border-[#BBD5DA]" : "bg-white/5 border-white/10"}`}>
                 <span />
-                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <span className={`text-xs font-semibold uppercase tracking-wider ${isLight ? "text-gray-500" : "text-gray-400"}`}>
                   Item Name
                 </span>
-                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <span className={`text-xs font-semibold uppercase tracking-wider ${isLight ? "text-gray-500" : "text-gray-400"}`}>
                   Brand
                 </span>
-                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <span className={`text-xs font-semibold uppercase tracking-wider ${isLight ? "text-gray-500" : "text-gray-400"}`}>
                   Quantity
                 </span>
                 <span />
@@ -631,10 +669,10 @@ export default function BulkPurchasePage() {
                     exit={{ opacity: 0, height: 0 }}
                     transition={{ duration: 0.18 }}
                     className={`grid grid-cols-[2rem_1fr_7rem_7rem_2.5rem] gap-2 items-center px-4 py-3
-                      ${idx % 2 === 1 ? "bg-[#FAFAFA]" : "bg-white"}
+                      ${isLight ? (idx % 2 === 1 ? "bg-[#FAFAFA]" : "bg-white") : (idx % 2 === 1 ? "bg-white/[0.03]" : "bg-transparent")}
                       ${item.checked ? "opacity-50" : ""}
-                      ${item.needsClarification ? "bg-amber-50" : ""}
-                      border-b border-[#BBD5DA] last:border-0`}
+                      ${item.needsClarification ? (isLight ? "bg-amber-50" : "bg-amber-900/10") : ""}
+                      border-b last:border-0 ${isLight ? "border-[#BBD5DA]" : "border-white/10"}`}
                   >
                     {/* Checkbox */}
                     <button
@@ -676,7 +714,7 @@ export default function BulkPurchasePage() {
                         />
                       </div>
                     ) : translatingId === item.id ? (
-                      <div className="flex items-center gap-1.5 text-sm text-teal-600">
+                      <div className="flex items-center gap-1.5 text-sm text-teal-500">
                         <RefreshCw
                           size={12}
                           className="animate-spin shrink-0"
@@ -688,8 +726,8 @@ export default function BulkPurchasePage() {
                     ) : (
                       <button
                         onClick={() => setEditingId(item.id)}
-                        className={`flex items-center gap-1.5 text-left text-sm font-medium text-gray-800 truncate hover:text-teal-700 transition
-                            ${item.checked ? "line-through text-gray-400" : ""}`}
+                        className={`flex items-center gap-1.5 text-left text-sm font-medium truncate hover:text-teal-500 transition
+                            ${item.checked ? `line-through ${isLight ? "text-gray-400" : "text-gray-600"}` : isLight ? "text-gray-800" : "text-gray-100"}`}
                       >
                         {item.needsClarification && (
                           <HelpCircle
@@ -699,13 +737,13 @@ export default function BulkPurchasePage() {
                         )}
                         <span className="truncate">
                           {item.name || (
-                            <span className="text-gray-300 italic">
+                            <span className={isLight ? "text-gray-300 italic" : "text-gray-600 italic"}>
                               tap to name
                             </span>
                           )}
                         </span>
                         {item.needsClarification && (
-                          <span className="text-[10px] text-amber-600 font-semibold shrink-0">
+                          <span className="text-[10px] text-amber-500 font-semibold shrink-0">
                             confirm?
                           </span>
                         )}
@@ -717,7 +755,11 @@ export default function BulkPurchasePage() {
                       value={item.brand}
                       onChange={e => update(item.id, 'brand', e.target.value)}
                       placeholder="e.g. Lifebuoy"
-                      className="w-full bg-transparent border border-transparent hover:border-[#BBD5DA] focus:border-teal-400 focus:bg-[#DFF1F1] rounded-lg px-2 py-1 text-sm text-gray-700 font-medium outline-none transition placeholder-gray-300"
+                      className={`w-full bg-transparent border border-transparent focus:bg-[#DFF1F1] focus:text-gray-800 rounded-lg px-2 py-1 text-sm font-medium outline-none transition ${
+                        isLight
+                          ? "hover:border-[#BBD5DA] focus:border-teal-400 text-gray-700 placeholder-gray-300"
+                          : "hover:border-white/20 focus:border-teal-400 text-gray-200 placeholder-gray-600"
+                      }`}
                     />
 
                     {/* Quantity */}
@@ -727,13 +769,17 @@ export default function BulkPurchasePage() {
                         update(item.id, "quantity", e.target.value)
                       }
                       placeholder="e.g. 2 kg"
-                      className="w-full bg-transparent border border-transparent hover:border-[#BBD5DA] focus:border-teal-400 focus:bg-[#DFF1F1] rounded-lg px-2 py-1 text-sm text-teal-700 font-medium outline-none transition placeholder-gray-300"
+                      className={`w-full bg-transparent border border-transparent focus:bg-[#DFF1F1] focus:text-teal-700 rounded-lg px-2 py-1 text-sm font-medium outline-none transition ${
+                        isLight
+                          ? "hover:border-[#BBD5DA] focus:border-teal-400 text-teal-700 placeholder-gray-300"
+                          : "hover:border-white/20 focus:border-teal-400 text-teal-400 placeholder-gray-600"
+                      }`}
                     />
 
                     {/* Delete */}
                     <button
                       onClick={() => remove(item.id)}
-                      className="w-7 h-7 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition"
+                      className={`w-7 h-7 rounded-lg hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition ${isLight ? "text-gray-300" : "text-gray-600"}`}
                     >
                       <Trash2 size={13} />
                     </button>
@@ -746,14 +792,18 @@ export default function BulkPurchasePage() {
             <div className="flex items-center justify-between pt-1">
               <button
                 onClick={clearAll}
-                className="text-xs text-gray-400 hover:text-red-500 transition flex items-center gap-1"
+                className={`text-xs hover:text-red-500 transition flex items-center gap-1 ${isLight ? "text-gray-400" : "text-gray-500"}`}
               >
                 <Trash2 size={11} /> Clear all
               </button>
               <div className="flex gap-2">
                 <button
                   onClick={handleCopy}
-                  className="flex items-center gap-1.5 text-sm font-semibold bg-white hover:bg-[#DFF1F1] border border-[#BBD5DA] text-gray-700 px-4 py-2.5 rounded-xl transition"
+                  className={`flex items-center gap-1.5 text-sm font-semibold px-4 py-2.5 rounded-xl transition border ${
+                    isLight
+                      ? "bg-white hover:bg-[#DFF1F1] border-[#BBD5DA] text-gray-700"
+                      : "bg-white/5 hover:bg-white/10 border-white/10 text-gray-200"
+                  }`}
                 >
                   {copied ? (
                     <Check size={14} className="text-green-600" />

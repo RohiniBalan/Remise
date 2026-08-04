@@ -162,7 +162,7 @@ export default function NavbarHome({ theme, toggleTheme }: NavbarProps) {
         </div>
 
         {/* ── Main Header ────────────────────────────────────────────────── */}
-        <header className={`${isLight ? 'bg-white border-b border-[#BBD5DA]' : 'bg-gray-950 border-b border-white/10'} transition-colors duration-300`}>
+        <header className={`${isLight ? 'bg-white border-b border-[#BBD5DA]' : 'bg-[#0f172a] border-b border-[#2d3748] shadow-[0_0_0_1px_rgba(255,255,255,0.04)]'} transition-colors duration-300`}>
           <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 h-16 flex items-center gap-3 lg:gap-5">
 
             {/* Mobile menu btn */}
@@ -187,7 +187,7 @@ export default function NavbarHome({ theme, toggleTheme }: NavbarProps) {
 
             {/* Search bar */}
             <form onSubmit={handleSearch} className="flex-1 max-w-2xl hidden sm:flex items-center">
-              <div className={`flex items-center w-full rounded-xl border-2 overflow-hidden transition-all ${isLight ? 'border-[#BBD5DA] focus-within:border-[#0FA3B1] bg-[#F5F5F5]' : 'border-white/10 focus-within:border-[#0FA3B1] bg-white/5'}`}>
+              <div className={`flex items-center w-full rounded-xl border-2 overflow-hidden transition-all ${isLight ? 'border-[#BBD5DA] focus-within:border-[#0FA3B1] bg-[#F5F5F5]' : 'border-[#334155] focus-within:border-[#0FA3B1] bg-[#111827]'}`}>
                 <input
                   type="text"
                   value={searchQuery}
@@ -276,7 +276,7 @@ export default function NavbarHome({ theme, toggleTheme }: NavbarProps) {
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
               transition={{ duration: 0.25 }}
-              className={`lg:hidden overflow-hidden border-b ${isLight ? 'bg-white border-[#BBD5DA]' : 'bg-gray-950 border-white/10'}`}
+              className={`lg:hidden overflow-hidden border-b ${isLight ? 'bg-white border-[#BBD5DA]' : 'bg-[#111827] border-[#2d3748]'}`}
             >
               {/* Mobile search */}
               <div className="px-4 pt-4 pb-2">

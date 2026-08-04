@@ -27,7 +27,8 @@ import {
   CheckCircle2,
   Mic,
   MicOff,
-  BarChart2, QrCode,
+  BarChart2,
+  QrCode,
   Menu,
   ChevronDown,
 } from "lucide-react";
@@ -2026,7 +2027,7 @@ function SellerProductsTab({
           </button>
         </div>
       ) : (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
           {productTypes.map((pt) => {
             const img = pt.image
               ? pt.image.startsWith("http")
@@ -2151,7 +2152,7 @@ function IncomingOrdersTab({ orders, token, onRefresh }: any) {
         <select
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          className="bg-white border border-[#BBD5DA] rounded-xl px-3 py-2.5 text-sm outline-none focus:border-teal-400 transition"
+          className="bg-white border border-[#BBD5DA] rounded-xl px-3 py-2.5 text-sm text-gray-700 outline-none focus:border-teal-400 transition"
         >
           <option value="all">All ({counts.all})</option>
           {ORDER_STATUSES.map((s) => (
@@ -2266,7 +2267,7 @@ function SellerSettingsTab({ store, token, onRefresh }: any) {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (upiError) {              
+    if (upiError) {
       setError(upiError);
       return;
     }
@@ -2368,7 +2369,6 @@ function SellerSettingsTab({ store, token, onRefresh }: any) {
             value={form.state}
             onChange={(e) => set("state", e.target.value)}
           />
-          
         </div>
 
         {/* ── NEW: UPI Payment QR Code ── */}
@@ -2700,11 +2700,6 @@ export default function SellerDashboard() {
                     {TABS.find((t) => t.id === tab)?.label}
                   </span>
                 </span>
-                {pendingCount > 0 && (
-                  <span className="bg-[#FF0000] text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center shrink-0">
-                    {pendingCount}
-                  </span>
-                )}
                 <ChevronDown
                   size={16}
                   className={`text-gray-400 shrink-0 transition-transform ${

@@ -14,6 +14,7 @@ import { AuthContext } from "../context/AuthContext";
 import { offersApi } from "../api-services/offersApi";
 import { useNotifications } from "../hooks/useNotifications";
 import NavbarHome from "../components-main/NavbarHome";
+import { isAuthenticated, redirectToLogin } from "../utils/authGuard";
 
 // Palette: #F5F5F5 bg · #DFF1F1 mint · #BBD5DA steel border · #FF0000 danger
 
@@ -297,11 +298,17 @@ function NearbyContent() {
 
         <main className="max-w-5xl mx-auto px-4 sm:px-6 pt-[80px] sm:pt-[112px] lg:pt-[152px] pb-8">
           {/* Hero */}
-          <div className="mb-4">
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">
+          <div
+            className={`mb-4 rounded-2xl border p-4 sm:p-5 shadow-sm ${theme === "light" ? "bg-white border-[#BBD5DA]" : "bg-[#111827] border-[#2d3748]"}`}
+          >
+            <h1
+              className={`text-2xl font-bold mb-1 ${theme === "light" ? "text-gray-900" : "text-white"}`}
+            >
               📍 Nearby Offers
             </h1>
-            <p className="text-gray-500 text-sm">
+            <p
+              className={`text-sm ${theme === "light" ? "text-gray-500" : "text-gray-400"}`}
+            >
               Exclusive deals from stores around you
             </p>
           </div>
@@ -317,7 +324,9 @@ function NearbyContent() {
           {/* Push notification banner */}
           {token && !subscribed && permission !== "denied" && location && (
             <div className="mb-3">
-              <div className="bg-[#DFF1F1] border border-[#BBD5DA] rounded-xl p-2 flex items-center justify-between gap-4">
+              <div
+                className={`rounded-xl border p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${theme === "light" ? "bg-[#DFF1F1] border-[#BBD5DA]" : "bg-[#111827] border-[#2d3748]"}`}
+              >
                 <div className="flex items-start gap-3">
                   <div className="w-9 h-9 rounded-full bg-white border border-[#BBD5DA] flex items-center justify-center shrink-0 mt-0.5">
                     <Bell size={16} className="text-teal-600" />
@@ -352,7 +361,9 @@ function NearbyContent() {
           )}
 
           {subscribed && (
-            <div className="flex items-center gap-2 bg-[#DFF1F1] border border-[#BBD5DA] rounded-xl px-4 py-3 mb-5 text-sm">
+            <div
+              className={`flex items-center gap-2 rounded-xl border px-4 py-3 mb-5 text-sm ${theme === "light" ? "bg-[#DFF1F1] border-[#BBD5DA]" : "bg-[#111827] border-[#2d3748]"}`}
+            >
               <Bell size={15} className="text-teal-600 shrink-0" />
               <span className="text-teal-700 font-medium">
                 You'll be notified about new offers within {radius} km
@@ -362,8 +373,12 @@ function NearbyContent() {
 
           {/* Radius filter */}
           {location && (
-            <div className="bg-white rounded-xl border border-[#BBD5DA] p-2 mb-4 flex items-center gap-3 flex-wrap shadow-sm">
-              <p className="text-sm text-gray-500 shrink-0 font-medium">
+            <div
+              className={`rounded-xl border p-3 mb-4 flex flex-col sm:flex-row sm:items-center gap-3 flex-wrap shadow-sm ${theme === "light" ? "bg-white border-[#BBD5DA]" : "bg-[#111827] border-[#2d3748]"}`}
+            >
+              <p
+                className={`text-sm shrink-0 font-medium ${theme === "light" ? "text-gray-500" : "text-gray-400"}`}
+              >
                 Search radius:
               </p>
               {[2, 5, 10, 20].map((r) => (
@@ -379,7 +394,9 @@ function NearbyContent() {
                   {r} km
                 </button>
               ))}
-              <p className="text-xs text-gray-400 ml-auto font-mono">
+              <p
+                className={`text-xs ml-auto font-mono ${theme === "light" ? "text-gray-400" : "text-gray-500"}`}
+              >
                 {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
               </p>
             </div>
@@ -387,7 +404,7 @@ function NearbyContent() {
 
           {/* Loading skeleton */}
           {loading && (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
               {[1, 2, 3, 4, 5, 6].map((i) => (
                 <div
                   key={i}
@@ -419,7 +436,7 @@ function NearbyContent() {
 
           {/* Offers grid */}
           {!loading && offers.length > 0 && (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
               {offers.map((offer) => {
                 const highlighted = searchParams.get("offer") === offer._id;
                 const timeLeft =
@@ -500,6 +517,10 @@ function NearbyContent() {
 
                       <button
                         onClick={() => {
+                          if (!isAuthenticated()) {
+                            redirectToLogin('/nearby');
+                            return;
+                          }
                           setSelectedOffer(offer);
                           setOrderSuccess(false);
                         }}

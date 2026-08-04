@@ -16,20 +16,23 @@ export default function TargetRevenueCard({
   // No target set yet — prompt instead of a misleading 0% bar
   if (!targetRevenue || targetRevenue <= 0) {
     return (
-      <div className="bg-white rounded-2xl border border-[#BBD5DA] p-5 shadow-sm flex items-center gap-4">
-        <div className="w-11 h-11 rounded-xl bg-[#DFF1F1] flex items-center justify-center text-teal-600 shrink-0">
-          <Target size={22} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="font-bold text-gray-900 text-sm">No revenue target set</p>
-          <p className="text-xs text-gray-500 mt-0.5">
-            Set a monthly target in Settings to track your progress here.
-          </p>
+      <div className="bg-white rounded-2xl border border-[#BBD5DA] p-4 sm:p-5 shadow-sm flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+        <div className="flex items-center gap-3 sm:gap-4">
+          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-[#DFF1F1] flex items-center justify-center text-teal-600 shrink-0">
+            <Target size={20} className="sm:hidden" />
+            <Target size={22} className="hidden sm:block" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-gray-900 text-sm">No revenue target set</p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Set a monthly target in Settings to track your progress here.
+            </p>
+          </div>
         </div>
         {onGoToSettings && (
           <button
             onClick={onGoToSettings}
-            className="flex items-center gap-1.5 text-xs font-semibold bg-teal-600 hover:bg-teal-700 text-white px-3.5 py-2 rounded-xl transition shrink-0"
+            className="flex items-center justify-center gap-1.5 text-xs font-semibold bg-teal-600 hover:bg-teal-700 text-white px-3.5 py-2.5 sm:py-2 rounded-xl transition shrink-0 w-full sm:w-auto"
           >
             <SettingsIcon size={13} /> Set Target
           </button>

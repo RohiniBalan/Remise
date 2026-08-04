@@ -26,21 +26,21 @@ function DealStrip({ theme }: { theme: 'dark' | 'light' }) {
   return (
     <section className={`py-6 ${isLight ? 'bg-white border-y border-[#BBD5DA]' : 'bg-gray-900 border-y border-white/10'}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-3">
           {DEALS.map((deal, i) => (
             <Link key={i} href={deal.link}>
               <motion.div
                 whileHover={{ y: -2 }}
-                className={`flex items-center gap-3 p-4 rounded-2xl border cursor-pointer transition-all ${isLight ? 'border-[#BBD5DA] hover:border-[#0FA3B1] hover:shadow-md bg-[#F5F5F5]' : 'border-white/10 hover:border-white/20 bg-gray-800'}`}
+                className={`flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 p-3 sm:p-4 rounded-xl sm:rounded-2xl border cursor-pointer transition-all h-full ${isLight ? 'border-[#BBD5DA] hover:border-[#0FA3B1] hover:shadow-md bg-[#F5F5F5]' : 'border-white/10 hover:border-white/20 bg-gray-800'}`}
               >
-                <div className={`w-10 h-10 rounded-xl ${deal.color} text-white flex items-center justify-center shrink-0`}>
+                <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl ${deal.color} text-white flex items-center justify-center shrink-0 [&>svg]:w-3.5 [&>svg]:h-3.5 sm:[&>svg]:w-4 sm:[&>svg]:h-4`}>
                   {deal.icon}
                 </div>
-                <div>
-                  <p className={`text-sm font-bold ${isLight ? 'text-gray-900' : 'text-white'}`}>{deal.title}</p>
-                  <p className={`text-xs ${isLight ? 'text-gray-500' : 'text-gray-400'}`}>{deal.sub}</p>
+                <div className="min-w-0">
+                  <p className={`text-xs sm:text-sm font-bold leading-tight ${isLight ? 'text-gray-900' : 'text-white'}`}>{deal.title}</p>
+                  <p className={`text-[10px] sm:text-xs mt-0.5 leading-tight ${isLight ? 'text-gray-500' : 'text-gray-400'}`}>{deal.sub}</p>
                 </div>
-                <ArrowRight size={14} className={`ml-auto ${isLight ? 'text-gray-300' : 'text-gray-600'}`} />
+                <ArrowRight size={14} className={`hidden sm:block ml-auto ${isLight ? 'text-gray-300' : 'text-gray-600'}`} />
               </motion.div>
             </Link>
           ))}

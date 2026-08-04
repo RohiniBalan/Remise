@@ -89,6 +89,7 @@ import SupplierBrandListDrawer, {
 import ConfirmModal from "../../components-main/ConfirmModal";
 import { indianStates, getCities } from "../../utils/indiaLocation";
 import TargetRevenueCard from "../../components-main/TargetRevenueCard";
+import { isAuthenticated, redirectToLogin } from "../../utils/authGuard";
 
 type CartLine = {
   productId: string;
@@ -957,11 +958,11 @@ function OverviewTab({
   return (
     <div className="space-y-6">
       {/* ── Analytics filter bar ── */}
-      <div className="flex flex-wrap items-center gap-3 bg-white rounded-2xl border border-[#BBD5DA] p-3 shadow-sm">
+      <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 sm:gap-3 bg-white rounded-2xl border border-[#BBD5DA] p-3 shadow-sm">
         <select
           value={range}
           onChange={(e) => setRange(e.target.value as DateRangeKey)}
-          className="bg-[#F5F5F5] border border-[#BBD5DA] rounded-xl px-3 py-2 text-sm outline-none"
+          className="col-span-1 bg-[#F5F5F5] border border-[#BBD5DA] rounded-xl px-3 py-2 text-sm text-gray-700 outline-none w-full sm:w-auto"
         >
           <option value="today">Today</option>
           <option value="week">This Week</option>
@@ -977,20 +978,20 @@ function OverviewTab({
               onChange={(e) =>
                 setCustom((c) => ({ ...c, from: e.target.value }))
               }
-              className="bg-[#F5F5F5] border border-[#BBD5DA] rounded-xl px-3 py-2 text-sm outline-none"
+              className="col-span-1 bg-[#F5F5F5] border border-[#BBD5DA] rounded-xl px-3 py-2 text-sm text-gray-700 outline-none w-full sm:w-auto"
             />
             <input
               type="date"
               value={custom.to}
               onChange={(e) => setCustom((c) => ({ ...c, to: e.target.value }))}
-              className="bg-[#F5F5F5] border border-[#BBD5DA] rounded-xl px-3 py-2 text-sm outline-none"
+              className="col-span-1 bg-[#F5F5F5] border border-[#BBD5DA] rounded-xl px-3 py-2 text-sm text-gray-700 outline-none w-full sm:w-auto"
             />
           </>
         )}
         <select
           value={category}
           onChange={(e) => setCategory(e.target.value)}
-          className="bg-[#F5F5F5] border border-[#BBD5DA] rounded-xl px-3 py-2 text-sm outline-none"
+          className="col-span-1 bg-[#F5F5F5] border border-[#BBD5DA] rounded-xl px-3 py-2 text-sm text-gray-700 outline-none w-full sm:w-auto"
         >
           <option value="">All Categories</option>
           {categories.map((c: any) => (
@@ -1002,7 +1003,7 @@ function OverviewTab({
         <select
           value={productFilter}
           onChange={(e) => setProductFilter(e.target.value)}
-          className="bg-[#F5F5F5] border border-[#BBD5DA] rounded-xl px-3 py-2 text-sm outline-none"
+          className="col-span-1 bg-[#F5F5F5] border border-[#BBD5DA] rounded-xl px-3 py-2 text-sm text-gray-700 outline-none w-full sm:w-auto"
         >
           <option value="">All Products</option>
           {products.map((p: any) => (
@@ -1013,7 +1014,7 @@ function OverviewTab({
         </select>
         <button
           onClick={handleExportPdf}
-          className="ml-auto flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-xl text-sm font-semibold transition"
+          className="col-span-2 sm:col-auto sm:ml-auto flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-xl text-sm font-semibold transition w-full sm:w-auto"
         >
           Export PDF
         </button>
@@ -1204,40 +1205,45 @@ function OverviewTab({
             <div className="px-5 py-4 border-b border-[#BBD5DA]">
               <h3 className="font-bold text-gray-900 text-sm">{title}</h3>
             </div>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-xs text-gray-400 uppercase">
-                  <th className="text-left px-5 py-2">Product</th>
-                  <th className="text-left px-5 py-2">Brand</th>
-                  <th className="text-right px-5 py-2">Qty</th>
-                  <th className="text-right px-5 py-2">Revenue</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r: any) => (
-                  <tr
-                    key={`${r.title}-${r.brand}`}
-                    className="border-t border-[#F5F5F5]"
-                  >
-                    <td className="px-5 py-2.5 font-medium text-gray-800">
-                      {r.title}
-                    </td>
-                    <td className="px-5 py-2.5 text-gray-500">{r.brand}</td>
-                    <td className="px-5 py-2.5 text-right">{r.qty}</td>
-                    <td className="px-5 py-2.5 text-right text-teal-700 font-semibold">
-                      ₹{r.revenue.toLocaleString("en-IN")}
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-xs text-gray-400 uppercase">
+                    <th className="text-left px-5 py-2">Product</th>
+                    <th className="text-left px-5 py-2">Brand</th>
+                    <th className="text-right px-5 py-2">Qty</th>
+                    <th className="text-right px-5 py-2">Revenue</th>
                   </tr>
-                ))}
-                {rows.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="text-center text-gray-400 py-6">
-                      No data
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {rows.map((r: any) => (
+                    <tr
+                      key={`${r.title}-${r.brand}`}
+                      className="border-t border-[#F5F5F5]"
+                    >
+                      <td className="px-5 py-2.5 font-medium text-gray-800">
+                        {r.title}
+                      </td>
+                      <td className="px-5 py-2.5 text-gray-500">{r.brand}</td>
+                      <td className="px-5 py-2.5 text-right">{r.qty}</td>
+                      <td className="px-5 py-2.5 text-right text-teal-700 font-semibold">
+                        ₹{r.revenue.toLocaleString("en-IN")}
+                      </td>
+                    </tr>
+                  ))}
+                  {rows.length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={4}
+                        className="text-center text-gray-400 py-6"
+                      >
+                        No data
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         ))}
 
@@ -2906,7 +2912,7 @@ function ProductsTab({ products, categories, storeId, token, onRefresh }: any) {
         <select
           value={catFilter}
           onChange={(e) => setCatFilter(e.target.value)}
-          className="bg-white border border-[#BBD5DA] rounded-xl px-3 py-2.5 text-sm outline-none focus:border-teal-400 transition"
+          className="bg-white border border-[#BBD5DA] rounded-xl px-3 py-2.5 text-sm text-gray-700 outline-none focus:border-teal-400 transition"
         >
           <option value="">All Categories</option>
           {categories.map((c: any) => (
@@ -2954,7 +2960,7 @@ function ProductsTab({ products, categories, storeId, token, onRefresh }: any) {
           </button>
         </div>
       ) : (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
           {productTypes.map((pt) => {
             const img = pt.image
               ? pt.image.startsWith("http")
@@ -3128,7 +3134,7 @@ function OrdersTab({ orders, token, onRefresh }: any) {
         <select
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          className="bg-white border border-[#BBD5DA] rounded-xl px-3 py-2.5 text-sm outline-none focus:border-teal-400 transition"
+          className="bg-white border border-[#BBD5DA] rounded-xl px-3 py-2.5 text-sm text-gray-700 outline-none focus:border-teal-400 transition"
         >
           <option value="all">All ({counts.all})</option>
           {ORDER_STATUSES.map((s) => (
@@ -3308,7 +3314,7 @@ function OffersTab({ offers, token, onRefresh }: any) {
           </Link>
         </div>
       ) : (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {offers.map((offer: any) => {
             const expired = new Date(offer.validUntil) < new Date();
             return (
@@ -3709,7 +3715,7 @@ function SuppliersTab({ token, store, categories }: any) {
       )}
 
       {view === "browse" ? (
-        <div className="grid lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-5">
           <div className="lg:col-span-2 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-start gap-3 flex-wrap">
               <div className="flex gap-2 flex-1">
@@ -3866,7 +3872,13 @@ function SuppliersTab({ token, store, categories }: any) {
                   </span>
                 </div>
                 <button
-                  onClick={() => setShowCartOrderFlow(true)}
+                  onClick={() => {
+                    if (!isAuthenticated()) {
+                      redirectToLogin("/store/dashboard");
+                      return;
+                    }
+                    setShowCartOrderFlow(true);
+                  }}
                   className="w-full flex items-center gap-2 justify-center py-3 bg-[#FF0000] hover:bg-[#e00000] text-white font-semibold rounded-xl text-sm transition"
                 >
                   <Store size={15} /> Place Order
@@ -4606,11 +4618,6 @@ export default function StoreDashboard() {
                     {TABS.find((t) => t.id === tab)?.label}
                   </span>
                 </span>
-                {pendingOrders > 0 && (
-                  <span className="bg-[#FF0000] text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center shrink-0">
-                    {pendingOrders}
-                  </span>
-                )}
                 <ChevronDown
                   size={16}
                   className={`text-gray-400 shrink-0 transition-transform ${

@@ -233,6 +233,7 @@ export default function SellerOverviewTab({
               Top Selling Products
             </h3>
           </div>
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-xs text-gray-400 uppercase">
@@ -267,6 +268,7 @@ export default function SellerOverviewTab({
               )}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
 

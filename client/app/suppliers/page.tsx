@@ -25,6 +25,7 @@ import SupplierBrandListDrawer, {
   TitleGroup,
   groupByTitle,
 } from "../components-main/SupplierBrandListDrawer";
+import { isAuthenticated, redirectToLogin } from "../utils/authGuard";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -194,6 +195,11 @@ export default function SuppliersPage() {
     tierLabel: string | null,
     group: ProductGroup,
   ) => {
+    if (!isAuthenticated()) {
+      redirectToLogin("/suppliers");
+      return;
+    }
+
     setCart((c) => ({
       ...c,
       [supplier.productId]: {
@@ -296,7 +302,7 @@ export default function SuppliersPage() {
           )}
 
           {view === "browse" ? (
-            <div className="grid lg:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-5">
               <div className="lg:col-span-2 space-y-4">
                 <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
                   <select
@@ -461,7 +467,13 @@ export default function SuppliersPage() {
                       </span>
                     </div>
                     <button
-                      onClick={() => setShowCartOrderFlow(true)}
+                      onClick={() => {
+                        if (!isAuthenticated()) {
+                          redirectToLogin("/suppliers");
+                          return;
+                        }
+                        setShowCartOrderFlow(true);
+                      }}
                       className="w-full flex items-center justify-center gap-2 py-3 bg-[#FF0000] hover:bg-[#e00000] text-white font-semibold rounded-xl text-sm transition"
                     >
                       <StoreIcon size={15} /> Place Order
