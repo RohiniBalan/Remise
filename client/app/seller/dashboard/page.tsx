@@ -27,7 +27,9 @@ import {
   CheckCircle2,
   Mic,
   MicOff,
-  BarChart2, QrCode
+  BarChart2, QrCode,
+  Menu,
+  ChevronDown,
 } from "lucide-react";
 import {
   useSpeechRecognition,
@@ -2468,6 +2470,7 @@ export default function SellerDashboard() {
   const [products, setProducts] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [tab, setTab] = useState<Tab>("overview");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [noStore, setNoStore] = useState(false);
@@ -2682,25 +2685,72 @@ export default function SellerDashboard() {
           </aside>
 
           <main className="flex-1 min-w-0">
-            <div className="lg:hidden flex gap-1 overflow-x-auto pb-1 mb-5 scrollbar-hide">
-              {TABS.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => setTab(t.id)}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition shrink-0 ${
-                    tab === t.id
-                      ? "bg-[#DFF1F1] text-teal-800"
-                      : "bg-white text-gray-600 border border-[#BBD5DA]"
+            <div className="lg:hidden relative mb-5">
+              <button
+                onClick={() => setMobileMenuOpen((v) => !v)}
+                aria-expanded={mobileMenuOpen}
+                className="flex items-center gap-2.5 w-full bg-white border border-[#BBD5DA] rounded-xl px-3.5 py-2.5 text-sm font-semibold text-gray-700 shadow-sm"
+              >
+                <Menu size={17} className="text-teal-600 shrink-0" />
+                <span className="flex items-center gap-1.5 flex-1 text-left min-w-0 truncate">
+                  <span className="text-[#FF0000] shrink-0">
+                    {TABS.find((t) => t.id === tab)?.icon}
+                  </span>
+                  <span className="truncate">
+                    {TABS.find((t) => t.id === tab)?.label}
+                  </span>
+                </span>
+                {pendingCount > 0 && (
+                  <span className="bg-[#FF0000] text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center shrink-0">
+                    {pendingCount}
+                  </span>
+                )}
+                <ChevronDown
+                  size={16}
+                  className={`text-gray-400 shrink-0 transition-transform ${
+                    mobileMenuOpen ? "rotate-180" : ""
                   }`}
-                >
-                  {t.icon} {t.label}
-                  {t.id === "orders" && pendingCount > 0 && (
-                    <span className="bg-[#FF0000] text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-                      {pendingCount}
-                    </span>
-                  )}
-                </button>
-              ))}
+                />
+              </button>
+
+              {mobileMenuOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-20"
+                    onClick={() => setMobileMenuOpen(false)}
+                  />
+                  <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-[#BBD5DA] rounded-xl shadow-lg z-30 overflow-hidden">
+                    {TABS.map((t) => (
+                      <button
+                        key={t.id}
+                        onClick={() => {
+                          setTab(t.id);
+                          setMobileMenuOpen(false);
+                        }}
+                        className={`flex items-center gap-3 w-full px-4 py-3 text-sm font-semibold text-left transition ${
+                          tab === t.id
+                            ? "bg-[#DFF1F1] text-teal-800"
+                            : "text-gray-600 hover:bg-[#F5F5F5]"
+                        }`}
+                      >
+                        <span
+                          className={
+                            tab === t.id ? "text-[#FF0000]" : "text-gray-400"
+                          }
+                        >
+                          {t.icon}
+                        </span>
+                        {t.label}
+                        {t.id === "orders" && pendingCount > 0 && (
+                          <span className="ml-auto bg-[#FF0000] text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                            {pendingCount}
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="flex items-center justify-between mb-5">

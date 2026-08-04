@@ -152,19 +152,23 @@ export default function SellerOverviewTab({
         onGoToSettings={onGoToSettings}
       />
       {/* Stat cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-2.5 sm:gap-4">
         {stats.map((s) => (
           <div
             key={s.label}
-            className={`bg-white rounded-2xl border p-4 shadow-sm ${s.border}`}
+            className={`bg-white rounded-xl sm:rounded-2xl border p-2.5 sm:p-4 shadow-sm ${s.border}`}
           >
             <div
-              className={`w-10 h-10 rounded-xl ${s.bg} flex items-center justify-center ${s.color} mb-3`}
+              className={`w-7 h-7 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl ${s.bg} flex items-center justify-center ${s.color} mb-1.5 sm:mb-3 [&>svg]:w-3.5 [&>svg]:h-3.5 sm:[&>svg]:w-5 sm:[&>svg]:h-5`}
             >
               {s.icon}
             </div>
-            <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
-            <p className="text-gray-500 text-xs mt-0.5">{s.label}</p>
+            <p className={`text-sm sm:text-2xl font-bold ${s.color} truncate`}>
+              {s.value}
+            </p>
+            <p className="text-gray-500 text-[10px] sm:text-xs mt-0.5 leading-tight">
+              {s.label}
+            </p>
           </div>
         ))}
       </div>

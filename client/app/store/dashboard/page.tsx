@@ -40,6 +40,7 @@ import {
   ListChecks,
   Mic,
   MicOff,
+  Menu,
 } from "lucide-react";
 import {
   LineChart,
@@ -1025,28 +1026,34 @@ function OverviewTab({
       />
 
       {/* ── Stats grid: original 6 cards + Total Products Sold ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-        <div className="bg-white rounded-2xl border border-purple-100 p-4 shadow-sm">
-          <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center text-purple-600 mb-3">
-            <TrendingUp size={20} />
+      <div className="grid grid-cols-3 gap-2.5 sm:gap-4">
+        <div className="bg-white rounded-xl sm:rounded-2xl border border-purple-100 p-2.5 sm:p-4 shadow-sm">
+          <div className="w-7 h-7 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-purple-50 flex items-center justify-center text-purple-600 mb-1.5 sm:mb-3">
+            <TrendingUp size={14} className="sm:w-5 sm:h-5" />
           </div>
-          <p className="text-2xl font-bold text-purple-600">
+          <p className="text-sm sm:text-2xl font-bold text-purple-600 truncate">
             {analytics.totalProductsSold}
           </p>
-          <p className="text-gray-500 text-xs mt-0.5">Total Products Sold</p>
+          <p className="text-gray-500 text-[10px] sm:text-xs mt-0.5 leading-tight">
+            Total Products Sold
+          </p>
         </div>
         {stats.map((s) => (
           <div
             key={s.label}
-            className={`bg-white rounded-2xl border p-4 shadow-sm ${s.border}`}
+            className={`bg-white rounded-xl sm:rounded-2xl border p-2.5 sm:p-4 shadow-sm ${s.border}`}
           >
             <div
-              className={`w-10 h-10 rounded-xl ${s.bg} flex items-center justify-center ${s.color} mb-3`}
+              className={`w-7 h-7 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl ${s.bg} flex items-center justify-center ${s.color} mb-1.5 sm:mb-3 [&>svg]:w-3.5 [&>svg]:h-3.5 sm:[&>svg]:w-5 sm:[&>svg]:h-5`}
             >
               {s.icon}
             </div>
-            <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
-            <p className="text-gray-500 text-xs mt-0.5">{s.label}</p>
+            <p className={`text-sm sm:text-2xl font-bold ${s.color} truncate`}>
+              {s.value}
+            </p>
+            <p className="text-gray-500 text-[10px] sm:text-xs mt-0.5 leading-tight">
+              {s.label}
+            </p>
           </div>
         ))}
       </div>
@@ -4328,6 +4335,7 @@ export default function StoreDashboard() {
   const [products, setProducts] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [tab, setTab] = useState<Tab>("overview");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [noStore, setNoStore] = useState(false);
@@ -4582,31 +4590,78 @@ export default function StoreDashboard() {
 
           {/* ── Main content ──────────────────────────────────────────────── */}
           <main className="flex-1 min-w-0">
-            {/* Mobile tab scroll */}
-            <div className="lg:hidden flex gap-1 overflow-x-auto pb-1 mb-5 scrollbar-hide">
-              {TABS.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => setTab(t.id)}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition shrink-0 ${
-                    tab === t.id
-                      ? "bg-[#DFF1F1] text-teal-800"
-                      : "bg-white text-gray-600 border border-[#BBD5DA]"
+            {/* Mobile tab menu */}
+            <div className="lg:hidden relative mb-5">
+              <button
+                onClick={() => setMobileMenuOpen((v) => !v)}
+                aria-expanded={mobileMenuOpen}
+                className="flex items-center gap-2.5 w-full bg-white border border-[#BBD5DA] rounded-xl px-3.5 py-2.5 text-sm font-semibold text-gray-700 shadow-sm"
+              >
+                <Menu size={17} className="text-teal-600 shrink-0" />
+                <span className="flex items-center gap-1.5 flex-1 text-left min-w-0 truncate">
+                  <span className="text-[#FF0000] shrink-0">
+                    {TABS.find((t) => t.id === tab)?.icon}
+                  </span>
+                  <span className="truncate">
+                    {TABS.find((t) => t.id === tab)?.label}
+                  </span>
+                </span>
+                {pendingOrders > 0 && (
+                  <span className="bg-[#FF0000] text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center shrink-0">
+                    {pendingOrders}
+                  </span>
+                )}
+                <ChevronDown
+                  size={16}
+                  className={`text-gray-400 shrink-0 transition-transform ${
+                    mobileMenuOpen ? "rotate-180" : ""
                   }`}
-                >
-                  {t.icon} {t.label}
-                  {t.id === "orders" && pendingOrders > 0 && (
-                    <span className="bg-[#FF0000] text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-                      {pendingOrders}
-                    </span>
-                  )}
-                  {t.id === "customers" && recurringCustomers > 0 && (
-                    <span className="bg-amber-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-                      {recurringCustomers}
-                    </span>
-                  )}
-                </button>
-              ))}
+                />
+              </button>
+
+              {mobileMenuOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-20"
+                    onClick={() => setMobileMenuOpen(false)}
+                  />
+                  <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-[#BBD5DA] rounded-xl shadow-lg z-30 overflow-hidden max-h-[70vh] overflow-y-auto">
+                    {TABS.map((t) => (
+                      <button
+                        key={t.id}
+                        onClick={() => {
+                          setTab(t.id);
+                          setMobileMenuOpen(false);
+                        }}
+                        className={`flex items-center gap-3 w-full px-4 py-3 text-sm font-semibold text-left transition ${
+                          tab === t.id
+                            ? "bg-[#DFF1F1] text-teal-800"
+                            : "text-gray-600 hover:bg-[#F5F5F5]"
+                        }`}
+                      >
+                        <span
+                          className={
+                            tab === t.id ? "text-[#FF0000]" : "text-gray-400"
+                          }
+                        >
+                          {t.icon}
+                        </span>
+                        {t.label}
+                        {t.id === "orders" && pendingOrders > 0 && (
+                          <span className="ml-auto bg-[#FF0000] text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                            {pendingOrders}
+                          </span>
+                        )}
+                        {t.id === "customers" && recurringCustomers > 0 && (
+                          <span className="ml-auto bg-amber-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                            {recurringCustomers}
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
 
             {/* ── Tab heading ───────────────────────────────────────────── */}
