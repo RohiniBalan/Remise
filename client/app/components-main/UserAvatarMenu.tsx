@@ -78,10 +78,11 @@ export default function UserAvatarMenu({
   const handleLogout = () => {
     localStorage.removeItem("user");
     localStorage.removeItem("token");
-    window.dispatchEvent(new CustomEvent("authChange"));
+    // window.dispatchEvent(new CustomEvent("authChange"));
     setIsOpen(false);
     setShowLogout(false);
-    router.push("/");
+    // router.push("/");
+    window.location.href = "/";
   };
 
   const getInitials = () => {

@@ -244,7 +244,6 @@ const updateStore = async (req, res) => {
         .status(404)
         .json({ success: false, message: "Store not found." });
 
-    // Only owner or admin
     if (store.ownerId !== req.user.id && req.user.role !== "admin") {
       return res
         .status(403)
@@ -265,6 +264,7 @@ const updateStore = async (req, res) => {
       longitude,
       upiId,
       targetRevenue,
+      fssai, // ← NEW
     } = req.body;
 
     if (name) store.name = name;
@@ -275,6 +275,16 @@ const updateStore = async (req, res) => {
     if (address)
       store.address =
         typeof address === "string" ? JSON.parse(address) : address;
+
+    // FSSAI — only relevant for Food & Beverages; clear it if category is
+    // (or is being changed to) anything else, so a stale license number
+    // never lingers on a store that's no longer in that category.
+    const effectiveCategory = category || store.category;
+    if (effectiveCategory !== "Food & Beverages") {
+      store.fssai = null;
+    } else if (fssai !== undefined) {
+      store.fssai = fssai.trim() || null;
+    }
 
     if (latitude && longitude) {
       const lat = parseFloat(latitude);
@@ -289,7 +299,6 @@ const updateStore = async (req, res) => {
     }
 
     if (req.file) {
-      // Remove old logo
       if (store.logo) {
         const oldPath = path.join(__dirname, "..", store.logo);
         if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
@@ -297,8 +306,6 @@ const updateStore = async (req, res) => {
       store.logo = `/uploads/stores/${req.file.filename}`;
     }
 
-    // UPI ID drives the generated QR — regenerate whenever it changes,
-    // clear both when the owner blanks it out.
     if (upiId !== undefined) {
       const trimmed = upiId.trim();
       if (!trimmed) {

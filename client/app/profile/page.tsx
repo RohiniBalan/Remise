@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { normalizeAuthErrorMessage, validatePasswordChangeForm } from "../utils/authValidation";
@@ -28,6 +28,8 @@ import {
 } from "lucide-react";
 import UserAvatarMenu from "../components-main/UserAvatarMenu";
 import NotificationBell from "../components-main/NotificationBell";
+import { indianStates, getCities } from "../utils/indiaLocation";
+import { productApi } from "../api-services/productApi";
 
 type TabKey = "overview" | "addresses" | "security" | "store";
 
@@ -51,6 +53,76 @@ interface ProfileForm {
   gender: string;
   avatar: string;
   profileData: Record<string, any>;
+}
+
+const GENDER_OPTIONS = [
+  { key: "male", label: "Male" },
+  { key: "female", label: "Female" },
+  { key: "other", label: "Other" },
+  { key: "prefer_not_to_say", label: "Prefer not to say" },
+];
+
+// Same list as DEFAULT_STORE_CATEGORIES in mobile's utils/storeCategories.ts —
+// kept in sync so the web Category dropdown matches the app.
+const DEFAULT_STORE_CATEGORIES = [
+  "Food & Beverages",
+  "Grocery",
+  "Fashion",
+  "Electronics",
+  "Pharmacy",
+  "Toys",
+  "Home & Living",
+  "Beauty",
+  "Sports",
+  "Other",
+];
+
+type MergedCategory = {
+  _id: string;
+  name: string;
+  isDefault: boolean;
+};
+
+// Merges the store's custom (backend-saved) categories with the built-in
+// defaults, de-duplicated by name (case-insensitive) — custom entries win
+// if a name collides, since they carry a real _id used for deletion.
+function mergeCategories(
+  customCategories: { _id: string; name: string }[],
+): MergedCategory[] {
+  const customNames = new Set(
+    (customCategories || []).map((c) => c.name.toLowerCase()),
+  );
+
+  const defaults: MergedCategory[] = DEFAULT_STORE_CATEGORIES.filter(
+    (name) => !customNames.has(name.toLowerCase()),
+  ).map((name) => ({ _id: `default-${name}`, name, isDefault: true }));
+
+  const custom: MergedCategory[] = (customCategories || []).map((c) => ({
+    _id: c._id,
+    name: c.name,
+    isDefault: false,
+  }));
+
+  return [...custom, ...defaults];
+}
+
+const normalizeLoc = (value: string) =>
+  (value || "").trim().toLowerCase();
+
+async function lookupPincode(cityName: string): Promise<string | null> {
+  if (!cityName) return null;
+  try {
+    const res = await fetch(
+      `https://api.postalpincode.in/postoffice/${encodeURIComponent(cityName)}`,
+    );
+    const data = await res.json();
+    if (data?.[0]?.Status === "Success" && data[0]?.PostOffice?.length) {
+      return data[0].PostOffice[0].Pincode || null;
+    }
+  } catch (err) {
+    console.log(err);
+  }
+  return null;
 }
 
 function getInitialForm(): ProfileForm {
@@ -82,7 +154,7 @@ function getInitialAddress(): Address {
 export default function ProfilePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({}); 
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ message: string; ok: boolean } | null>(
     null,
@@ -104,8 +176,14 @@ export default function ProfilePage() {
     confirm: false,
   });
 
+  const [categories, setCategories] = useState<any[]>([]);
+  const [draftCities, setDraftCities] = useState<any[]>([]);
+
   const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
   const isStoreOwner = user?.role === "store_owner";
+  const hasStoreAccess = ["store_owner", "whole_saler", "home_business"].includes(
+    user?.role || "",
+  );
 
   const tabs = useMemo(() => {
     const base: Array<{ id: TabKey; label: string }> = [
@@ -113,11 +191,77 @@ export default function ProfilePage() {
       { id: "addresses", label: "Addresses" },
       { id: "security", label: "Security" },
     ];
-    if (isStoreOwner) {
+    if (hasStoreAccess) {
       base.push({ id: "store", label: "Store" });
     }
     return base;
-  }, [isStoreOwner]);
+  }, [hasStoreAccess]);
+
+  const categoryOptions = useMemo(
+    () =>
+      mergeCategories(categories || []).map((c) => ({
+        key: c.name,
+        label: c.name,
+      })),
+    [categories],
+  );
+
+  const stateOptions = useMemo(
+    () => indianStates.map((s: any) => ({ key: s.isoCode, label: s.name })),
+    [],
+  );
+
+  const draftCityOptions = useMemo(
+    () => draftCities.map((c: any) => ({ key: c.name, label: c.name })),
+    [draftCities],
+  );
+
+  const findState = useCallback((value: string) => {
+    const v = normalizeLoc(value);
+    if (!v) return undefined;
+    return indianStates.find(
+      (s: any) =>
+        normalizeLoc(s.name) === v || normalizeLoc(s.isoCode) === v,
+    );
+  }, []);
+
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const res = await productApi.getCategories();
+        setCategories(res.data.data || res.data || []);
+      } catch (err) {
+        console.log(err);
+      }
+    };
+    loadCategories();
+  }, []);
+
+  useEffect(() => {
+    if (!addressDraft.state) {
+      setDraftCities([]);
+      return;
+    }
+    const state = findState(addressDraft.state);
+    setDraftCities(state ? getCities(state.isoCode) : []);
+  }, [addressDraft.state, findState]);
+
+  const handleDraftStateSelect = (isoCode: string, label: string) => {
+    setAddressDraft((prev) => ({
+      ...prev,
+      state: label,
+      city: "",
+      pinCode: "",
+    }));
+    setDraftCities(getCities(isoCode));
+  };
+
+  const handleDraftCitySelect = async (cityName: string) => {
+    setAddressDraft((prev) => ({ ...prev, city: cityName }));
+    if (!cityName) return;
+    const pin = await lookupPincode(cityName);
+    if (pin) setAddressDraft((prev) => ({ ...prev, pinCode: pin }));
+  };
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -253,6 +397,7 @@ export default function ProfilePage() {
     await saveProfileData(nextProfileData);
     setIsAddressEditorOpen(false);
     setAddressDraft(getInitialAddress());
+    setDraftCities([]);
   };
 
   const handleAddressDelete = async (id: string) => {
@@ -340,45 +485,48 @@ export default function ProfilePage() {
     );
   }
 
+  const isFoodCategory =
+    form.profileData.storeProfile?.category === "Food & Beverages";
+
   return (
     <div className="min-h-screen bg-[#F5F5F5]">
       <header className="bg-white border-b border-[#BBD5DA] sticky top-0 z-30 shadow-sm">
-  <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-    <Link
-      href="/"
-      className="flex items-center gap-2 text-sm text-gray-500 hover:text-teal-700 transition font-medium shrink-0"
-    >
-      <ArrowLeft size={16} /> Home
-    </Link>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+          <Link
+            href="/"
+            className="flex items-center gap-2 text-sm text-gray-500 hover:text-teal-700 transition font-medium shrink-0"
+          >
+            <ArrowLeft size={16} /> Home
+          </Link>
 
-    <div className="flex items-center gap-2 min-w-0">
-      <div className="w-8 h-8 rounded-lg bg-[#DFF1F1] flex items-center justify-center shrink-0 overflow-hidden">
-        {form.avatar ? (
-          <img src={form.avatar} alt="" className="w-full h-full object-cover" />
-        ) : (
-          <span className="text-xs font-bold text-teal-700">
-            {(form.fullname || user?.email || "U").charAt(0).toUpperCase()}
-          </span>
-        )}
-      </div>
-      <span className="text-sm font-bold text-gray-900 truncate hidden sm:block">
-        My Profile
-      </span>
-      {isStoreOwner && (
-        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#DFF1F1] text-teal-700 border border-[#BBD5DA] shrink-0">
-          Store Owner
-        </span>
-      )}
-    </div>
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-8 h-8 rounded-lg bg-[#DFF1F1] flex items-center justify-center shrink-0 overflow-hidden">
+              {form.avatar ? (
+                <img src={form.avatar} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-xs font-bold text-teal-700">
+                  {(form.fullname || user?.email || "U").charAt(0).toUpperCase()}
+                </span>
+              )}
+            </div>
+            <span className="text-sm font-bold text-gray-900 truncate hidden sm:block">
+              My Profile
+            </span>
+            {isStoreOwner && (
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#DFF1F1] text-teal-700 border border-[#BBD5DA] shrink-0">
+                Store Owner
+              </span>
+            )}
+          </div>
 
-    <div className="flex items-center gap-2 shrink-0">
-      <div className="bg-gray-900 rounded-full">
-        <NotificationBell />
-      </div>
-      <UserAvatarMenu theme="light" />
-    </div>
-  </div>
-</header>
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="bg-gray-900 rounded-full">
+              <NotificationBell />
+            </div>
+            <UserAvatarMenu theme="light" />
+          </div>
+        </div>
+      </header>
 
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
         <div className="rounded-3xl border border-[#BBD5DA] bg-white p-5 shadow-sm sm:p-7">
@@ -511,6 +659,7 @@ export default function ProfilePage() {
                       <input
                         type="date"
                         value={form.dob}
+                        max={new Date().toISOString().slice(0, 10)}
                         onChange={(event) =>
                           setForm((prev) => ({
                             ...prev,
@@ -533,9 +682,11 @@ export default function ProfilePage() {
                         className="w-full rounded-xl border border-[#BBD5DA] bg-white px-3.5 py-2.5 text-sm outline-none"
                       >
                         <option value="">Select</option>
-                        <option value="Male">Male</option>
-                        <option value="Female">Female</option>
-                        <option value="Other">Other</option>
+                        {GENDER_OPTIONS.map((g) => (
+                          <option key={g.key} value={g.key}>
+                            {g.label}
+                          </option>
+                        ))}
                       </select>
                     </label>
                   </div>
@@ -552,6 +703,7 @@ export default function ProfilePage() {
                   <button
                     onClick={() => {
                       setAddressDraft(getInitialAddress());
+                      setDraftCities([]);
                       setIsAddressEditorOpen(true);
                     }}
                     className="inline-flex items-center gap-2 rounded-xl bg-[#FF0000] px-3.5 py-2 text-sm font-semibold text-white"
@@ -623,32 +775,51 @@ export default function ProfilePage() {
                         />
                       </label>
                       <label className="text-sm text-gray-600">
-                        <span className="mb-1.5 block font-semibold">City</span>
-                        <input
-                          value={addressDraft.city}
-                          onChange={(event) =>
-                            setAddressDraft((prev) => ({
-                              ...prev,
-                              city: event.target.value,
-                            }))
-                          }
-                          className="w-full rounded-xl border border-[#BBD5DA] bg-white px-3.5 py-2.5 text-sm outline-none"
-                        />
-                      </label>
-                      <label className="text-sm text-gray-600">
                         <span className="mb-1.5 block font-semibold">
                           State
                         </span>
-                        <input
-                          value={addressDraft.state}
-                          onChange={(event) =>
-                            setAddressDraft((prev) => ({
-                              ...prev,
-                              state: event.target.value,
-                            }))
+                        <select
+                          value={
+                            findState(addressDraft.state)?.isoCode || ""
                           }
+                          onChange={(event) => {
+                            const isoCode = event.target.value;
+                            const label =
+                              stateOptions.find((s) => s.key === isoCode)
+                                ?.label || "";
+                            handleDraftStateSelect(isoCode, label);
+                          }}
                           className="w-full rounded-xl border border-[#BBD5DA] bg-white px-3.5 py-2.5 text-sm outline-none"
-                        />
+                        >
+                          <option value="">Select State</option>
+                          {stateOptions.map((s) => (
+                            <option key={s.key} value={s.key}>
+                              {s.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="text-sm text-gray-600">
+                        <span className="mb-1.5 block font-semibold">City</span>
+                        <select
+                          value={addressDraft.city}
+                          onChange={(event) =>
+                            handleDraftCitySelect(event.target.value)
+                          }
+                          disabled={!addressDraft.state}
+                          className="w-full rounded-xl border border-[#BBD5DA] bg-white px-3.5 py-2.5 text-sm outline-none disabled:bg-gray-100 disabled:text-gray-400"
+                        >
+                          <option value="">
+                            {addressDraft.state
+                              ? "Select City"
+                              : "Select a state first"}
+                          </option>
+                          {draftCityOptions.map((c) => (
+                            <option key={c.key} value={c.key}>
+                              {c.label}
+                            </option>
+                          ))}
+                        </select>
                       </label>
                       <label className="text-sm text-gray-600 sm:col-span-2">
                         <span className="mb-1.5 block font-semibold">
@@ -677,6 +848,7 @@ export default function ProfilePage() {
                         onClick={() => {
                           setIsAddressEditorOpen(false);
                           setAddressDraft(getInitialAddress());
+                          setDraftCities([]);
                         }}
                         className="rounded-xl border border-[#BBD5DA] px-4 py-2 text-sm font-semibold text-gray-700"
                       >
@@ -716,6 +888,10 @@ export default function ProfilePage() {
                           <button
                             onClick={() => {
                               setAddressDraft(item);
+                              const state = findState(item.state);
+                              setDraftCities(
+                                state ? getCities(state.isoCode) : [],
+                              );
                               setIsAddressEditorOpen(true);
                             }}
                             className="rounded-full border border-[#BBD5DA] px-2.5 py-1 text-xs font-semibold text-gray-700"
@@ -895,7 +1071,7 @@ export default function ProfilePage() {
                       <span className="mb-1.5 block font-semibold">
                         Category
                       </span>
-                      <input
+                      <select
                         value={form.profileData.storeProfile?.category || ""}
                         onChange={(event) =>
                           setForm((prev) => ({
@@ -910,8 +1086,45 @@ export default function ProfilePage() {
                           }))
                         }
                         className="w-full rounded-xl border border-[#BBD5DA] bg-white px-3.5 py-2.5 text-sm outline-none"
-                      />
+                      >
+                        <option value="">Select Category</option>
+                        {categoryOptions.map((c) => (
+                          <option key={c.key} value={c.key}>
+                            {c.label}
+                          </option>
+                        ))}
+                      </select>
                     </label>
+
+                    {/* FSSAI — only for Food & Beverages */}
+                    {isFoodCategory && (
+                      <label className="text-sm text-gray-600">
+                        <span className="mb-1.5 block font-semibold">
+                          FSSAI License Number
+                        </span>
+                        <input
+                          value={
+                            form.profileData.businessDetails?.fssai || ""
+                          }
+                          maxLength={14}
+                          inputMode="numeric"
+                          onChange={(event) =>
+                            setForm((prev) => ({
+                              ...prev,
+                              profileData: {
+                                ...prev.profileData,
+                                businessDetails: {
+                                  ...(prev.profileData.businessDetails || {}),
+                                  fssai: event.target.value,
+                                },
+                              },
+                            }))
+                          }
+                          className="w-full rounded-xl border border-[#BBD5DA] bg-white px-3.5 py-2.5 text-sm outline-none"
+                        />
+                      </label>
+                    )}
+
                     <label className="text-sm text-gray-600">
                       <span className="mb-1.5 block font-semibold">
                         Address
@@ -1068,6 +1281,29 @@ export default function ProfilePage() {
                               businessDetails: {
                                 ...(prev.profileData.businessDetails || {}),
                                 gst: event.target.value,
+                              },
+                            },
+                          }))
+                        }
+                        className="w-full rounded-xl border border-[#BBD5DA] bg-white px-3.5 py-2.5 text-sm outline-none"
+                      />
+                    </label>
+                    <label className="block text-sm text-gray-600">
+                      <span className="mb-1.5 block font-semibold">
+                        PAN Card Number
+                      </span>
+                      <input
+                        value={form.profileData.businessDetails?.pan || ""}
+                        maxLength={10}
+                        style={{ textTransform: "uppercase" }}
+                        onChange={(event) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            profileData: {
+                              ...prev.profileData,
+                              businessDetails: {
+                                ...(prev.profileData.businessDetails || {}),
+                                pan: event.target.value.toUpperCase(),
                               },
                             },
                           }))

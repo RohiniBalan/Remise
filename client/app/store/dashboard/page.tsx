@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useContext, useCallback, useRef } from "react";
+import { useEffect, useState, useContext, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -107,6 +107,39 @@ type CartLine = {
 // #F5F5F5 page bg · #DFF1F1 mint · #BBD5DA border · #FF0000 red · teal-600 CTA
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+
+// ── Category ───────────────────────────────────────────────────────────────────
+const DEFAULT_STORE_CATEGORIES = [
+  "Food & Beverages",
+  "Grocery",
+  "Fashion",
+  "Electronics",
+  "Pharmacy",
+  "Toys",
+  "Home & Living",
+  "Beauty",
+  "Sports",
+  "Other",
+];
+
+type MergedCategory = { _id: string; name: string; isDefault: boolean };
+
+function mergeCategories(
+  customCategories: { _id: string; name: string }[],
+): MergedCategory[] {
+  const customNames = new Set(
+    (customCategories || []).map((c) => c.name.toLowerCase()),
+  );
+  const defaults: MergedCategory[] = DEFAULT_STORE_CATEGORIES.filter(
+    (name) => !customNames.has(name.toLowerCase()),
+  ).map((name) => ({ _id: `default-${name}`, name, isDefault: true }));
+  const custom: MergedCategory[] = (customCategories || []).map((c) => ({
+    _id: c._id,
+    name: c.name,
+    isDefault: false,
+  }));
+  return [...custom, ...defaults];
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Tab =
@@ -829,6 +862,11 @@ function OverviewTab({
     return d >= from && d <= to;
   });
 
+  const mergedCategories = useMemo(
+    () => mergeCategories(categories || []),
+    [categories],
+  );
+
   let items = extractLineItems(filteredOrders, products);
   if (category) items = items.filter((i) => i.category === category);
   if (productFilter)
@@ -989,17 +1027,17 @@ function OverviewTab({
           </>
         )}
         <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          className="col-span-1 bg-[#F5F5F5] border border-[#BBD5DA] rounded-xl px-3 py-2 text-sm text-gray-700 outline-none w-full sm:w-auto"
-        >
-          <option value="">All Categories</option>
-          {categories.map((c: any) => (
-            <option key={c._id} value={c.name}>
-              {c.name}
-            </option>
-          ))}
-        </select>
+  value={category}
+  onChange={(e) => setCategory(e.target.value)}
+  className="col-span-1 bg-[#F5F5F5] border border-[#BBD5DA] rounded-xl px-3 py-2 text-sm text-gray-700 outline-none w-full sm:w-auto"
+>
+  <option value="">All Categories</option>
+  {mergedCategories.map((c) => (
+    <option key={c._id} value={c.name}>
+      {c.name}
+    </option>
+  ))}
+</select>
         <select
           value={productFilter}
           onChange={(e) => setProductFilter(e.target.value)}
@@ -2571,6 +2609,11 @@ function CategoriesTab({ categories, products, token, onRefresh }: any) {
   const [selectedCategory, setSelectedCategory] = useState<any>(null);
   const [deleting, setDeleting] = useState(false);
 
+  const mergedCategories = useMemo(
+    () => mergeCategories(categories || []),
+    [categories],
+  );
+
   const countByCategory = (products || []).reduce(
     (acc: Record<string, number>, p: any) => {
       if (p.category) acc[p.category] = (acc[p.category] || 0) + 1;
@@ -2615,15 +2658,11 @@ function CategoriesTab({ categories, products, token, onRefresh }: any) {
 
   const confirmDelete = async () => {
     if (!selectedCategory) return;
-
     setDeleting(true);
-
     try {
       await productApi.deleteCategory(selectedCategory._id, token);
-
       setDeleteModalOpen(false);
       setSelectedCategory(null);
-
       onRefresh();
     } catch {
       alert("Failed to delete category.");
@@ -2666,16 +2705,16 @@ function CategoriesTab({ categories, products, token, onRefresh }: any) {
       <div className="bg-white rounded-2xl border border-[#BBD5DA] shadow-sm overflow-hidden">
         <div className="px-5 py-3 border-b border-[#BBD5DA] bg-[#F9F9F9]">
           <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-            All Categories ({categories.length})
+            All Categories ({mergedCategories.length})
           </p>
         </div>
-        {categories.length === 0 ? (
+        {mergedCategories.length === 0 ? (
           <p className="text-gray-400 text-sm text-center py-10">
             No categories yet. Add one above.
           </p>
         ) : (
           <ul className="divide-y divide-[#F5F5F5]">
-            {categories.map((c: any) => (
+            {mergedCategories.map((c) => (
               <li
                 key={c._id}
                 className="flex items-center justify-between px-5 py-3.5 hover:bg-[#F9F9F9] transition"
@@ -2684,22 +2723,29 @@ function CategoriesTab({ categories, products, token, onRefresh }: any) {
                   <div className="w-8 h-8 rounded-lg bg-[#DFF1F1] flex items-center justify-center">
                     <Layers size={14} className="text-teal-600" />
                   </div>
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-semibold text-gray-900">
                       {c.name}
                     </span>
+                    {c.isDefault && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[#F5F5F5] text-gray-500">
+                        Default
+                      </span>
+                    )}
                     <span className="text-[11px] font-semibold text-teal-700 bg-[#DFF1F1] border border-[#BBD5DA] px-2 py-0.5 rounded-full">
                       {countByCategory[c.name] || 0} product
                       {(countByCategory[c.name] || 0) !== 1 ? "s" : ""}
                     </span>
                   </div>
                 </div>
-                <button
-                  onClick={() => handleDelete(c)}
-                  className="text-gray-300 hover:text-[#FF0000] hover:bg-red-50 p-2 rounded-lg transition"
-                >
-                  <Trash2 size={14} />
-                </button>
+                {!c.isDefault && (
+                  <button
+                    onClick={() => handleDelete(c)}
+                    className="text-gray-300 hover:text-[#FF0000] hover:bg-red-50 p-2 rounded-lg transition"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
               </li>
             ))}
           </ul>
@@ -2733,6 +2779,11 @@ function ProductsTab({ products, categories, storeId, token, onRefresh }: any) {
   const [showBulkScan, setShowBulkScan] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [selectedTypeKey, setSelectedTypeKey] = useState<string | null>(null);
+
+  const mergedCategories = useMemo(
+    () => mergeCategories(categories || []),
+    [categories],
+  );
 
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this product? This cannot be undone.")) return;
@@ -2872,7 +2923,7 @@ function ProductsTab({ products, categories, storeId, token, onRefresh }: any) {
         {(showAdd || editProd) && (
           <ProductModal
             product={editProd}
-            categories={categories}
+            categories={mergedCategories}
             storeId={storeId}
             token={token}
             initialTitle={!editProd ? selectedType.title : undefined}
@@ -2910,17 +2961,17 @@ function ProductsTab({ products, categories, storeId, token, onRefresh }: any) {
           />
         </div>
         <select
-          value={catFilter}
-          onChange={(e) => setCatFilter(e.target.value)}
-          className="bg-white border border-[#BBD5DA] rounded-xl px-3 py-2.5 text-sm text-gray-700 outline-none focus:border-teal-400 transition"
-        >
-          <option value="">All Categories</option>
-          {categories.map((c: any) => (
-            <option key={c._id} value={c.name}>
-              {c.name}
-            </option>
-          ))}
-        </select>
+  value={catFilter}
+  onChange={(e) => setCatFilter(e.target.value)}
+  className="bg-white border border-[#BBD5DA] rounded-xl px-3 py-2.5 text-sm text-gray-700 outline-none focus:border-teal-400 transition"
+>
+  <option value="">All Categories</option>
+  {mergedCategories.map((c) => (
+    <option key={c._id} value={c.name}>
+      {c.name}
+    </option>
+  ))}
+</select>
         <button
           onClick={() => setShowScan(true)}
           className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold transition shrink-0"
@@ -3047,7 +3098,7 @@ function ProductsTab({ products, categories, storeId, token, onRefresh }: any) {
       {(showAdd || editProd) && (
         <ProductModal
           product={editProd}
-          categories={categories}
+          categories={mergedCategories}
           storeId={storeId}
           token={token}
           onClose={() => {
@@ -3623,13 +3674,13 @@ function SuppliersTab({ token, store, categories }: any) {
   }, [view, loadMyOrders]);
 
   const supplierCategories = Array.from(
-    new Set(
-      [
-        ...(categories || []).map((c: any) => c.name),
-        ...groups.map((g) => g.category),
-      ].filter(Boolean),
-    ),
-  ) as string[];
+  new Set(
+    [
+      ...mergeCategories(categories || []).map((c) => c.name),
+      ...groups.map((g) => g.category),
+    ].filter(Boolean),
+  ),
+) as string[];
 
   const titleGroups = groupByTitle(groups);
 
@@ -3974,7 +4025,7 @@ function SuppliersTab({ token, store, categories }: any) {
 }
 
 // ── Settings Tab ──────────────────────────────────────────────────────────────
-function SettingsTab({ store, token, onRefresh }: any) {
+function SettingsTab({ store, token, onRefresh, categories }: any) {
   const [form, setForm] = useState({
     name: store?.name || "",
     description: store?.description || "",
@@ -3995,11 +4046,18 @@ function SettingsTab({ store, token, onRefresh }: any) {
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
   const [upiId, setUpiId] = useState(store?.upiId || "");
+  const [fssai, setFssai] = useState(store?.fssai || "");
   const UPI_ID_REGEX = /^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}$/;
   const upiError =
     upiId.trim() && !UPI_ID_REGEX.test(upiId.trim())
       ? "Invalid UPI ID format (expected e.g. name@bank)."
       : "";
+
+  const categoryOptions = useMemo(
+    () => mergeCategories(categories || []),
+    [categories],
+  );
+  const isFoodCategory = form.category === "Food & Beverages";
 
   const normalize = (s: string) =>
     (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -4018,27 +4076,9 @@ function SettingsTab({ store, token, onRefresh }: any) {
     if (state) {
       setCities(getCities(state.isoCode));
     } else {
-      console.warn(
-        "State mismatch — saved value:",
-        JSON.stringify(form.state),
-        "→ no match found in indianStates",
-      );
       setCities([]);
     }
   }, [form.state, findState]);
-
-  const STORE_CATEGORIES = [
-    "Food & Beverages",
-    "Grocery",
-    "Fashion",
-    "Electronics",
-    "Pharmacy",
-    "Toys",
-    "Home & Living",
-    "Beauty",
-    "Sports",
-    "Other",
-  ];
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -4062,6 +4102,7 @@ function SettingsTab({ store, token, onRefresh }: any) {
       fd.append("address[pinCode]", form.pinCode);
       fd.append("targetRevenue", form.targetRevenue);
       fd.append("upiId", upiId.trim());
+      fd.append("fssai", isFoodCategory ? fssai.trim() : "");
       await storeApi.update(store._id, fd, token);
       setSaved(true);
       onRefresh();
@@ -4128,17 +4169,31 @@ function SettingsTab({ store, token, onRefresh }: any) {
             value={form.email}
             onChange={(e) => set("email", e.target.value)}
           />
+
           <Select
             label="Category"
             value={form.category}
             onChange={(e) => set("category", e.target.value)}
           >
-            {STORE_CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
+            <option value="">Select Category</option>
+            {categoryOptions.map((c) => (
+              <option key={c._id} value={c.name}>
+                {c.name}
               </option>
             ))}
           </Select>
+
+          {isFoodCategory && (
+            <Input
+              label="FSSAI License Number"
+              value={fssai}
+              maxLength={14}
+              inputMode="numeric"
+              placeholder="14-digit FSSAI number"
+              onChange={(e) => setFssai(e.target.value)}
+            />
+          )}
+
           <Input
             label="Pin Code"
             value={form.pinCode}
@@ -4751,8 +4806,13 @@ export default function StoreDashboard() {
             )}
             {tab === "customers" && <CustomersTab orders={orders} />}
             {tab === "settings" && (
-              <SettingsTab store={store} token={token!} onRefresh={loadData} />
-            )}
+  <SettingsTab
+    store={store}
+    token={token!}
+    onRefresh={loadData}
+    categories={categories}
+  />
+)}
           </main>
         </div>
       </div>

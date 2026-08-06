@@ -24,11 +24,24 @@ const verifyAdmin = (req, res, next) => {
 };
 
 // Allow both admin and store_owner
+// Allow admin, store_owner, whole_saler and home_business
 const verifyAdminOrStoreOwner = (req, res, next) => {
   const role = req.user?.role;
-  if (role !== 'admin' && role !== 'store_owner') {
-    return res.status(403).json({ success: false, message: 'Access denied. Store owner or admin required.' });
+
+  const allowedRoles = [
+    'admin',
+    'store_owner',
+    'whole_saler',
+    'home_business',
+  ];
+
+  if (!allowedRoles.includes(role)) {
+    return res.status(403).json({
+      success: false,
+      message: 'Access denied. Business owner or admin required.',
+    });
   }
+
   req.isAdmin = role === 'admin';
   next();
 };

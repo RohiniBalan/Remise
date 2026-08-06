@@ -1,5 +1,12 @@
 "use client";
-import { useEffect, useState, useContext, useCallback, useRef } from "react";
+import {
+  useEffect,
+  useState,
+  useContext,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -30,7 +37,7 @@ import {
   BarChart2,
   QrCode,
   Menu,
-  ChevronDown,
+  ChevronDown, Layers
 } from "lucide-react";
 import {
   useSpeechRecognition,
@@ -46,10 +53,66 @@ import NotificationBell from "../../components-main/NotificationBell";
 import SellerOverviewTab from "./SellerOverviewTab";
 import { SellerOrder } from "./seller-analytics";
 import TargetRevenueCard from "../../components-main/TargetRevenueCard";
+import { indianStates, getCities } from "../../utils/indiaLocation";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
-type Tab = "overview" | "products" | "orders" | "settings";
+type Tab = "overview" | "categories" | "products" | "orders" | "settings";
+
+// Same list as DEFAULT_STORE_CATEGORIES in mobile's utils/storeCategories.ts —
+// kept in sync so this dropdown matches the app.
+const DEFAULT_STORE_CATEGORIES = [
+  "Food & Beverages",
+  "Grocery",
+  "Fashion",
+  "Electronics",
+  "Pharmacy",
+  "Toys",
+  "Home & Living",
+  "Beauty",
+  "Sports",
+  "Other",
+];
+
+type MergedCategory = { _id: string; name: string; isDefault: boolean };
+
+// Merges the store's custom (backend-saved) categories with the built-in
+// defaults, de-duplicated by name (case-insensitive) — custom entries win
+// if a name collides, since they carry a real _id used for deletion.
+function mergeCategories(
+  customCategories: { _id: string; name: string }[],
+): MergedCategory[] {
+  const customNames = new Set(
+    (customCategories || []).map((c) => c.name.toLowerCase()),
+  );
+  const defaults: MergedCategory[] = DEFAULT_STORE_CATEGORIES.filter(
+    (name) => !customNames.has(name.toLowerCase()),
+  ).map((name) => ({ _id: `default-${name}`, name, isDefault: true }));
+  const custom: MergedCategory[] = (customCategories || []).map((c) => ({
+    _id: c._id,
+    name: c.name,
+    isDefault: false,
+  }));
+  return [...custom, ...defaults];
+}
+
+const normalizeLoc = (value: string) => (value || "").trim().toLowerCase();
+
+async function lookupPincode(cityName: string): Promise<string | null> {
+  if (!cityName) return null;
+  try {
+    const res = await fetch(
+      `https://api.postalpincode.in/postoffice/${encodeURIComponent(cityName)}`,
+    );
+    const data = await res.json();
+    if (data?.[0]?.Status === "Success" && data[0]?.PostOffice?.length) {
+      return data[0].PostOffice[0].Pincode || null;
+    }
+  } catch (err) {
+    console.log(err);
+  }
+  return null;
+}
 
 const ORDER_STATUSES = [
   "Processing",
@@ -2116,6 +2179,152 @@ function SellerProductsTab({
   );
 }
 
+// ── Category Tab ──────────────────────────────────────────────────────────────
+function SellerCategoriesTab({ categories, products, token, onRefresh }: any) {
+  const [name, setName] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const countByCategory: Record<string, number> = (products || []).reduce(
+    (acc: Record<string, number>, p: any) => {
+      if (p.category) acc[p.category] = (acc[p.category] || 0) + 1;
+      return acc;
+    },
+    {},
+  );
+
+  const mergedCategories = mergeCategories(categories || []);
+
+  const handleAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+    setSaving(true);
+    setError("");
+    try {
+      const res = await fetch(`${API}/api/categories`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ name: name.trim() }),
+      });
+      const data = await res.json();
+      if (!data.success)
+        throw new Error(data.message || "Failed to create category.");
+      setName("");
+      onRefresh();
+    } catch (err: any) {
+      setError(err.message || "Failed to create category.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id: string, catName: string) => {
+    if (!confirm(`Delete category "${catName}"?`)) return;
+    setDeletingId(id);
+    try {
+      const res = await fetch(`${API}/api/categories/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!data.success)
+        throw new Error(data.message || "Failed to delete category.");
+      onRefresh();
+    } catch {
+      alert("Failed to delete category.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  return (
+    <div className="max-w-2xl">
+      <form
+        onSubmit={handleAdd}
+        className="bg-white rounded-2xl border border-[#BBD5DA] p-5 shadow-sm mb-5"
+      >
+        <h3 className="text-sm font-bold text-gray-900 mb-3">
+          Add New Category
+        </h3>
+        <div className="flex gap-2">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Skincare"
+            className="flex-1 bg-white border border-[#BBD5DA] rounded-xl px-3.5 py-2.5 text-sm outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 transition placeholder-gray-400"
+          />
+          <button
+            type="submit"
+            disabled={saving || !name.trim()}
+            className="w-11 flex items-center justify-center bg-[#FF0000] hover:bg-[#e00000] disabled:opacity-50 text-white rounded-xl transition shrink-0"
+          >
+            {saving ? (
+              <RefreshCw size={15} className="animate-spin" />
+            ) : (
+              <Plus size={15} />
+            )}
+          </button>
+        </div>
+        {error && <p className="text-xs text-[#FF0000] mt-2">{error}</p>}
+      </form>
+
+      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">
+        All Categories ({mergedCategories.length})
+      </p>
+
+      <div className="bg-white rounded-2xl border border-[#BBD5DA] shadow-sm overflow-hidden">
+        {mergedCategories.length === 0 ? (
+          <p className="text-center text-gray-400 text-sm py-10">
+            No categories yet. Add one above.
+          </p>
+        ) : (
+          mergedCategories.map((c, idx) => {
+            const count = countByCategory[c.name] || 0;
+            return (
+              <div
+                key={c._id}
+                className={`flex items-center gap-3 px-5 py-4 ${idx !== 0 ? "border-t border-[#F5F5F5]" : ""}`}
+              >
+                <div className="w-8 h-8 rounded-lg bg-[#DFF1F1] flex items-center justify-center shrink-0">
+                  <Layers size={14} className="text-teal-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-bold text-gray-900 truncate">
+                      {c.name}
+                    </p>
+                    {c.isDefault && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[#F5F5F5] text-gray-500">
+                        Default
+                      </span>
+                    )}
+                  </div>
+                  <span className="inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#DFF1F1] border border-[#BBD5DA] text-teal-700">
+                    {count} product{count !== 1 ? "s" : ""}
+                  </span>
+                </div>
+                {!c.isDefault && (
+                  <button
+                    onClick={() => handleDelete(c._id, c.name)}
+                    disabled={deletingId === c._id}
+                    className="text-gray-400 hover:text-[#FF0000] hover:bg-red-50 p-2 rounded-lg transition shrink-0 disabled:opacity-50"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Incoming Orders Tab ─────────────────────────────────────────────────────
 function IncomingOrdersTab({ orders, token, onRefresh }: any) {
   const [filter, setFilter] = useState("all");
@@ -2241,12 +2450,13 @@ function IncomingOrdersTab({ orders, token, onRefresh }: any) {
 }
 
 // ── Settings Tab (trimmed — no UPI/QR, since that's a store-owner-only concept here; swap in full SettingsTab if you want parity) ──
-function SellerSettingsTab({ store, token, onRefresh }: any) {
+function SellerSettingsTab({ store, token, onRefresh, categories }: any) {
   const [form, setForm] = useState({
     name: store?.name || "",
     description: store?.description || "",
     phone: store?.phone || "",
     email: store?.email || "",
+    category: store?.category || "",
     street: store?.address?.street || "",
     city: store?.address?.city || "",
     state: store?.address?.state || "",
@@ -2259,11 +2469,64 @@ function SellerSettingsTab({ store, token, onRefresh }: any) {
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
   const [upiId, setUpiId] = useState(store?.upiId || "");
+  const [fssai, setFssai] = useState(store?.fssai || "");
   const UPI_ID_REGEX = /^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}$/;
   const upiError =
     upiId.trim() && !UPI_ID_REGEX.test(upiId.trim())
       ? "Invalid UPI ID format (expected e.g. name@bank)."
       : "";
+
+  const categoryOptions = useMemo(
+    () =>
+      mergeCategories(categories || []).map((c) => ({
+        key: c.name,
+        label: c.name,
+      })),
+    [categories],
+  );
+
+  const stateOptions = useMemo(
+    () => indianStates.map((s: any) => ({ key: s.isoCode, label: s.name })),
+    [],
+  );
+
+  const findState = useCallback((value: string) => {
+    const v = normalizeLoc(value);
+    if (!v) return undefined;
+    return indianStates.find(
+      (s: any) => normalizeLoc(s.name) === v || normalizeLoc(s.isoCode) === v,
+    );
+  }, []);
+
+  const [cities, setCities] = useState<any[]>([]);
+  useEffect(() => {
+    if (!form.state) {
+      setCities([]);
+      return;
+    }
+    const state = findState(form.state);
+    setCities(state ? getCities(state.isoCode) : []);
+  }, [form.state, findState]);
+
+  const cityOptions = useMemo(
+    () => cities.map((c: any) => ({ key: c.name, label: c.name })),
+    [cities],
+  );
+
+  const handleStateSelect = (isoCode: string) => {
+    const label = stateOptions.find((s) => s.key === isoCode)?.label || "";
+    setForm((f) => ({ ...f, state: label, city: "", pinCode: "" }));
+    setCities(getCities(isoCode));
+  };
+
+  const handleCitySelect = async (cityName: string) => {
+    set("city", cityName);
+    if (!cityName) return;
+    const pin = await lookupPincode(cityName);
+    if (pin) set("pinCode", pin);
+  };
+
+  const isFoodCategory = form.category === "Food & Beverages";
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2280,11 +2543,14 @@ function SellerSettingsTab({ store, token, onRefresh }: any) {
       fd.append("description", form.description);
       fd.append("phone", form.phone);
       fd.append("email", form.email);
+      fd.append("category", form.category);
       fd.append("address[street]", form.street);
       fd.append("address[city]", form.city);
       fd.append("address[state]", form.state);
       fd.append("address[pinCode]", form.pinCode);
       fd.append("targetRevenue", form.targetRevenue);
+      fd.append("upiId", upiId.trim());
+      fd.append("fssai", isFoodCategory ? fssai.trim() : "");
       await storeApi.update(store._id, fd, token);
       setSaved(true);
       onRefresh();
@@ -2349,6 +2615,31 @@ function SellerSettingsTab({ store, token, onRefresh }: any) {
             value={form.email}
             onChange={(e) => set("email", e.target.value)}
           />
+
+          <Select
+            label="Category"
+            value={form.category}
+            onChange={(e) => set("category", e.target.value)}
+          >
+            <option value="">Select Category</option>
+            {categoryOptions.map((c) => (
+              <option key={c.key} value={c.key}>
+                {c.label}
+              </option>
+            ))}
+          </Select>
+
+          {isFoodCategory && (
+            <Input
+              label="FSSAI License Number"
+              value={fssai}
+              maxLength={14}
+              inputMode="numeric"
+              placeholder="14-digit FSSAI number"
+              onChange={(e) => setFssai(e.target.value)}
+            />
+          )}
+
           <Input
             label="Pin Code"
             value={form.pinCode}
@@ -2359,19 +2650,38 @@ function SellerSettingsTab({ store, token, onRefresh }: any) {
             value={form.street}
             onChange={(e) => set("street", e.target.value)}
           />
-          <Input
+
+          <Select
+            label="State"
+            value={findState(form.state)?.isoCode || ""}
+            onChange={(e) => handleStateSelect(e.target.value)}
+          >
+            <option value="">Select State</option>
+            {stateOptions.map((s) => (
+              <option key={s.key} value={s.key}>
+                {s.label}
+              </option>
+            ))}
+          </Select>
+
+          <Select
             label="City"
             value={form.city}
-            onChange={(e) => set("city", e.target.value)}
-          />
-          <Input
-            label="State"
-            value={form.state}
-            onChange={(e) => set("state", e.target.value)}
-          />
+            onChange={(e) => handleCitySelect(e.target.value)}
+            disabled={!form.state}
+          >
+            <option value="">
+              {form.state ? "Select City" : "Select state first"}
+            </option>
+            {cityOptions.map((c) => (
+              <option key={c.key} value={c.key}>
+                {c.label}
+              </option>
+            ))}
+          </Select>
         </div>
 
-        {/* ── NEW: UPI Payment QR Code ── */}
+        {/* UPI Payment QR Code */}
         <div className="pt-2 border-t border-[#F5F5F5]">
           <p className="text-sm font-semibold text-gray-800 mb-1">
             UPI Payment QR Code
@@ -2441,6 +2751,7 @@ function SellerSettingsTab({ store, token, onRefresh }: any) {
 // ── Tab config ────────────────────────────────────────────────────────────────
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "overview", label: "Overview", icon: <BarChart2 size={15} /> },
+  { id: "categories", label: "Categories", icon: <Layers size={15} /> },
   { id: "products", label: "Products", icon: <Package size={15} /> },
   { id: "orders", label: "Incoming Orders", icon: <ShoppingBag size={15} /> },
   { id: "settings", label: "Settings", icon: <Settings size={15} /> },
@@ -2792,6 +3103,7 @@ export default function SellerDashboard() {
                 onGoToSettings={() => setTab("settings")}
               />
             )}
+            
             {tab === "products" && (
               <SellerProductsTab
                 products={products}
@@ -2813,6 +3125,7 @@ export default function SellerDashboard() {
                 store={store}
                 token={token!}
                 onRefresh={loadData}
+                categories={categories}
               />
             )}
           </main>
