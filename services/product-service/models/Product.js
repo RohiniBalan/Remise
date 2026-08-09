@@ -8,8 +8,14 @@ const productSchema = new mongoose.Schema(
       trim: true,
     },
     description: { type: String, trim: true },
+    // Customer-facing price (shown to direct/retail customers)
     price: { type: Number, required: [true, "Price is required"], min: 0 },
     discountedPrice: { type: Number, min: 0 },
+    // Store-owner base price (shown to store_owner / whole_saler / home_business
+    // buyers below MOQ; falls back to `price`/`discountedPrice` when not set).
+    // bulkPricing tiers still apply on top of this for qty >= their minQty.
+    storePrice: { type: Number, min: 0, default: null },
+    storeDiscountedPrice: { type: Number, min: 0, default: null },
     images: [{ type: String, trim: true }],
     imageUrl: { type: String, trim: true },
     category: { type: String, trim: true },

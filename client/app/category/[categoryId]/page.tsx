@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useContext } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter, useParams } from "next/navigation";
 import {
@@ -17,6 +17,10 @@ import {
 import { useCart } from "@/app/components-main/CartContext";
 import NavbarHome from "@/app/components-main/NavbarHome";
 import { isAuthenticated, redirectToLogin } from "@/app/utils/authGuard";
+import { AuthContext } from "@/app/context/AuthContext";
+
+// Roles that see store-owner pricing instead of the direct-customer price
+const STORE_OWNER_ROLES = ["store_owner", "whole_saler", "home_business"];
 
 // Define your backend API URL here
 const API_URL = "https://wow-lifebackend.onrender.com/api";
@@ -137,6 +141,9 @@ export default function CategoryPage() {
   const urlCategoryId = params?.categoryId as string | undefined;
 
   const { addToCart, setBuyNowItem } = useCart() as any;
+
+  const ctx = useContext(AuthContext) as any;
+  const isStoreOwner = STORE_OWNER_ROLES.includes(ctx?.user?.role);
 
   const [products, setProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -321,8 +328,21 @@ export default function CategoryPage() {
     count: getCount("availability", String(v)),
   }));
 
+  // Store-owner buyers see storePrice/storeDiscountedPrice (falling back to
+  // the regular customer price if the seller didn't set a store price).
+  // Recomputes whenever isStoreOwner changes (e.g. AuthContext finishes
+  // loading the user from localStorage after this page's initial render).
+  const displayProducts = useMemo(() => {
+    if (!isStoreOwner) return products;
+    return products.map((p) => ({
+      ...p,
+      price: p.storePrice ?? p.price,
+      discountedPrice: p.storeDiscountedPrice ?? p.discountedPrice,
+    }));
+  }, [products, isStoreOwner]);
+
   const filteredProducts = useMemo(() => {
-    return products
+    return displayProducts
       .filter((p) => {
         if (activeCategory && p.category !== activeCategory) return false;
         if (p.price < priceRange.min || p.price > priceRange.max) return false;

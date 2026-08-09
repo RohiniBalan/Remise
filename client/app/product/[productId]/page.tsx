@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useContext } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useParams, useRouter } from "next/navigation";
 import {
@@ -17,6 +17,10 @@ import {
 import { useCart } from "@/app/components-main/CartContext";
 import NavbarHome from "@/app/components-main/NavbarHome";
 import { isAuthenticated, redirectToLogin } from "@/app/utils/authGuard";
+import { AuthContext } from "@/app/context/AuthContext";
+
+// Roles that see store-owner pricing instead of the direct-customer price
+const STORE_OWNER_ROLES = ["store_owner", "whole_saler", "home_business"];
 
 // Define your backend API URL here
 const API_URL = "https://wow-lifebackend.onrender.com/api";
@@ -38,6 +42,9 @@ export default function ProductDetailPage() {
 
   // EXTRACTED setBuyNowItem from CartContext
   const { addToCart, setBuyNowItem } = useCart() as any;
+
+  const ctx = useContext(AuthContext) as any;
+  const isStoreOwner = STORE_OWNER_ROLES.includes(ctx?.user?.role);
 
   const [showZoom, setShowZoom] = useState(false);
   const [zoomStyle, setZoomStyle] = useState({});
@@ -127,6 +134,7 @@ export default function ProductDetailPage() {
     for (let i = 0; i < quantity; i++) {
       addToCart({
         ...product,
+        price: displayProduct.price,
         id: product._id || product.id,
         image: displayImg,
         totalStock: product.totalStock,
@@ -151,7 +159,7 @@ export default function ProductDetailPage() {
     setBuyNowItem({
       id: product._id || product.id,
       title: product.title,
-      price: product.price,
+      price: displayProduct.price,
       image: displayImg,
       quantity: quantity,
       brand: product.brand,
@@ -233,6 +241,16 @@ export default function ProductDetailPage() {
   }
 
   /* ─── Data prep ───────────────────────────────────────────────────── */
+  // Store-owner buyers see storePrice/storeDiscountedPrice (falling back to
+  // the regular customer price if the seller didn't set a store price).
+  const displayProduct = isStoreOwner
+    ? {
+        ...product,
+        price: product.storePrice ?? product.price,
+        discountedPrice: product.storeDiscountedPrice ?? product.discountedPrice,
+      }
+    : product;
+
   let galleryImages: string[] = [];
   if (Array.isArray(product.images) && product.images.length > 0)
     galleryImages = product.images;
@@ -257,9 +275,10 @@ export default function ProductDetailPage() {
     });
 
   const discount =
-    product.originalPrice > product.price
+    displayProduct.originalPrice > displayProduct.price
       ? Math.round(
-          ((product.originalPrice - product.price) / product.originalPrice) *
+          ((displayProduct.originalPrice - displayProduct.price) /
+            displayProduct.originalPrice) *
             100,
         )
       : 0;
@@ -543,16 +562,16 @@ export default function ProductDetailPage() {
                       className="pdp-serif text-[2.6rem] font-semibold leading-none"
                       style={{ color: textPri }}
                     >
-                      ₹{product.price?.toLocaleString()}
+                      ₹{displayProduct.price?.toLocaleString()}
                     </span>
                   </div>
-                  {product.originalPrice > product.price && !isOutOfStock && (
+                  {displayProduct.originalPrice > displayProduct.price && !isOutOfStock && (
                     <div className="mb-1 flex flex-col gap-1">
                       <span
                         className="text-sm line-through font-medium"
                         style={{ color: textSec }}
                       >
-                        ₹{product.originalPrice?.toLocaleString()}
+                        ₹{displayProduct.originalPrice?.toLocaleString()}
                       </span>
                       <span
                         className="text-[10px] font-bold px-2 py-0.5 tracking-wide shadow-sm rounded-sm"

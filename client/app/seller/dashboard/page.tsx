@@ -187,6 +187,8 @@ type SellerScanForm = {
   category: string;
   price: string;
   discountedPrice: string;
+  storePrice: string;
+  storeDiscountedPrice: string;
   description: string;
   brand: string;
   imageUrl: string;
@@ -291,6 +293,12 @@ async function createOneSellerProduct(
       "discountedPrice",
       String(Number(form.discountedPrice) || Number(form.price)),
     );
+    if (form.storePrice) fd.append("storePrice", String(Number(form.storePrice)));
+    if (form.storeDiscountedPrice)
+      fd.append(
+        "storeDiscountedPrice",
+        String(Number(form.storeDiscountedPrice)),
+      );
     fd.append("description", description);
     fd.append("brand", form.brand);
     fd.append("storeId", storeId);
@@ -328,6 +336,10 @@ async function createOneSellerProduct(
         category: form.category,
         price: Number(form.price),
         discountedPrice: Number(form.discountedPrice) || Number(form.price),
+        ...(form.storePrice ? { storePrice: Number(form.storePrice) } : {}),
+        ...(form.storeDiscountedPrice
+          ? { storeDiscountedPrice: Number(form.storeDiscountedPrice) }
+          : {}),
         description,
         brand: form.brand,
         imageUrl,
@@ -361,6 +373,7 @@ function SellerProductModal({
   categories,
   storeId,
   token,
+  isHomeBusiness,
   onClose,
   onSaved,
   initialTitle,
@@ -370,6 +383,7 @@ function SellerProductModal({
   categories: any[];
   storeId: string;
   token: string;
+  isHomeBusiness?: boolean;
   onClose: () => void;
   onSaved: (p: any) => void;
   initialTitle?: string;
@@ -381,6 +395,8 @@ function SellerProductModal({
     description: product?.description || "",
     price: product?.price || "",
     discountedPrice: product?.discountedPrice || "",
+    storePrice: product?.storePrice || "",
+    storeDiscountedPrice: product?.storeDiscountedPrice || "",
     category: product?.category || initialCategory || "",
     brand: product?.brand || "",
     totalStock: product?.totalStock || "",
@@ -687,6 +703,28 @@ function SellerProductModal({
               value={form.discountedPrice}
               onChange={(e) => set("discountedPrice", e.target.value)}
             />
+            {isHomeBusiness && (
+              <>
+                <Input
+                  label="Store Owner Price (₹)"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.storePrice}
+                  onChange={(e) => set("storePrice", e.target.value)}
+                  placeholder="Leave blank to use Price above"
+                />
+                <Input
+                  label="Store Owner Discounted Price (₹)"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.storeDiscountedPrice}
+                  onChange={(e) => set("storeDiscountedPrice", e.target.value)}
+                  placeholder="Leave blank to use Discounted Price above"
+                />
+              </>
+            )}
             <Select
               label="Category"
               value={form.category}
@@ -820,11 +858,13 @@ type ScanStep = "idle" | "scanning" | "review" | "saving" | "done" | "error";
 function SellerSmartUploadModal({
   storeId,
   token,
+  isHomeBusiness,
   onClose,
   onCreated,
 }: {
   storeId: string;
   token: string;
+  isHomeBusiness?: boolean;
   onClose: () => void;
   onCreated: () => void;
 }) {
@@ -841,6 +881,8 @@ function SellerSmartUploadModal({
     category: "",
     price: "",
     discountedPrice: "",
+    storePrice: "",
+    storeDiscountedPrice: "",
     description: "",
     brand: "",
     imageUrl: "",
@@ -881,6 +923,8 @@ function SellerSmartUploadModal({
       category: "",
       price: "",
       discountedPrice: "",
+      storePrice: "",
+      storeDiscountedPrice: "",
       description: "",
       brand: "",
       imageUrl: "",
@@ -925,6 +969,8 @@ function SellerSmartUploadModal({
         category: x.category || "",
         price: String(x.price || ""),
         discountedPrice: String(x.discountedPrice || x.price || ""),
+        storePrice: String(x.storePrice || ""),
+        storeDiscountedPrice: String(x.storeDiscountedPrice || ""),
         description: x.description || "",
         brand: x.brand || "",
         imageUrl: x.imageUrl || "",
@@ -1161,6 +1207,34 @@ function SellerSmartUploadModal({
                   />
                 </div>
               </div>
+              {isHomeBusiness && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                      Store Owner Price (₹)
+                    </label>
+                    <input
+                      type="number"
+                      value={form.storePrice}
+                      onChange={(e) => setF("storePrice", e.target.value)}
+                      className={inputCls}
+                      placeholder="Leave blank to use Price"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                      Store Owner Discounted Price (₹)
+                    </label>
+                    <input
+                      type="number"
+                      value={form.storeDiscountedPrice}
+                      onChange={(e) => setF("storeDiscountedPrice", e.target.value)}
+                      className={inputCls}
+                      placeholder="Leave blank to use Discounted Price"
+                    />
+                  </div>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
@@ -1372,11 +1446,13 @@ type SellerBulkRow = SellerScanForm & { id: string };
 function SellerBulkSmartUploadModal({
   storeId,
   token,
+  isHomeBusiness,
   onClose,
   onCreated,
 }: {
   storeId: string;
   token: string;
+  isHomeBusiness?: boolean;
   onClose: () => void;
   onCreated: () => void;
 }) {
@@ -1429,6 +1505,8 @@ function SellerBulkSmartUploadModal({
         category: "",
         price: "",
         discountedPrice: "",
+        storePrice: "",
+        storeDiscountedPrice: "",
         description: "",
         brand: "",
         imageUrl: "",
@@ -1462,6 +1540,8 @@ function SellerBulkSmartUploadModal({
           category: p.category || "",
           price: "",
           discountedPrice: "",
+          storePrice: "",
+          storeDiscountedPrice: "",
           description: p.description || "",
           brand: p.brand || "",
           imageUrl: p.imageUrl || "",
@@ -1870,8 +1950,10 @@ function SellerProductsTab({
   categories,
   storeId,
   token,
+  sellerRole,
   onRefresh,
 }: any) {
+  const isHomeBusiness = sellerRole === "home_business";
   const [search, setSearch] = useState("");
   const [editProd, setEditProd] = useState<any>(null);
   const [showAdd, setShowAdd] = useState(false);
@@ -2018,6 +2100,7 @@ function SellerProductsTab({
             categories={categories}
             storeId={storeId}
             token={token}
+            isHomeBusiness={isHomeBusiness}
             initialTitle={!editProd ? selectedType.title : undefined}
             initialCategory={!editProd ? selectedType.category : undefined}
             onClose={() => {
@@ -2147,6 +2230,7 @@ function SellerProductsTab({
           categories={categories}
           storeId={storeId}
           token={token}
+          isHomeBusiness={isHomeBusiness}
           onClose={() => {
             setShowAdd(false);
             setEditProd(null);
@@ -2163,6 +2247,7 @@ function SellerProductsTab({
         <SellerSmartUploadModal
           storeId={storeId}
           token={token}
+          isHomeBusiness={isHomeBusiness}
           onClose={() => setShowScan(false)}
           onCreated={onRefresh}
         />
@@ -2171,6 +2256,7 @@ function SellerProductsTab({
         <SellerBulkSmartUploadModal
           storeId={storeId}
           token={token}
+          isHomeBusiness={isHomeBusiness}
           onClose={() => setShowBulkScan(false)}
           onCreated={onRefresh}
         />
@@ -3103,13 +3189,21 @@ export default function SellerDashboard() {
                 onGoToSettings={() => setTab("settings")}
               />
             )}
-            
+            {tab === "categories" && (
+              <SellerCategoriesTab
+                categories={categories}
+                products={products}
+                token={token!}
+                onRefresh={loadData}
+              />
+            )}
             {tab === "products" && (
               <SellerProductsTab
                 products={products}
                 categories={categories}
                 storeId={store?._id}
                 token={token!}
+                sellerRole={user?.role}
                 onRefresh={loadData}
               />
             )}
