@@ -24,6 +24,9 @@ services:
       ORDER_SERVICE_URL:   http://order-service:3004
       PAYMENT_SERVICE_URL: http://payment-service:3005
       CONTENT_SERVICE_URL: http://content-service:3006
+      STORE_SERVICE_URL: http://store-service:3007
+      OFFERS_SERVICE_URL: http://offers-service:3008
+      NOTIFICATION_SERVICE_URL: http://notification-service:3009
     depends_on:
       - auth-service
       - user-service
@@ -31,6 +34,9 @@ services:
       - order-service
       - payment-service
       - content-service
+      - store-service
+      - offers-service
+      - notification-service
     networks:
       - wowlife-net
     healthcheck:
@@ -55,6 +61,8 @@ services:
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
       GOOGLE_CALLBACK_URL: ${GOOGLE_CALLBACK_URL}
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL}
       GATEWAY_URL: http://api-gateway:3000
     networks:
       - wowlife-net
@@ -178,6 +186,79 @@ services:
       timeout: 10s
       retries: 3
 
+  # ── Store Service ───────────────────────────────────────────────────────────
+  store-service:
+    build: ./services/store-service
+    container_name: store-service
+    restart: unless-stopped
+    ports:
+      - "3007:3007"
+    environment:
+      <<: *common-env
+      PORT: 3007
+      MONGODB_URI: mongodb://mongodb:27017/wowlife_stores
+      GATEWAY_URL: http://api-gateway:3000
+      OFFERS_SERVICE_URL: http://offers-service:3008
+    depends_on:
+      - mongodb
+    networks:
+      - wowlife-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3007/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Offers Service ─────────────────────────────────────────────────────────
+  offers-service:
+    build: ./services/offers-service
+    container_name: offers-service
+    restart: unless-stopped
+    ports:
+      - "3008:3008"
+    environment:
+      <<: *common-env
+      PORT: 3008
+      MONGODB_URI: mongodb://mongodb:27017/wowlife_offers
+      STORE_SERVICE_URL: http://store-service:3007
+      NOTIFICATION_SERVICE_URL: http://notification-service:3009
+      GATEWAY_URL: http://api-gateway:3000
+    depends_on:
+      - mongodb
+      - store-service
+      - notification-service
+    networks:
+      - wowlife-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3008/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Notification Service ────────────────────────────────────────────────────
+  notification-service:
+    build: ./services/notification-service
+    container_name: notification-service
+    restart: unless-stopped
+    ports:
+      - "3009:3009"
+    environment:
+      <<: *common-env
+      PORT: 3009
+      MONGODB_URI: mongodb://mongodb:27017/wowlife_notifications
+      GATEWAY_URL: http://api-gateway:3000
+      VAPID_EMAIL: ${VAPID_EMAIL}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
+    depends_on:
+      - mongodb
+    networks:
+      - wowlife-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3009/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 # ── Shared network (internal service-to-service comms) ──────────────────────
 networks:
