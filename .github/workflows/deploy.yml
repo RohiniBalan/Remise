@@ -10,6 +10,7 @@ jobs:
   deploy:
     name: Deploy
     runs-on: ubuntu-latest
+
     steps:
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1.0.3
@@ -18,10 +19,30 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           password: ${{ secrets.VPS_PASSWORD }}
           port: ${{ secrets.VPS_PORT || 22 }}
+
           script: |
             set -e
+
             cd ${{ secrets.VPS_PROJECT_PATH }}
+
+            echo "Pulling latest code..."
             git pull origin main
+
+            echo "Deploying backend..."
             docker compose pull || true
             docker compose up -d --build
+
+            echo "Building frontend..."
+            cd client
+            npm install
+            npm run build
+
+            echo "Restarting frontend..."
+            pm2 restart remise-frontend
+
+            pm2 save
+
+            echo "Cleaning unused Docker images..."
             docker image prune -f
+
+            echo "Deployment completed successfully!"
