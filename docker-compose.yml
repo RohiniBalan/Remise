@@ -186,6 +186,18 @@ services:
       timeout: 10s
       retries: 3
 
+ # MongoDB
+  mongodb:
+    image: mongo:4.4
+    container_name: mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb-data:/data/db
+    networks:
+      - wowlife-net
+
   # ── Store Service ───────────────────────────────────────────────────────────
   store-service:
     build: ./services/store-service
@@ -204,7 +216,7 @@ services:
     networks:
       - wowlife-net
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3007/health"]
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3007/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -230,7 +242,7 @@ services:
     networks:
       - wowlife-net
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3008/health"]
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3008/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -255,7 +267,7 @@ services:
     networks:
       - wowlife-net
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3009/health"]
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3009/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -269,3 +281,5 @@ networks:
 volumes:
   product-uploads:
   content-uploads:
+  mongodb-data:
+    name: remise-mongodb-data
