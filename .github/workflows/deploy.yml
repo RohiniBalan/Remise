@@ -28,10 +28,6 @@ jobs:
             echo "Pulling latest code..."
             git pull origin main
 
-            echo "Deploying backend..."
-            docker compose pull || true
-            docker compose up -d --build
-
             echo "Building frontend..."
             cd client
             npm install
@@ -40,9 +36,12 @@ jobs:
             echo "Restarting frontend..."
             pm2 restart remise-frontend
 
-            pm2 save
+            echo "Starting backend services..."
+            cd ..
+            docker compose pull || true
+            docker compose up -d --build
 
             echo "Cleaning unused Docker images..."
             docker image prune -f
 
-            echo "Deployment completed successfully!"
+            echo "Deployment completed!"
