@@ -149,7 +149,7 @@ const createWholesaleOrder = async (req, res) => {
       supplierRole,
       items,
       totalAmount,
-      paymentMethod: 'wholesale_manual',
+      paymentMethod: 'qr',
       paymentStatus: 'PENDING',
       orderStatus: 'Processing',
       shippingAddress: req.body.shippingAddress,
