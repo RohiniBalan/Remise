@@ -37,7 +37,8 @@ import {
   BarChart2,
   QrCode,
   Menu,
-  ChevronDown, Layers
+  ChevronDown,
+  Layers,
 } from "lucide-react";
 import {
   useSpeechRecognition,
@@ -53,6 +54,7 @@ import NotificationBell from "../../components-main/NotificationBell";
 import SellerOverviewTab from "./SellerOverviewTab";
 import { SellerOrder } from "./seller-analytics";
 import TargetRevenueCard from "../../components-main/TargetRevenueCard";
+import ConfirmModal from "../../components-main/ConfirmModal";
 import { indianStates, getCities } from "../../utils/indiaLocation";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
@@ -293,7 +295,8 @@ async function createOneSellerProduct(
       "discountedPrice",
       String(Number(form.discountedPrice) || Number(form.price)),
     );
-    if (form.storePrice) fd.append("storePrice", String(Number(form.storePrice)));
+    if (form.storePrice)
+      fd.append("storePrice", String(Number(form.storePrice)));
     if (form.storeDiscountedPrice)
       fd.append(
         "storeDiscountedPrice",
@@ -731,7 +734,7 @@ function SellerProductModal({
               onChange={(e) => set("category", e.target.value)}
             >
               <option value="">Select category</option>
-              {categories.map((c: any) => (
+              {mergeCategories(categories || []).map((c) => (
                 <option key={c._id} value={c.name}>
                   {c.name}
                 </option>
@@ -1228,7 +1231,9 @@ function SellerSmartUploadModal({
                     <input
                       type="number"
                       value={form.storeDiscountedPrice}
-                      onChange={(e) => setF("storeDiscountedPrice", e.target.value)}
+                      onChange={(e) =>
+                        setF("storeDiscountedPrice", e.target.value)
+                      }
                       className={inputCls}
                       placeholder="Leave blank to use Discounted Price"
                     />
@@ -1961,17 +1966,25 @@ function SellerProductsTab({
   const [showBulkScan, setShowBulkScan] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [selectedTypeKey, setSelectedTypeKey] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Delete this product? This cannot be undone.")) return;
-    setDeleting(id);
+  const requestDelete = (id: string, title: string) =>
+    setDeleteTarget({ id, title });
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(deleteTarget.id);
     try {
-      await productApi.delete(id, token);
+      await productApi.delete(deleteTarget.id, token);
       onRefresh();
     } catch {
       alert("Failed to delete product.");
     } finally {
       setDeleting(null);
+      setDeleteTarget(null);
     }
   };
 
@@ -2082,7 +2095,7 @@ function SellerProductsTab({
                     <Edit2 size={16} />
                   </button>
                   <button
-                    onClick={() => handleDelete(p._id)}
+                    onClick={() => requestDelete(p._id, p.brand || p.title)}
                     disabled={deleting === p._id}
                     className="text-gray-500 hover:text-[#FF0000] hover:bg-red-50 p-2 rounded-lg transition"
                   >
@@ -2114,6 +2127,17 @@ function SellerProductsTab({
             }}
           />
         )}
+
+        <ConfirmModal
+          open={!!deleteTarget}
+          title="Delete Product"
+          message={`Are you sure you want to delete "${deleteTarget?.title}"? This action cannot be undone.`}
+          confirmText="Delete"
+          cancelText="Cancel"
+          loading={deleting === deleteTarget?.id}
+          onCancel={() => setDeleteTarget(null)}
+          onConfirm={confirmDelete}
+        />
       </div>
     );
   }

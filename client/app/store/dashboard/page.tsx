@@ -1,5 +1,12 @@
 "use client";
-import { useEffect, useState, useContext, useCallback, useRef, useMemo } from "react";
+import {
+  useEffect,
+  useState,
+  useContext,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -1027,17 +1034,17 @@ function OverviewTab({
           </>
         )}
         <select
-  value={category}
-  onChange={(e) => setCategory(e.target.value)}
-  className="col-span-1 bg-[#F5F5F5] border border-[#BBD5DA] rounded-xl px-3 py-2 text-sm text-gray-700 outline-none w-full sm:w-auto"
->
-  <option value="">All Categories</option>
-  {mergedCategories.map((c) => (
-    <option key={c._id} value={c.name}>
-      {c.name}
-    </option>
-  ))}
-</select>
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          className="col-span-1 bg-[#F5F5F5] border border-[#BBD5DA] rounded-xl px-3 py-2 text-sm text-gray-700 outline-none w-full sm:w-auto"
+        >
+          <option value="">All Categories</option>
+          {mergedCategories.map((c) => (
+            <option key={c._id} value={c.name}>
+              {c.name}
+            </option>
+          ))}
+        </select>
         <select
           value={productFilter}
           onChange={(e) => setProductFilter(e.target.value)}
@@ -2779,24 +2786,32 @@ function ProductsTab({ products, categories, storeId, token, onRefresh }: any) {
   const [showBulkScan, setShowBulkScan] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [selectedTypeKey, setSelectedTypeKey] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
 
-  const mergedCategories = useMemo(
-    () => mergeCategories(categories || []),
-    [categories],
-  );
+  const requestDelete = (id: string, title: string) =>
+    setDeleteTarget({ id, title });
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Delete this product? This cannot be undone.")) return;
-    setDeleting(id);
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(deleteTarget.id);
     try {
-      await productApi.delete(id, token);
+      await productApi.delete(deleteTarget.id, token);
       onRefresh();
     } catch {
       alert("Failed to delete product.");
     } finally {
       setDeleting(null);
+      setDeleteTarget(null);
     }
   };
+
+  const mergedCategories = useMemo(
+    () => mergeCategories(categories || []),
+    [categories],
+  );
 
   const filtered = products.filter((p: any) => {
     const matchSearch =
@@ -2908,7 +2923,7 @@ function ProductsTab({ products, categories, storeId, token, onRefresh }: any) {
                     <Edit2 size={16} />
                   </button>
                   <button
-                    onClick={() => handleDelete(p._id)}
+                    onClick={() => requestDelete(p._id, p.brand || p.title)}
                     disabled={deleting === p._id}
                     className="text-gray-500 hover:text-[#FF0000] hover:bg-red-50 p-2 rounded-lg transition"
                   >
@@ -2961,17 +2976,17 @@ function ProductsTab({ products, categories, storeId, token, onRefresh }: any) {
           />
         </div>
         <select
-  value={catFilter}
-  onChange={(e) => setCatFilter(e.target.value)}
-  className="bg-white border border-[#BBD5DA] rounded-xl px-3 py-2.5 text-sm text-gray-700 outline-none focus:border-teal-400 transition"
->
-  <option value="">All Categories</option>
-  {mergedCategories.map((c) => (
-    <option key={c._id} value={c.name}>
-      {c.name}
-    </option>
-  ))}
-</select>
+          value={catFilter}
+          onChange={(e) => setCatFilter(e.target.value)}
+          className="bg-white border border-[#BBD5DA] rounded-xl px-3 py-2.5 text-sm text-gray-700 outline-none focus:border-teal-400 transition"
+        >
+          <option value="">All Categories</option>
+          {mergedCategories.map((c) => (
+            <option key={c._id} value={c.name}>
+              {c.name}
+            </option>
+          ))}
+        </select>
         <button
           onClick={() => setShowScan(true)}
           className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold transition shrink-0"
@@ -3130,6 +3145,17 @@ function ProductsTab({ products, categories, storeId, token, onRefresh }: any) {
           onCreated={onRefresh}
         />
       )}
+
+      <ConfirmModal
+        open={!!deleteTarget}
+        title="Delete Product"
+        message={`Are you sure you want to delete "${deleteTarget?.title}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        loading={deleting === deleteTarget?.id}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }
@@ -3674,13 +3700,13 @@ function SuppliersTab({ token, store, categories }: any) {
   }, [view, loadMyOrders]);
 
   const supplierCategories = Array.from(
-  new Set(
-    [
-      ...mergeCategories(categories || []).map((c) => c.name),
-      ...groups.map((g) => g.category),
-    ].filter(Boolean),
-  ),
-) as string[];
+    new Set(
+      [
+        ...mergeCategories(categories || []).map((c) => c.name),
+        ...groups.map((g) => g.category),
+      ].filter(Boolean),
+    ),
+  ) as string[];
 
   const titleGroups = groupByTitle(groups);
 
@@ -4806,13 +4832,13 @@ export default function StoreDashboard() {
             )}
             {tab === "customers" && <CustomersTab orders={orders} />}
             {tab === "settings" && (
-  <SettingsTab
-    store={store}
-    token={token!}
-    onRefresh={loadData}
-    categories={categories}
-  />
-)}
+              <SettingsTab
+                store={store}
+                token={token!}
+                onRefresh={loadData}
+                categories={categories}
+              />
+            )}
           </main>
         </div>
       </div>

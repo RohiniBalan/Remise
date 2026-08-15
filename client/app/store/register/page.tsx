@@ -6,6 +6,7 @@ import { ArrowLeft, Store, MapPin, Camera, CheckCircle } from "lucide-react";
 import { AuthContext } from "../../context/AuthContext";
 import { storeApi } from "../../api-services/storeApi";
 import UserAvatarMenu from "../../components-main/UserAvatarMenu";
+import { indianStates, getCities } from "../../utils/indiaLocation";
 
 // Palette: #F5F5F5 bg · #DFF1F1 mint · #BBD5DA steel border · #FF0000 danger
 
@@ -114,6 +115,46 @@ export default function StoreRegisterPage() {
   const [error, setError] = useState("");
   const [detecting, setDetecting] = useState(false);
 
+  const [cities, setCities] = useState<any[]>([]);
+
+  const normalizeLoc = (value: string) => (value || "").trim().toLowerCase();
+
+  const findState = (value: string) => {
+    const v = normalizeLoc(value);
+    if (!v) return undefined;
+    return indianStates.find(
+      (s: any) => normalizeLoc(s.name) === v || normalizeLoc(s.isoCode) === v,
+    );
+  };
+
+  async function lookupPincode(cityName: string): Promise<string | null> {
+    if (!cityName) return null;
+    try {
+      const res = await fetch(
+        `https://api.postalpincode.in/postoffice/${encodeURIComponent(cityName)}`,
+      );
+      const data = await res.json();
+      if (data?.[0]?.Status === "Success" && data[0]?.PostOffice?.length) {
+        return data[0].PostOffice[0].Pincode || null;
+      }
+    } catch (err) {
+      console.log(err);
+    }
+    return null;
+  }
+
+  const handleStateSelect = (isoCode: string, label: string) => {
+    setForm((f) => ({ ...f, state: label, city: "", pinCode: "" }));
+    setCities(isoCode ? getCities(isoCode) : []);
+  };
+
+  const handleCitySelect = async (cityName: string) => {
+    set("city", cityName);
+    if (!cityName) return;
+    const pin = await lookupPincode(cityName);
+    if (pin) set("pinCode", pin);
+  };
+
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
   const detectLocation = () => {
@@ -183,7 +224,7 @@ export default function StoreRegisterPage() {
         }),
       );
       fd.append("ownerName", user?.fullname || "Owner");
-      fd.append('storeType', storeType);
+      fd.append("storeType", storeType);
       if (logoFile) fd.append("logo", logoFile);
       const res = await storeApi.register(fd, token);
 
@@ -191,10 +232,12 @@ export default function StoreRegisterPage() {
       // Save it so product/category APIs work immediately without re-login.
       const newToken = res.data?.token;
       if (newToken && ctx?.login) {
-        ctx.login(user, newToken);   // keep existing role — backend already returns the right one
+        ctx.login(user, newToken); // keep existing role — backend already returns the right one
       }
 
-      router.push(storeType === 'store' ? '/store/dashboard' : '/seller/dashboard');
+      router.push(
+        storeType === "store" ? "/store/dashboard" : "/seller/dashboard",
+      );
     } catch (err: any) {
       setError(err.response?.data?.message || "Registration failed.");
     } finally {
@@ -360,21 +403,44 @@ export default function StoreRegisterPage() {
             </div>
             <div className="grid sm:grid-cols-3 gap-4">
               <div>
-                <Label>City</Label>
-                <Input
-                  value={form.city}
-                  onChange={(e) => set("city", e.target.value)}
-                  placeholder="Chennai"
-                />
-              </div>
-              <div>
                 <Label>State</Label>
-                <Input
-                  value={form.state}
-                  onChange={(e) => set("state", e.target.value)}
-                  placeholder="Tamil Nadu"
-                />
+                <Select
+                  value={findState(form.state)?.isoCode || ""}
+                  onChange={(e) => {
+                    const isoCode = e.target.value;
+                    const label =
+                      indianStates.find((s: any) => s.isoCode === isoCode)
+                        ?.name || "";
+                    handleStateSelect(isoCode, label);
+                  }}
+                >
+                  <option value="">Select State</option>
+                  {indianStates.map((s: any) => (
+                    <option key={s.isoCode} value={s.isoCode}>
+                      {s.name}
+                    </option>
+                  ))}
+                </Select>
               </div>
+
+              <div>
+                <Label>City</Label>
+                <Select
+                  value={form.city}
+                  onChange={(e) => handleCitySelect(e.target.value)}
+                  disabled={!form.state}
+                >
+                  <option value="">
+                    {form.state ? "Select City" : "Select a state first"}
+                  </option>
+                  {cities.map((c: any) => (
+                    <option key={c.name} value={c.name}>
+                      {c.name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+
               <div>
                 <Label>PIN Code</Label>
                 <Input

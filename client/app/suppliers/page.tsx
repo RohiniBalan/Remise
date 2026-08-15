@@ -29,6 +29,38 @@ import { isAuthenticated, redirectToLogin } from "../utils/authGuard";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
+const DEFAULT_STORE_CATEGORIES = [
+  "Food & Beverages",
+  "Grocery",
+  "Fashion",
+  "Electronics",
+  "Pharmacy",
+  "Toys",
+  "Home & Living",
+  "Beauty",
+  "Sports",
+  "Other",
+];
+
+type MergedCategory = { _id: string; name: string; isDefault: boolean };
+
+function mergeCategories(
+  customCategories: { _id: string; name: string }[],
+): MergedCategory[] {
+  const customNames = new Set(
+    (customCategories || []).map((c) => c.name.toLowerCase()),
+  );
+  const defaults: MergedCategory[] = DEFAULT_STORE_CATEGORIES.filter(
+    (name) => !customNames.has(name.toLowerCase()),
+  ).map((name) => ({ _id: `default-${name}`, name, isDefault: true }));
+  const custom: MergedCategory[] = (customCategories || []).map((c) => ({
+    _id: c._id,
+    name: c.name,
+    isDefault: false,
+  }));
+  return [...custom, ...defaults];
+}
+
 const STATUS_STYLE: Record<string, string> = {
   Processing: "bg-amber-100 text-amber-700 border-amber-200",
   Shipped: "bg-blue-100 text-blue-700 border-blue-200",
@@ -111,7 +143,7 @@ export default function SuppliersPage() {
   useEffect(() => {
     productApi
       .getCategories()
-      .then((res) => setAllCategories(res.data.data || []))
+      .then((res) => setAllCategories(mergeCategories(res.data.data || [])))
       .catch(() => {});
   }, []);
 
@@ -183,8 +215,8 @@ export default function SuppliersPage() {
   }, [view, loadMyOrders]);
 
   const supplierCategories = Array.from(
-    new Set(allCategories.map((c: any) => c.name).filter(Boolean)),
-  ) as string[];
+  new Set(mergeCategories(allCategories || []).map((c) => c.name)),
+) as string[];
 
   const titleGroups = groupByTitle(groups);
 

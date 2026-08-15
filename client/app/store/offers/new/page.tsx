@@ -1,5 +1,5 @@
 "use client";
-import { Suspense ,useState, useRef, useContext, useEffect } from "react";
+import { Suspense, useState, useRef, useContext, useEffect } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -23,8 +23,48 @@ import UserAvatarMenu from "../../../components-main/UserAvatarMenu";
 import { AuthContext } from "../../../context/AuthContext";
 import { storeApi } from "../../../api-services/storeApi";
 import { offersApi } from "../../../api-services/offersApi";
+import { productApi } from "../../../api-services/productApi";
 import { useRouter, useSearchParams } from "next/navigation";
 import NotificationBell from "../../../components-main/NotificationBell";
+
+const DEFAULT_STORE_CATEGORIES = [
+  "Food & Beverages",
+  "Grocery",
+  "Fashion",
+  "Electronics",
+  "Pharmacy",
+  "Toys",
+  "Home & Living",
+  "Beauty",
+  "Sports",
+  "Other",
+];
+
+type MergedCategory = {
+  _id: string;
+  name: string;
+  isDefault: boolean;
+};
+
+function mergeCategories(
+  customCategories: { _id: string; name: string }[],
+): MergedCategory[] {
+  const customNames = new Set(
+    (customCategories || []).map((c) => c.name.toLowerCase()),
+  );
+
+  const defaults: MergedCategory[] = DEFAULT_STORE_CATEGORIES.filter(
+    (name) => !customNames.has(name.toLowerCase()),
+  ).map((name) => ({ _id: `default-${name}`, name, isDefault: true }));
+
+  const custom: MergedCategory[] = (customCategories || []).map((c) => ({
+    _id: c._id,
+    name: c.name,
+    isDefault: false,
+  }));
+
+  return [...custom, ...defaults];
+}
 
 // Palette: #F5F5F5 bg · #DFF1F1 mint · #BBD5DA steel border · #FF0000 danger
 
@@ -323,8 +363,8 @@ function NewOfferPageContent() {
     (typeof window !== "undefined" ? localStorage.getItem("token") : null);
   const router = useRouter();
   const searchParams = useSearchParams();
-const targetCustomerId = searchParams.get("customerId");
-const targetCustomerName = searchParams.get("customerName");
+  const targetCustomerId = searchParams.get("customerId");
+  const targetCustomerName = searchParams.get("customerName");
   const imgRef = useRef<HTMLInputElement>(null);
 
   const [store, setStore] = useState<any>(null);
@@ -349,6 +389,20 @@ const targetCustomerName = searchParams.get("customerName");
   const [locSource, setLocSource] = useState<"store" | "gps" | "manual">(
     "store",
   );
+
+  const [categories, setCategories] = useState<any[]>([]);
+
+  const categoryOptions = mergeCategories(categories || []).map((c) => ({
+    key: c.name,
+    label: c.name,
+  }));
+
+  useEffect(() => {
+    productApi
+      .getCategories()
+      .then((res) => setCategories(res.data.data || res.data || []))
+      .catch((err) => console.log(err));
+  }, []);
 
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -514,42 +568,42 @@ const targetCustomerName = searchParams.get("customerName");
     <div className="min-h-screen bg-[#F5F5F5]">
       {/* ── Top bar ──────────────────────────────────────────────────────── */}
       <header className="bg-white border-b border-[#BBD5DA] sticky top-0 z-30 shadow-sm">
-  <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-    <Link
-      href="/"
-      className="flex items-center gap-2 text-sm text-gray-500 hover:text-teal-700 transition font-medium shrink-0"
-    >
-      <ArrowLeft size={16} /> Home
-    </Link>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+          <Link
+            href="/"
+            className="flex items-center gap-2 text-sm text-gray-500 hover:text-teal-700 transition font-medium shrink-0"
+          >
+            <ArrowLeft size={16} /> Home
+          </Link>
 
-    <div className="flex items-center gap-2 min-w-0">
-      <div className="w-8 h-8 rounded-lg bg-[#DFF1F1] flex items-center justify-center shrink-0 overflow-hidden">
-        {store?.logo ? (
-          <img
-            src={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"}${store.logo}`}
-            alt=""
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <Store size={16} className="text-teal-600" />
-        )}
-      </div>
-      <span className="text-sm font-bold text-gray-900 truncate hidden sm:block">
-        {store?.name}
-      </span>
-      {store?.isVerified && (
-        <CheckCircle size={14} className="text-teal-600 shrink-0" />
-      )}
-    </div>
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-8 h-8 rounded-lg bg-[#DFF1F1] flex items-center justify-center shrink-0 overflow-hidden">
+              {store?.logo ? (
+                <img
+                  src={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"}${store.logo}`}
+                  alt=""
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <Store size={16} className="text-teal-600" />
+              )}
+            </div>
+            <span className="text-sm font-bold text-gray-900 truncate hidden sm:block">
+              {store?.name}
+            </span>
+            {store?.isVerified && (
+              <CheckCircle size={14} className="text-teal-600 shrink-0" />
+            )}
+          </div>
 
-    <div className="flex items-center gap-2 shrink-0">
-      <div className="bg-gray-900 rounded-full">
-        <NotificationBell />
-      </div>
-      <UserAvatarMenu theme="light" />
-    </div>
-  </div>
-</header>
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="bg-gray-900 rounded-full">
+              <NotificationBell />
+            </div>
+            <UserAvatarMenu theme="light" />
+          </div>
+        </div>
+      </header>
 
       <main className="max-w-7xl mx-auto px-6 py-8">
         {/* Hero text */}
@@ -584,11 +638,15 @@ const targetCustomerName = searchParams.get("customerName");
           <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-xl mb-6 text-sm">
             <Tag size={15} />
             Creating a private offer — only{" "}
-            <span className="font-semibold">{targetCustomerName}</span> will see it.
+            <span className="font-semibold">{targetCustomerName}</span> will see
+            it.
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <form
+          onSubmit={handleSubmit}
+          className="grid grid-cols-1 lg:grid-cols-12 gap-6"
+        >
           {/* ── Offer image ──────────────────────────────────────────────── */}
           <div className="lg:col-span-4 bg-white rounded-2xl border border-[#BBD5DA] overflow-hidden shadow-sm">
             <div
@@ -660,11 +718,19 @@ const targetCustomerName = searchParams.get("customerName");
 
             <div>
               <Label>Category</Label>
-              <Input
+              <select
                 value={form.category}
                 onChange={(e) => set("category", e.target.value)}
-                placeholder="Food, Clothes, Electronics…"
-              />
+                className="w-full bg-white border border-[#BBD5DA] rounded-xl px-4 py-2.5 text-sm text-gray-800
+      outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 transition cursor-pointer"
+              >
+                <option value="General">General</option>
+                {categoryOptions.map((c) => (
+                  <option key={c.key} value={c.key}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>
