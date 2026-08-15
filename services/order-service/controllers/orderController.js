@@ -1,13 +1,47 @@
 const Order = require('../models/Order');
+const { notifyCustomerOrderParties, notifyWholeSaleOrderParties } = require('../utils/notifications');
 
 // Internal: create order (called by payment-service)
+// const createOrder = async (req, res) => {
+//   try {
+//     const order = await Order.create(req.body);
+//     res.status(201).json({ success: true, data: order });
+//   } catch (error) {
+//     if (error.code === 11000) return res.status(409).json({ success: false, message: 'Order ID already exists' });
+//     res.status(500).json({ success: false, message: 'Failed to create order', error: error.message });
+//   }
+// };
+
 const createOrder = async (req, res) => {
   try {
     const order = await Order.create(req.body);
-    res.status(201).json({ success: true, data: order });
+
+    // Send notifications after the order is successfully created.
+    // Notification failure must not make the order fail.
+    notifyCustomerOrderParties(order).catch((error) => {
+      console.error(
+        '[Order Notification] Background notification failed:',
+        error.message
+      );
+    });
+
+    res.status(201).json({
+      success: true,
+      data: order,
+    });
   } catch (error) {
-    if (error.code === 11000) return res.status(409).json({ success: false, message: 'Order ID already exists' });
-    res.status(500).json({ success: false, message: 'Failed to create order', error: error.message });
+    if (error.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message: 'Order ID already exists',
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create order',
+      error: error.message,
+    });
   }
 };
 
@@ -155,6 +189,13 @@ const createWholesaleOrder = async (req, res) => {
       shippingAddress: req.body.shippingAddress,
       billingAddress: req.body.billingAddress,
     });
+
+    notifyWholesaleOrderParties(order).catch((error) => {
+  console.error(
+    '[Wholesale Notification] Background notification failed:',
+    error.message
+  );
+});
 
     res.status(201).json({ success: true, message: 'Order placed successfully', data: order });
   } catch (error) {
