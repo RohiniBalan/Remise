@@ -2954,6 +2954,17 @@ function ProductsTab({ products, categories, storeId, token, onRefresh }: any) {
             }}
           />
         )}
+
+        <ConfirmModal
+          open={!!deleteTarget}
+          title="Delete Product"
+          message={`Are you sure you want to delete "${deleteTarget?.title}"? This action cannot be undone.`}
+          confirmText="Delete"
+          cancelText="Cancel"
+          loading={deleting === deleteTarget?.id}
+          onCancel={() => setDeleteTarget(null)}
+          onConfirm={confirmDelete}
+        />
       </div>
     );
   }
@@ -3145,17 +3156,6 @@ function ProductsTab({ products, categories, storeId, token, onRefresh }: any) {
           onCreated={onRefresh}
         />
       )}
-
-      <ConfirmModal
-        open={!!deleteTarget}
-        title="Delete Product"
-        message={`Are you sure you want to delete "${deleteTarget?.title}"? This action cannot be undone.`}
-        confirmText="Delete"
-        cancelText="Cancel"
-        loading={deleting === deleteTarget?.id}
-        onCancel={() => setDeleteTarget(null)}
-        onConfirm={confirmDelete}
-      />
     </div>
   );
 }

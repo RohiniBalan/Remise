@@ -22,8 +22,15 @@ import {
   Clock,
   Zap,
   Phone,
-  Loader2,
+  Mail,
+  MapPin,
+  ChevronDown,
+  RotateCcw,
+  CreditCard,
+  LifeBuoy,
 } from "lucide-react";
+
+const API_URL = "https://wow-lifebackend.onrender.com/api";
 
 const DEFAULT_RETAIL_OFFER = {
   badgeText: "EXCLUSIVE OFFER",
@@ -49,20 +56,87 @@ const DEFAULT_WHOLESALE_OFFER = {
   terms: "*Valid on orders above ₹5,00,000. Limited time offer.",
 };
 
-export default function ServicesPage(props: any) {
-  const isPreview = props.isPreview || false;
+const SUPPORT_CATEGORIES = [
+  {
+    icon: Truck,
+    title: "Orders & Shipping",
+    desc: "Track your order, check delivery timelines, and see coverage areas.",
+  },
+  {
+    icon: RotateCcw,
+    title: "Returns & Refunds",
+    desc: "Learn how exchanges, returns, and refunds work.",
+  },
+  {
+    icon: CreditCard,
+    title: "Payments & Billing",
+    desc: "Accepted payment methods, invoices, and discount codes.",
+  },
+  {
+    icon: Shield,
+    title: "Product & Warranty",
+    desc: "Authenticity, warranty coverage, and product care tips.",
+  },
+  {
+    icon: Building2,
+    title: "Wholesale & Bulk Orders",
+    desc: "Business partnerships, bulk pricing, and volume discounts.",
+  },
+  {
+    icon: Users,
+    title: "Account & Seller Help",
+    desc: "Login issues, profile settings, and Home Seller support.",
+  },
+];
+
+const FAQS = [
+  {
+    q: "How can I track my order?",
+    a: "Once your order ships, you'll receive a tracking link by email and SMS. You can also view live order status anytime from the Orders section of your account.",
+  },
+  {
+    q: "What is your return & refund policy?",
+    a: "Most items can be returned within 7 days of delivery if unused and in original packaging. Refunds are processed to your original payment method within 5-7 business days after we receive the item.",
+  },
+  {
+    q: "Do you offer wholesale or bulk pricing?",
+    a: "Yes. Business partners get volume discounts on bulk orders. Use the Wholesale tab when contacting us, or reach out directly and our team will share a custom quote.",
+  },
+  {
+    q: "What payment methods do you accept?",
+    a: "We accept UPI, credit/debit cards, net banking, and popular wallets. Prepaid orders above ₹499 qualify for free delivery, and code REMISE10 gives 10% off.",
+  },
+  {
+    q: "How long does delivery take?",
+    a: "Standard delivery typically takes 3-7 business days depending on your location. Bulk/wholesale orders may take longer and will be confirmed at the time of order.",
+  },
+  {
+    q: "How do I become a Home Seller?",
+    a: "Visit the Home Seller section from the main menu to apply. Our team will review your application and get in touch with onboarding details.",
+  },
+  {
+    q: "How do I reach a real person for help?",
+    a: "Use the Contact Us button on this page to send us a message, or reach out directly using the phone number and email listed below. Our team typically responds within 24 hours.",
+  },
+];
+
+/* ------------------------------------------------------------------ */
+/*  LEGACY RETAIL / WHOLESALE VIEW                                    */
+/*  Kept as-is and only rendered inside the Admin > Services CMS      */
+/*  preview panel (isPreview=true). Not shown on the public route.    */
+/* ------------------------------------------------------------------ */
+function LegacyServicesPreview(props: any) {
+  const isPreview = true;
   const previewData = props.previewData || null;
 
   const [viewMode, setViewMode] = useState<"retail" | "wholesale">("retail");
   const [selectedProduct, setSelectedProduct] = useState<number>(0);
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
-  const [showContact, setShowContact] = useState(false);
+  const [theme] = useState<"dark" | "light">("dark");
 
   const [retailProducts, setRetailProducts] = useState<any[]>([]);
   const [wholesaleProducts, setWholesaleProducts] = useState<any[]>([]);
   const [retailOffer, setRetailOffer] = useState(DEFAULT_RETAIL_OFFER);
   const [wholesaleOffer, setWholesaleOffer] = useState(DEFAULT_WHOLESALE_OFFER);
-  const [isLoading, setIsLoading] = useState(!isPreview);
 
   const isDarkMode = theme === "dark";
   const currentProducts =
@@ -70,74 +144,14 @@ export default function ServicesPage(props: any) {
   const currentOffer = viewMode === "retail" ? retailOffer : wholesaleOffer;
 
   useEffect(() => {
-    if (isPreview && previewData) {
+    if (previewData) {
       setRetailProducts(previewData.retailProducts || []);
       setWholesaleProducts(previewData.wholesaleProducts || []);
       if (previewData.retailOffer) setRetailOffer(previewData.retailOffer);
       if (previewData.wholesaleOffer)
         setWholesaleOffer(previewData.wholesaleOffer);
-      return;
     }
-
-    const fetchData = async () => {
-      try {
-        const API_URL = "https://wow-lifebackend.onrender.com/api";
-        const response = await fetch(`${API_URL}/services`);
-        const result = await response.json();
-
-        if (result.success && result.data) {
-          setRetailProducts(result.data.retailProducts || []);
-          setWholesaleProducts(result.data.wholesaleProducts || []);
-          if (result.data.retailOffer) setRetailOffer(result.data.retailOffer);
-          if (result.data.wholesaleOffer)
-            setWholesaleOffer(result.data.wholesaleOffer);
-        }
-      } catch (error) {
-        console.error("Error fetching services:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchData();
-  }, [isPreview, previewData]);
-
-  const toggleTheme = () => {
-    const newTheme = theme === "dark" ? "light" : "dark";
-    setTheme(newTheme);
-    localStorage.setItem("theme", newTheme);
-    window.dispatchEvent(
-      new CustomEvent("themeChange", { detail: { theme: newTheme } }),
-    );
-  };
-
-  useEffect(() => {
-    const savedTheme = localStorage.getItem("theme") as "dark" | "light";
-    if (savedTheme) setTheme(savedTheme);
-    const handleThemeChange = (e: CustomEvent) => {
-      if (e.detail?.theme) setTheme(e.detail.theme);
-    };
-    window.addEventListener("themeChange" as any, handleThemeChange);
-    return () =>
-      window.removeEventListener("themeChange" as any, handleThemeChange);
-  }, []);
-
-  useEffect(() => {
-    if (showContact) document.body.style.overflow = "hidden";
-    else document.body.style.overflow = "unset";
-    return () => {
-      document.body.style.overflow = "unset";
-    };
-  }, [showContact]);
-
-  if (isLoading) {
-    return (
-      <div
-        className={`min-h-screen flex justify-center items-center ${isDarkMode ? "bg-black" : "bg-slate-50"}`}
-      >
-        <Loader2 className="animate-spin text-yellow-500 w-12 h-12" />
-      </div>
-    );
-  }
+  }, [previewData]);
 
   return (
     <div
@@ -147,7 +161,6 @@ export default function ServicesPage(props: any) {
           : "bg-slate-50 text-slate-900 selection:bg-yellow-500/30 selection:text-yellow-900"
       }`}
     >
-      {/* Dynamic Gold Glow Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div
           className={`absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full blur-3xl ${isDarkMode ? "bg-[radial-gradient(circle,rgba(234,179,8,0.1)_0%,transparent_70%)]" : "bg-[radial-gradient(circle,rgba(234,179,8,0.15)_0%,transparent_70%)]"}`}
@@ -157,11 +170,7 @@ export default function ServicesPage(props: any) {
         ></div>
       </div>
 
-      {!isPreview && <Navbar theme={theme} toggleTheme={toggleTheme} />}
-
-      <div
-        className={`relative z-10 flex-grow ${isPreview ? "py-12" : "pt-[80px] sm:pt-[112px] lg:pt-[152px] pb-12"} px-4 md:px-8`}
-      >
+      <div className="relative z-10 flex-grow py-12 px-4 md:px-8">
         <div className="max-w-7xl mx-auto mb-12">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-12">
             <div className="space-y-4 w-full lg:w-auto">
@@ -203,16 +212,6 @@ export default function ServicesPage(props: any) {
             </div>
 
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full lg:w-auto">
-              {!isPreview && (
-                <button
-                  onClick={() => setShowContact(true)}
-                  className="px-6 py-3.5 rounded-xl font-black tracking-widest uppercase transition-all duration-300 flex items-center justify-center gap-3 bg-gradient-to-r from-yellow-600 via-yellow-400 to-yellow-600 bg-[length:200%_auto] hover:bg-[position:right_center] text-black shadow-[0_0_20px_rgba(234,179,8,0.2)] hover:scale-105 hover:shadow-[0_0_30px_rgba(234,179,8,0.4)] group w-full sm:w-auto"
-                >
-                  <Phone size={18} className="group-hover:animate-bounce" />
-                  <span>Contact Us</span>
-                </button>
-              )}
-
               <div
                 className={`flex w-full sm:w-auto p-1.5 backdrop-blur-md rounded-xl shadow-2xl border ${
                   isDarkMode
@@ -255,7 +254,6 @@ export default function ServicesPage(props: any) {
           </div>
 
           <div className="grid lg:grid-cols-3 gap-8">
-            {/* PRODUCT LIST (Left Column) */}
             <div className="lg:col-span-2">
               <div
                 className={`backdrop-blur-xl rounded-3xl overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.1)] border ${
@@ -535,7 +533,6 @@ export default function ServicesPage(props: any) {
               </div>
             </div>
 
-            {/* GOLD THEMED OFFER CARD (Right Column) */}
             <div className="lg:col-span-1">
               <AnimatePresence mode="wait">
                 <motion.div
@@ -553,7 +550,6 @@ export default function ServicesPage(props: any) {
                         : "bg-white border-yellow-400/50 shadow-[0_20px_50px_rgba(234,179,8,0.15)]"
                     }`}
                   >
-                    {/* Background Accents */}
                     <div
                       className={`absolute top-0 right-0 w-48 sm:w-64 h-48 sm:h-64 rounded-full blur-[60px] sm:blur-[80px] transition-colors duration-700 ${isDarkMode ? "bg-yellow-500/10 group-hover:bg-yellow-500/20" : "bg-yellow-300/30 group-hover:bg-yellow-400/30"}`}
                     ></div>
@@ -562,7 +558,6 @@ export default function ServicesPage(props: any) {
                     ></div>
 
                     <div className="relative z-10 flex flex-col h-full">
-                      {/* Badge */}
                       <div className="flex items-center gap-3 mb-6 sm:mb-8">
                         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 flex items-center justify-center shadow-[0_0_15px_rgba(234,179,8,0.4)] flex-shrink-0">
                           {viewMode === "retail" ? (
@@ -576,7 +571,6 @@ export default function ServicesPage(props: any) {
                         </span>
                       </div>
 
-                      {/* Main Offer Title */}
                       <div className="mb-8 sm:mb-10 text-center">
                         <div className="relative inline-block">
                           <div
@@ -611,7 +605,6 @@ export default function ServicesPage(props: any) {
                         </p>
                       </div>
 
-                      {/* Dynamic Perks */}
                       <div className="space-y-3 mb-6 sm:mb-8">
                         <div
                           className={`flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-2xl transition-colors border ${
@@ -720,7 +713,6 @@ export default function ServicesPage(props: any) {
                         </div>
                       </div>
 
-                      {/* Selected Product Info */}
                       {currentProducts[selectedProduct] && (
                         <div
                           className={`mt-2 p-4 sm:p-5 rounded-2xl border mb-6 sm:mb-8 ${
@@ -753,7 +745,6 @@ export default function ServicesPage(props: any) {
                         </div>
                       )}
 
-                      {/* CTA Button */}
                       <button className="mt-auto w-full py-3.5 sm:py-4 bg-gradient-to-r from-yellow-600 via-yellow-400 to-yellow-600 bg-[length:200%_auto] hover:bg-[position:right_center] text-black font-black tracking-widest uppercase rounded-xl transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 shadow-[0_0_20px_rgba(234,179,8,0.3)] hover:shadow-[0_0_30px_rgba(234,179,8,0.5)] hover:scale-[1.02] active:scale-[0.98] text-sm sm:text-base">
                         {viewMode === "retail" ? (
                           <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -775,15 +766,404 @@ export default function ServicesPage(props: any) {
             </div>
           </div>
         </div>
+      </div>
+
+      <style jsx global>{`
+        @keyframes gradient {
+          0%,
+          100% {
+            background-position: 0% 50%;
+          }
+          50% {
+            background-position: 100% 50%;
+          }
+        }
+        .animate-gradient {
+          background-size: 200% 200%;
+          animation: gradient 3s ease infinite;
+        }
+      `}</style>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  PUBLIC CUSTOMER SUPPORT PAGE                                      */
+/*  This is what renders at /services (linked from the navbar as      */
+/*  "Customer Support").                                              */
+/* ------------------------------------------------------------------ */
+function CustomerSupportPage() {
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [showContact, setShowContact] = useState(false);
+  const [openFaq, setOpenFaq] = useState<number | null>(0);
+  const [contactInfo, setContactInfo] = useState({
+    email: "contact@wowlifestyle.com",
+    phone: "+91 98765 43210",
+    address: "123 Lifestyle Street, Mumbai, India 400001",
+    hoursWeekday: "9:00 AM - 8:00 PM",
+    hoursSaturday: "10:00 AM - 6:00 PM",
+    hoursSunday: "Closed",
+  });
+
+  const isDarkMode = theme === "dark";
+
+  const toggleTheme = () => {
+    const newTheme = theme === "dark" ? "light" : "dark";
+    setTheme(newTheme);
+    localStorage.setItem("theme", newTheme);
+    window.dispatchEvent(
+      new CustomEvent("themeChange", { detail: { theme: newTheme } }),
+    );
+  };
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("theme") as "dark" | "light";
+    if (savedTheme) setTheme(savedTheme);
+    const handleThemeChange = (e: CustomEvent) => {
+      if (e.detail?.theme) setTheme(e.detail.theme);
+    };
+    window.addEventListener("themeChange" as any, handleThemeChange);
+    return () =>
+      window.removeEventListener("themeChange" as any, handleThemeChange);
+  }, []);
+
+  useEffect(() => {
+    if (showContact) document.body.style.overflow = "hidden";
+    else document.body.style.overflow = "unset";
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [showContact]);
+
+  useEffect(() => {
+    const fetchContactInfo = async () => {
+      try {
+        const response = await fetch(`${API_URL}/contact`);
+        const result = await response.json();
+        if (result.success && result.data) {
+          setContactInfo((prev) => ({ ...prev, ...result.data }));
+        }
+      } catch (error) {
+        console.error("Error fetching contact info:", error);
+      }
+    };
+    fetchContactInfo();
+  }, []);
+
+  return (
+    <div
+      className={`relative min-h-screen flex flex-col transition-colors duration-500 overflow-x-hidden ${
+        isDarkMode
+          ? "bg-black text-white selection:bg-yellow-500/30 selection:text-yellow-200"
+          : "bg-slate-50 text-slate-900 selection:bg-yellow-500/30 selection:text-yellow-900"
+      }`}
+    >
+      {/* Dynamic Gold Glow Background */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        <div
+          className={`absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full blur-3xl ${isDarkMode ? "bg-[radial-gradient(circle,rgba(234,179,8,0.1)_0%,transparent_70%)]" : "bg-[radial-gradient(circle,rgba(234,179,8,0.15)_0%,transparent_70%)]"}`}
+        ></div>
+        <div
+          className={`absolute bottom-[-10%] right-[-5%] w-[40%] h-[60%] rounded-full blur-3xl ${isDarkMode ? "bg-[radial-gradient(circle,rgba(212,175,55,0.08)_0%,transparent_70%)]" : "bg-[radial-gradient(circle,rgba(212,175,55,0.15)_0%,transparent_70%)]"}`}
+        ></div>
+      </div>
+
+      <Navbar theme={theme} toggleTheme={toggleTheme} />
+
+      <div className="relative z-10 flex-grow pt-[80px] sm:pt-[112px] lg:pt-[152px] pb-16 px-4 md:px-8">
+        <div className="max-w-6xl mx-auto">
+          {/* HERO */}
+          <div className="text-center mb-14 sm:mb-16">
+            <div className="flex justify-center items-center gap-3 mb-5">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 flex items-center justify-center shadow-[0_0_15px_rgba(234,179,8,0.4)]">
+                <LifeBuoy className="w-4 h-4 text-black" />
+              </div>
+              <span
+                className={`text-[10px] sm:text-xs font-black uppercase tracking-[0.25em] ${isDarkMode ? "text-yellow-500/80" : "text-yellow-700"}`}
+              >
+                We're Here to Help
+              </span>
+            </div>
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-black uppercase tracking-tighter mb-4 leading-tight">
+              <span
+                className={
+                  isDarkMode
+                    ? "text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]"
+                    : "text-slate-900 drop-shadow-sm"
+                }
+              >
+                Customer{" "}
+              </span>
+              <span
+                className={`bg-gradient-to-r from-[#D4AF37] via-[#FFD700] to-[#B8860B] bg-clip-text text-transparent animate-gradient ${isDarkMode ? "drop-shadow-[0_0_20px_rgba(234,179,8,0.3)]" : ""}`}
+              >
+                Support
+              </span>
+            </h1>
+            <p
+              className={`text-base sm:text-lg max-w-2xl mx-auto font-medium ${isDarkMode ? "text-gray-400" : "text-slate-600"}`}
+            >
+              Questions about an order, a return, or a bulk purchase? Browse
+              our help topics and FAQs below, or reach our team directly.
+            </p>
+            <div className="mt-8">
+              <button
+                onClick={() => setShowContact(true)}
+                className="px-8 py-3.5 rounded-xl font-black tracking-widest uppercase transition-all duration-300 inline-flex items-center justify-center gap-3 bg-gradient-to-r from-yellow-600 via-yellow-400 to-yellow-600 bg-[length:200%_auto] hover:bg-[position:right_center] text-black shadow-[0_0_20px_rgba(234,179,8,0.2)] hover:scale-105 hover:shadow-[0_0_30px_rgba(234,179,8,0.4)] group"
+              >
+                <Phone size={18} className="group-hover:animate-bounce" />
+                <span>Contact Us</span>
+              </button>
+            </div>
+          </div>
+
+          {/* QUICK CONTACT CARDS */}
+          <div className="grid sm:grid-cols-3 gap-5 sm:gap-6 mb-16 sm:mb-20">
+            <div
+              className={`rounded-2xl p-5 sm:p-6 border backdrop-blur-xl flex items-start gap-4 ${
+                isDarkMode
+                  ? "bg-neutral-950/80 border-yellow-500/20"
+                  : "bg-white border-yellow-400/30"
+              }`}
+            >
+              <div
+                className={`w-11 h-11 flex-shrink-0 rounded-xl flex items-center justify-center border ${
+                  isDarkMode
+                    ? "bg-yellow-500/10 border-yellow-500/20"
+                    : "bg-yellow-100 border-yellow-200"
+                }`}
+              >
+                <Mail
+                  className={`w-5 h-5 ${isDarkMode ? "text-yellow-400" : "text-yellow-600"}`}
+                />
+              </div>
+              <div className="min-w-0">
+                <p
+                  className={`text-[10px] font-black uppercase tracking-widest mb-1 ${isDarkMode ? "text-yellow-600" : "text-yellow-700"}`}
+                >
+                  Email Us
+                </p>
+                <p
+                  className={`font-bold text-sm truncate ${isDarkMode ? "text-white" : "text-slate-900"}`}
+                >
+                  {contactInfo.email}
+                </p>
+              </div>
+            </div>
+
+            <div
+              className={`rounded-2xl p-5 sm:p-6 border backdrop-blur-xl flex items-start gap-4 ${
+                isDarkMode
+                  ? "bg-neutral-950/80 border-yellow-500/20"
+                  : "bg-white border-yellow-400/30"
+              }`}
+            >
+              <div
+                className={`w-11 h-11 flex-shrink-0 rounded-xl flex items-center justify-center border ${
+                  isDarkMode
+                    ? "bg-yellow-500/10 border-yellow-500/20"
+                    : "bg-yellow-100 border-yellow-200"
+                }`}
+              >
+                <Phone
+                  className={`w-5 h-5 ${isDarkMode ? "text-yellow-400" : "text-yellow-600"}`}
+                />
+              </div>
+              <div className="min-w-0">
+                <p
+                  className={`text-[10px] font-black uppercase tracking-widest mb-1 ${isDarkMode ? "text-yellow-600" : "text-yellow-700"}`}
+                >
+                  Call Us
+                </p>
+                <p
+                  className={`font-bold text-sm truncate ${isDarkMode ? "text-white" : "text-slate-900"}`}
+                >
+                  {contactInfo.phone}
+                </p>
+              </div>
+            </div>
+
+            <div
+              className={`rounded-2xl p-5 sm:p-6 border backdrop-blur-xl flex items-start gap-4 ${
+                isDarkMode
+                  ? "bg-neutral-950/80 border-yellow-500/20"
+                  : "bg-white border-yellow-400/30"
+              }`}
+            >
+              <div
+                className={`w-11 h-11 flex-shrink-0 rounded-xl flex items-center justify-center border ${
+                  isDarkMode
+                    ? "bg-yellow-500/10 border-yellow-500/20"
+                    : "bg-yellow-100 border-yellow-200"
+                }`}
+              >
+                <Clock
+                  className={`w-5 h-5 ${isDarkMode ? "text-yellow-400" : "text-yellow-600"}`}
+                />
+              </div>
+              <div className="min-w-0">
+                <p
+                  className={`text-[10px] font-black uppercase tracking-widest mb-1 ${isDarkMode ? "text-yellow-600" : "text-yellow-700"}`}
+                >
+                  Support Hours
+                </p>
+                <p
+                  className={`font-bold text-sm ${isDarkMode ? "text-white" : "text-slate-900"}`}
+                >
+                  Mon-Fri: {contactInfo.hoursWeekday}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* SUPPORT CATEGORIES */}
+          <div className="mb-16 sm:mb-20">
+            <div className="flex items-center gap-3 sm:gap-4 mb-8">
+              <div className="w-1.5 h-6 sm:h-8 rounded-full bg-gradient-to-b from-yellow-300 to-yellow-600 shadow-[0_0_10px_rgba(234,179,8,0.5)] flex-shrink-0" />
+              <h2 className="text-xl sm:text-2xl font-black tracking-widest uppercase">
+                How Can We Help?
+              </h2>
+            </div>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
+              {SUPPORT_CATEGORIES.map((cat, i) => {
+                const Icon = cat.icon;
+                return (
+                  <div
+                    key={i}
+                    className={`rounded-2xl p-5 sm:p-6 border backdrop-blur-xl transition-all duration-300 group ${
+                      isDarkMode
+                        ? "bg-neutral-950/80 border-yellow-500/20 hover:border-yellow-500/50 hover:bg-neutral-900"
+                        : "bg-white border-yellow-400/30 hover:border-yellow-500 hover:shadow-lg"
+                    }`}
+                  >
+                    <div
+                      className={`w-11 h-11 rounded-xl flex items-center justify-center border mb-4 transition-transform group-hover:scale-110 ${
+                        isDarkMode
+                          ? "bg-yellow-500/10 border-yellow-500/20"
+                          : "bg-yellow-100 border-yellow-200"
+                      }`}
+                    >
+                      <Icon
+                        className={`w-5 h-5 ${isDarkMode ? "text-yellow-400" : "text-yellow-600"}`}
+                      />
+                    </div>
+                    <h3
+                      className={`font-bold text-base mb-1.5 ${isDarkMode ? "text-white" : "text-slate-900"}`}
+                    >
+                      {cat.title}
+                    </h3>
+                    <p
+                      className={`text-sm leading-relaxed ${isDarkMode ? "text-gray-400" : "text-slate-600"}`}
+                    >
+                      {cat.desc}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* FAQ */}
+          <div className="mb-16 sm:mb-20">
+            <div className="flex items-center gap-3 sm:gap-4 mb-8">
+              <div className="w-1.5 h-6 sm:h-8 rounded-full bg-gradient-to-b from-yellow-300 to-yellow-600 shadow-[0_0_10px_rgba(234,179,8,0.5)] flex-shrink-0" />
+              <h2 className="text-xl sm:text-2xl font-black tracking-widest uppercase">
+                Frequently Asked Questions
+              </h2>
+            </div>
+            <div
+              className={`rounded-3xl border backdrop-blur-xl divide-y overflow-hidden ${
+                isDarkMode
+                  ? "bg-neutral-950/80 border-yellow-500/20 divide-white/5"
+                  : "bg-white border-yellow-400/30 divide-slate-100"
+              }`}
+            >
+              {FAQS.map((item, i) => {
+                const isOpen = openFaq === i;
+                return (
+                  <div key={i}>
+                    <button
+                      onClick={() => setOpenFaq(isOpen ? null : i)}
+                      className={`w-full flex items-center justify-between gap-4 text-left p-5 sm:p-6 transition-colors ${
+                        isDarkMode ? "hover:bg-white/5" : "hover:bg-yellow-50/50"
+                      }`}
+                    >
+                      <span
+                        className={`font-bold text-sm sm:text-base ${isDarkMode ? "text-white" : "text-slate-900"}`}
+                      >
+                        {item.q}
+                      </span>
+                      <ChevronDown
+                        className={`w-5 h-5 flex-shrink-0 transition-transform duration-300 ${isOpen ? "rotate-180" : ""} ${isDarkMode ? "text-yellow-500" : "text-yellow-600"}`}
+                      />
+                    </button>
+                    <AnimatePresence initial={false}>
+                      {isOpen && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.25 }}
+                          className="overflow-hidden"
+                        >
+                          <p
+                            className={`px-5 sm:px-6 pb-5 sm:pb-6 text-sm leading-relaxed ${isDarkMode ? "text-gray-400" : "text-slate-600"}`}
+                          >
+                            {item.a}
+                          </p>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* STILL NEED HELP CTA */}
+          <div
+            className={`rounded-3xl p-8 sm:p-12 border relative overflow-hidden text-center ${
+              isDarkMode
+                ? "bg-neutral-950 border-yellow-500/30 shadow-[0_20px_50px_rgba(0,0,0,0.5)]"
+                : "bg-white border-yellow-400/50 shadow-[0_20px_50px_rgba(234,179,8,0.15)]"
+            }`}
+          >
+            <div
+              className={`absolute top-0 right-0 w-64 h-64 rounded-full blur-[80px] ${isDarkMode ? "bg-yellow-500/10" : "bg-yellow-300/30"}`}
+            ></div>
+            <div className="relative z-10">
+              <Headphones
+                className={`w-10 h-10 mx-auto mb-4 ${isDarkMode ? "text-yellow-400" : "text-yellow-600"}`}
+              />
+              <h3
+                className={`text-2xl sm:text-3xl font-black uppercase tracking-widest mb-3 ${isDarkMode ? "text-white" : "text-slate-900"}`}
+              >
+                Still Need Help?
+              </h3>
+              <p
+                className={`text-sm sm:text-base max-w-xl mx-auto mb-8 font-medium ${isDarkMode ? "text-gray-400" : "text-slate-600"}`}
+              >
+                Send us a message and our concierge team will get back to you
+                within 24 hours.
+              </p>
+              <button
+                onClick={() => setShowContact(true)}
+                className="px-8 py-3.5 rounded-xl font-black tracking-widest uppercase transition-all duration-300 inline-flex items-center justify-center gap-3 bg-gradient-to-r from-yellow-600 via-yellow-400 to-yellow-600 bg-[length:200%_auto] hover:bg-[position:right_center] text-black shadow-[0_0_20px_rgba(234,179,8,0.2)] hover:scale-105 hover:shadow-[0_0_30px_rgba(234,179,8,0.4)] group"
+              >
+                <Phone size={18} className="group-hover:animate-bounce" />
+                <span>Contact Us</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
 
         {/* Contact Modal */}
-        {!isPreview && (
-          <ContactPage
-            isOpen={showContact}
-            onClose={() => setShowContact(false)}
-            isDarkMode={isDarkMode}
-          />
-        )}
+        <ContactPage
+          isOpen={showContact}
+          onClose={() => setShowContact(false)}
+          isDarkMode={isDarkMode}
+        />
       </div>
 
       <style jsx global>{`
@@ -802,8 +1182,23 @@ export default function ServicesPage(props: any) {
         }
       `}</style>
 
-      {/* FOOTER */}
-      {!isPreview && <FooterComponent theme={theme} />}
+      <FooterComponent theme={theme} />
     </div>
   );
+}
+
+/* ------------------------------------------------------------------ */
+/*  ENTRY POINT                                                       */
+/*  - Admin CMS preview (isPreview=true) still shows the retail /     */
+/*    wholesale offer layout so /admin/services keeps working.        */
+/*  - The real public route shows the new Customer Support page.      */
+/* ------------------------------------------------------------------ */
+export default function ServicesPage(props: any) {
+  const isPreview = props?.isPreview || false;
+
+  if (isPreview) {
+    return <LegacyServicesPreview {...props} />;
+  }
+
+  return <CustomerSupportPage />;
 }
