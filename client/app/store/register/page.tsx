@@ -92,9 +92,15 @@ export default function StoreRegisterPage() {
         ? "home_business"
         : "store";
 
+  // FIX: Update dashboard path based on role
   const dashboardPath =
-    storeType === "store" ? "/store/dashboard" : "/seller/dashboard";
-  // router.push(dashboardPath);
+    storeType === "store" 
+      ? "/store/dashboard" 
+      : storeType === "whole_saler" 
+        ? "/wholesaler/dashboard" 
+        : storeType === "home_business" 
+          ? "/home-business/dashboard" 
+          : "/store/dashboard";
 
   const [form, setForm] = useState({
     name: "",
@@ -164,9 +170,6 @@ export default function StoreRegisterPage() {
       (pos) => {
         const { latitude: lat, longitude: lng } = pos.coords;
         setDetecting(false);
-        // Some Windows/Wi-Fi-based location providers occasionally report a
-        // corrupted reading outside valid GeoJSON ranges — catch it here
-        // instead of silently filling the form with a bad value.
         if (!isValidLatLng(lat, lng)) {
           setError(
             `Detected location looks invalid (lat: ${lat}, lng: ${lng}). Please enter your coordinates manually.`,
@@ -235,8 +238,15 @@ export default function StoreRegisterPage() {
         ctx.login(user, newToken); // keep existing role — backend already returns the right one
       }
 
+      // FIX: Redirect based on role
       router.push(
-        storeType === "store" ? "/store/dashboard" : "/seller/dashboard",
+        storeType === "store" 
+          ? "/store/dashboard" 
+          : storeType === "whole_saler" 
+            ? "/wholesaler/dashboard" 
+            : storeType === "home_business" 
+              ? "/home-business/dashboard" 
+              : "/store/dashboard"
       );
     } catch (err: any) {
       setError(err.response?.data?.message || "Registration failed.");

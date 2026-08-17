@@ -260,11 +260,15 @@ export default function UserAvatarMenu({
                   </Link>
                 )}
                 {!isSeller && !isStoreOwner && (
-  <Link href="/my-offers" onClick={() => setIsOpen(false)}
-    className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-[#F5F5F5] transition">
-    <Tag size={15} className="text-gray-400 shrink-0" /> My Offers
-  </Link>
-)}
+                  <Link
+                    href="/my-offers"
+                    onClick={() => setIsOpen(false)}
+                    className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-[#F5F5F5] transition"
+                  >
+                    <Tag size={15} className="text-gray-400 shrink-0" /> My
+                    Offers
+                  </Link>
+                )}
                 {isStoreOwner && (
                   <Link
                     href="/store/dashboard"
@@ -277,7 +281,11 @@ export default function UserAvatarMenu({
                 )}
                 {isSeller && (
                   <Link
-                    href="/seller/dashboard"
+                    href={
+                      userData.role === "whole_saler"
+                        ? "/wholesaler/dashboard"
+                        : "/home-business/dashboard"
+                    }
                     onClick={() => setIsOpen(false)}
                     className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-[#F5F5F5] transition"
                   >

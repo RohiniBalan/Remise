@@ -48,7 +48,7 @@ import {
   Mic,
   MicOff,
   Menu,
-  Camera
+  Camera,
 } from "lucide-react";
 import {
   LineChart,
@@ -1721,7 +1721,7 @@ function SmartUploadModal({
           {/* ── Step 1: upload ── */}
           {(step === "idle" || step === "scanning" || step === "error") && (
             <>
-            {/* Camera-capture input — mobile only, opens the device camera directly */}
+              {/* Camera-capture input — mobile only, opens the device camera directly */}
               <input
                 ref={cameraInputRef}
                 type="file"
@@ -2297,7 +2297,7 @@ function BulkSmartUploadModal({
           {/* ── Step 1: upload ── */}
           {(step === "idle" || step === "scanning" || step === "error") && (
             <>
-            {/* Camera-capture input — mobile only, opens the device camera directly */}
+              {/* Camera-capture input — mobile only, opens the device camera directly */}
               <input
                 ref={cameraInputRef}
                 type="file"
@@ -4623,7 +4623,11 @@ export default function StoreDashboard() {
 
   useEffect(() => {
     if (user && !["store_owner", "user"].includes(user.role)) {
-      router.push("/seller/dashboard");
+      router.push(
+        user.role === "whole_saler"
+          ? "/wholesaler/dashboard"
+          : "/home-business/dashboard",
+      );
     }
   }, [user, router]);
 

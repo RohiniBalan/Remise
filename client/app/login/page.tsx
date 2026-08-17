@@ -2,7 +2,7 @@
 
 import { useState, FormEvent, useEffect, useContext, Suspense } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { AuthContext } from "../context/AuthContext";
 import { Eye, EyeOff } from "lucide-react";
 import {
@@ -49,7 +49,24 @@ function AuthPageContent() {
 
   const router = useRouter();
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   const ctx = useContext(AuthContext) as any;
+
+  useEffect(() => {
+  if (pathname === "/store-owner/signup") {
+    setRegisterAs("store_owner");
+    setIsLogin(false);
+  } else if (pathname === "/wholesaler/signup") {
+    setRegisterAs("whole_saler");
+    setIsLogin(false);
+  } else if (pathname === "/home-business/signup") {
+    setRegisterAs("home_business");
+    setIsLogin(false);
+  } else if (pathname === "/signup") {
+    setRegisterAs("user");
+    setIsLogin(false);
+  }
+}, [pathname]);
 
   const [fullname, setFullname] = useState("");
   const [email, setEmail] = useState("");

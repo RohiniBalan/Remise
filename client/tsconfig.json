@@ -35,7 +35,7 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     "**/*.mts"
-, "app/api-services/trendingApi.js", ".next/types/app/about/page.tsx"  ],
+, "app/api-services/trendingApi.js", ".next/types/app/about/page.tsx", "app/store/signup", "app/home-business/signup"  ],
   "exclude": [
     "node_modules"
   ]
