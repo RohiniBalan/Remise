@@ -48,6 +48,7 @@ import {
   Mic,
   MicOff,
   Menu,
+  Camera
 } from "lucide-react";
 import {
   LineChart,
@@ -1580,6 +1581,7 @@ function SmartUploadModal({
   const [engine, setEngine] = useState("");
   const [aiGenerated, setAiGenerated] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   // editable review form — same field set as ProductModal (Manual Add Product)
   const [form, setForm] = useState({
@@ -1719,6 +1721,37 @@ function SmartUploadModal({
           {/* ── Step 1: upload ── */}
           {(step === "idle" || step === "scanning" || step === "error") && (
             <>
+            {/* Camera-capture input — mobile only, opens the device camera directly */}
+              <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) pickFile(f);
+                }}
+              />
+              {/* Quick actions: Take Photo (mobile only) + Upload — shown before a file is picked */}
+              {!preview && (
+                <div className="grid grid-cols-1 sm:hidden gap-2">
+                  <button
+                    type="button"
+                    onClick={() => cameraInputRef.current?.click()}
+                    className="flex items-center justify-center gap-2 bg-[#FF0000] hover:bg-[#e00000] text-white text-sm font-semibold px-4 py-3 rounded-xl transition"
+                  >
+                    <Camera size={16} /> Take Photo
+                  </button>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-px bg-[#BBD5DA]" />
+                    <span className="text-[11px] font-medium text-gray-400">
+                      or
+                    </span>
+                    <div className="flex-1 h-px bg-[#BBD5DA]" />
+                  </div>
+                </div>
+              )}
               <div
                 className={`relative border-2 border-dashed rounded-2xl transition cursor-pointer
                   ${dragging ? "border-teal-500 bg-teal-50" : "border-[#BBD5DA] hover:border-teal-400 hover:bg-[#F5F5F5]"}
@@ -2116,6 +2149,7 @@ function BulkSmartUploadModal({
     failed: { name: string; reason: string }[];
   }>({ added: 0, failed: [] });
   const inputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const reset = () => {
     setFile(null);
@@ -2263,6 +2297,37 @@ function BulkSmartUploadModal({
           {/* ── Step 1: upload ── */}
           {(step === "idle" || step === "scanning" || step === "error") && (
             <>
+            {/* Camera-capture input — mobile only, opens the device camera directly */}
+              <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) pickFile(f);
+                }}
+              />
+              {/* Quick actions: Take Photo (mobile only) + Upload — shown before a file is picked */}
+              {!preview && (
+                <div className="grid grid-cols-1 sm:hidden gap-2">
+                  <button
+                    type="button"
+                    onClick={() => cameraInputRef.current?.click()}
+                    className="flex items-center justify-center gap-2 bg-[#FF0000] hover:bg-[#e00000] text-white text-sm font-semibold px-4 py-3 rounded-xl transition"
+                  >
+                    <Camera size={16} /> Take Photo
+                  </button>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-px bg-[#BBD5DA]" />
+                    <span className="text-[11px] font-medium text-gray-400">
+                      or
+                    </span>
+                    <div className="flex-1 h-px bg-[#BBD5DA]" />
+                  </div>
+                </div>
+              )}
               <div
                 className={`relative border-2 border-dashed rounded-2xl transition cursor-pointer
                   ${dragging ? "border-teal-500 bg-teal-50" : "border-[#BBD5DA] hover:border-teal-400 hover:bg-[#F5F5F5]"}
