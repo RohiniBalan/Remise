@@ -138,7 +138,7 @@ function LegacyServicesPreview(props: any) {
   const [retailOffer, setRetailOffer] = useState(DEFAULT_RETAIL_OFFER);
   const [wholesaleOffer, setWholesaleOffer] = useState(DEFAULT_WHOLESALE_OFFER);
 
-  const isDarkMode = theme === "dark";
+  const isDarkMode = theme === "light";
   const currentProducts =
     viewMode === "retail" ? retailProducts : wholesaleProducts;
   const currentOffer = viewMode === "retail" ? retailOffer : wholesaleOffer;
