@@ -4622,9 +4622,9 @@ export default function StoreDashboard() {
   }, [loadData]);
 
   useEffect(() => {
-    if (user && !["store_owner", "user"].includes(user.role)) {
+    if (user && !["store_owner", "user", "customer"].includes(user.role)) {
       router.push(
-        user.role === "whole_saler"
+        user.role === "whole_saler" || user.role === "wholesaler"
           ? "/wholesaler/dashboard"
           : "/home-business/dashboard",
       );

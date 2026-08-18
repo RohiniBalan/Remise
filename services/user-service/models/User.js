@@ -13,7 +13,7 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: function () { return !this.googleId; } },
   googleId: { type: String, unique: true, sparse: true },
   avatar: { type: String, default: null },
-  role: { type: String, enum: ['user', 'store_owner', 'moderator', 'admin'], default: 'user' },
+  role: { type: String, enum: ['customer', 'user', 'store_owner', 'wholesaler', 'whole_saler', 'home_business', 'moderator', 'admin'], default: 'customer' },
   cart: { type: [cartItemSchema], default: [], select: false },
   createdAt: { type: Date, default: Date.now },
 });

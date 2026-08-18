@@ -112,7 +112,9 @@ export default function UserAvatarMenu({
   const displayName = userData.fullname || userData.name || "User";
   const isStoreOwner = userData.role === "store_owner";
   const isSeller =
-    userData.role === "whole_saler" || userData.role === "home_business";
+    userData.role === "whole_saler" ||
+    userData.role === "wholesaler" ||
+    userData.role === "home_business";
   // treat `undefined` as verified (legacy accounts without the field)
   const isVerified = userData.isEmailVerified !== false;
 
@@ -282,7 +284,8 @@ export default function UserAvatarMenu({
                 {isSeller && (
                   <Link
                     href={
-                      userData.role === "whole_saler"
+                      userData.role === "whole_saler" ||
+                      userData.role === "wholesaler"
                         ? "/wholesaler/dashboard"
                         : "/home-business/dashboard"
                     }

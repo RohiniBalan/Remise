@@ -28,7 +28,20 @@ const protect = async (req, res, next) => {
 };
 
 const authorize = (...roles) => (req, res, next) => {
-  if (!roles.includes(req.user?.role)) {
+  if (!req.user) {
+    return res.status(401).json({ success: false, message: 'Not authenticated' });
+  }
+  const expandedRoles = new Set(roles);
+  if (expandedRoles.has('wholesaler') || expandedRoles.has('whole_saler')) {
+    expandedRoles.add('wholesaler');
+    expandedRoles.add('whole_saler');
+  }
+  if (expandedRoles.has('customer') || expandedRoles.has('user')) {
+    expandedRoles.add('customer');
+    expandedRoles.add('user');
+  }
+
+  if (!expandedRoles.has(req.user?.role)) {
     return res.status(403).json({
       success: false,
       message: `Role ${req.user?.role} is not authorized to access this route`,

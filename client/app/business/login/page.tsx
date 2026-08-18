@@ -3,13 +3,13 @@
 import { useState, FormEvent, useEffect, useContext, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AuthContext } from "../context/AuthContext";
-import { Eye, EyeOff, Briefcase, ArrowRight } from "lucide-react";
+import { AuthContext } from "../../context/AuthContext";
+import { Eye, EyeOff, Building2, ShoppingBag, ArrowRight } from "lucide-react";
 import {
   validateLoginForm,
   normalizeAuthErrorMessage,
-} from "../utils/authValidation";
-import { getRoleRedirectUrl } from "../utils/authRedirect";
+} from "../../utils/authValidation";
+import { getRoleRedirectUrl } from "../../utils/authRedirect";
 
 const API_URL = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"}/api`;
 
@@ -26,7 +26,7 @@ interface AuthResponse {
   };
 }
 
-function CustomerLoginPageContent() {
+function BusinessLoginPageContent() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -47,7 +47,7 @@ function CustomerLoginPageContent() {
     }
   }, [searchParams]);
 
-  // Already logged in → redirect straight to the right place
+  // Already logged in → redirect straight to dashboard
   useEffect(() => {
     const token = localStorage.getItem("token");
     const userStr = localStorage.getItem("user");
@@ -98,6 +98,7 @@ function CustomerLoginPageContent() {
         }
         window.dispatchEvent(new CustomEvent("authChange"));
 
+        // Redirect based on actual database role
         const destination = getRoleRedirectUrl(data.data.role);
         setSuccessMessage("Logged in successfully!");
         setShowSuccess(true);
@@ -117,8 +118,8 @@ function CustomerLoginPageContent() {
   return (
     <>
       {/* Background glows */}
-      <div className="pointer-events-none absolute -top-20 -left-20 h-96 w-96 rounded-full bg-yellow-600/20 blur-[100px]" />
-      <div className="pointer-events-none absolute top-0 left-0 h-64 w-64 rounded-full bg-orange-500/10 blur-[80px]" />
+      <div className="pointer-events-none absolute -top-20 -left-20 h-96 w-96 rounded-full bg-red-600/20 blur-[100px]" />
+      <div className="pointer-events-none absolute top-0 right-0 h-64 w-64 rounded-full bg-orange-500/10 blur-[80px]" />
 
       {/* Error toast */}
       {error && (
@@ -174,11 +175,15 @@ function CustomerLoginPageContent() {
 
         {/* Header */}
         <div className="mb-6 text-center">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FF0000]/10 border border-[#FF0000]/30 text-[#FF0000] text-xs font-semibold uppercase tracking-wider mb-2">
+            <Building2 size={12} />
+            Business Portal
+          </div>
           <h2 className="text-3xl font-medium tracking-tight text-white/90">
-            Welcome Back
+            Business Sign In
           </h2>
-          <p className="mt-2 text-sm text-gray-400">
-            Sign in to your customer account
+          <p className="mt-1 text-sm text-gray-400">
+            Access your store or seller dashboard
           </p>
         </div>
 
@@ -193,7 +198,7 @@ function CustomerLoginPageContent() {
                 setEmail(e.target.value);
                 setFieldErrors((prev) => ({ ...prev, email: "" }));
               }}
-              placeholder="Email Address"
+              placeholder="Business Email Address"
               className="w-full rounded-full border border-white/10 bg-black/20 px-6 py-4 text-sm text-white placeholder-gray-500 focus:border-[#FF0000]/50 focus:bg-black/40 focus:outline-none transition-colors"
             />
             {fieldErrors.email && (
@@ -315,27 +320,27 @@ function CustomerLoginPageContent() {
           </svg>
         </button>
 
-        {/* Signup Link */}
+        {/* Business Signup Link */}
         <p className="mt-5 text-center text-sm text-gray-400">
-          Don't have an account?{" "}
+          Don't have a business account?{" "}
           <Link
-            href="/signup"
+            href="/business/signup"
             className="font-medium text-[#FF0000] hover:text-red-400 hover:underline transition-colors"
           >
-            Sign up
+            Register Business
           </Link>
         </p>
 
-        {/* Business Portal Link */}
+        {/* Customer Login link */}
         <div className="mt-6 border-t border-white/10 pt-4 text-center">
           <Link
-            href="/business/login"
+            href="/login"
             className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors"
           >
-            <Briefcase size={14} className="text-[#FF0000]" />
-            <span>Are you a business?</span>
+            <ShoppingBag size={14} className="text-[#FF0000]" />
+            <span>Looking for personal shopping?</span>
             <span className="font-semibold text-white hover:underline flex items-center gap-0.5">
-              Business Login <ArrowRight size={12} />
+              Customer Login <ArrowRight size={12} />
             </span>
           </Link>
         </div>
@@ -344,7 +349,7 @@ function CustomerLoginPageContent() {
   );
 }
 
-export default function CustomerLoginPage() {
+export default function BusinessLoginPage() {
   return (
     <section className="fixed inset-0 z-[9999] flex h-screen w-full items-center justify-center bg-black px-4 text-white overflow-hidden">
       <Suspense
@@ -357,7 +362,7 @@ export default function CustomerLoginPage() {
           </div>
         }
       >
-        <CustomerLoginPageContent />
+        <BusinessLoginPageContent />
       </Suspense>
     </section>
   );

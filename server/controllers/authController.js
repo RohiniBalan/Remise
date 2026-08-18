@@ -30,7 +30,7 @@ const generateToken = (id, role) => {
 // @access  Public
 const register = async (req, res, next) => {
   try {
-    const { fullname, email, mobilenumber, password } = req.body;
+    const { fullname, email, mobilenumber, password, role } = req.body;
 
     const passwordError = validatePassword(password);
     if (passwordError) {
@@ -52,12 +52,16 @@ const register = async (req, res, next) => {
       });
     }
 
+    const allowedRoles = ['customer', 'user', 'store_owner', 'wholesaler', 'whole_saler', 'home_business'];
+    const assignedRole = allowedRoles.includes(role) ? role : 'customer';
+
     // Create new user
     const user = await User.create({
       fullname,
       email,
       mobilenumber,
-      password
+      password,
+      role: assignedRole
     });
 
     // Generate token

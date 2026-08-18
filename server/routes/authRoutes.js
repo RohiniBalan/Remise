@@ -23,10 +23,17 @@ router.post('/forgot-password', forgotPassword);
 router.post('/reset-password', resetPassword);
 
 // Google OAuth routes
-router.get('/google', passport.authenticate('google', { 
-  scope: ['profile', 'email'],
-  prompt: 'select_account'
-}));
+router.get('/google', (req, res, next) => {
+  const rawRole = req.query.role || req.query.state || '';
+  const allowedRoles = ['customer', 'user', 'store_owner', 'wholesaler', 'whole_saler', 'home_business'];
+  const role = allowedRoles.includes(rawRole) ? rawRole : 'customer';
+
+  passport.authenticate('google', { 
+    scope: ['profile', 'email'],
+    prompt: 'select_account',
+    state: JSON.stringify({ role })
+  })(req, res, next);
+});
 
 router.get('/google/callback', 
   passport.authenticate('google', { 

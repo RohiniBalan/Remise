@@ -1,44 +1,64 @@
 "use client";
 
-import { useEffect, useContext, Suspense } from "react";
+import { useEffect, useContext, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AuthContext } from "../../context/AuthContext";
+
+import { getRoleRedirectUrl } from "../../utils/authRedirect";
 
 function GoogleSuccessContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const ctx = useContext(AuthContext) as any;
 
+  // Guards against re-running: without this, calling ctx.login() below
+  // changes AuthContext's value identity, which re-triggers this effect
+  // (since ctx is a dependency) → infinite "Maximum update depth exceeded" loop.
+  const hasRun = useRef(false);
+
   useEffect(() => {
+    if (hasRun.current) return;
+
     const token = searchParams.get('token');
     const userParam = searchParams.get('user');
 
-    if (token && userParam) {
-      try {
-        const user = JSON.parse(decodeURIComponent(userParam));
-
-        // Go through AuthContext (not just localStorage) so every component
-        // reading ctx.token picks up this login immediately.
-        if (ctx?.login) {
-          ctx.login(user, token);
-        } else {
-          localStorage.setItem('token', token);
-          localStorage.setItem('user', JSON.stringify(user));
-        }
-        window.dispatchEvent(new CustomEvent('authChange'));
-
-        // Redirect to home page
-        setTimeout(() => {
-          router.push('/');
-        }, 1500);
-      } catch (error) {
-        console.error('Error parsing user data:', error);
-        router.push('/auth?error=invalid_data');
-      }
-    } else {
-      router.push('/auth?error=missing_data');
+    if (!token || !userParam) {
+      hasRun.current = true;
+      router.push('/login?error=missing_data');
+      return;
     }
-  }, [searchParams, router]);
+
+    try {
+      // Next.js's searchParams.get() already URL-decodes the value once,
+      // so a second decodeURIComponent() is redundant and can throw
+      // (URIError: malformed URI) if the JSON ever contains a literal "%".
+      const user = JSON.parse(userParam);
+
+      hasRun.current = true;
+
+      if (ctx?.login) {
+        ctx.login(user, token);
+      } else {
+        localStorage.setItem('token', token);
+        localStorage.setItem('user', JSON.stringify(user));
+      }
+      window.dispatchEvent(new CustomEvent('authChange'));
+
+      // Redirect based on actual user role stored in DB
+      const destination = getRoleRedirectUrl(user.role);
+      setTimeout(() => {
+        router.push(destination);
+      }, 1500);
+    } catch (error) {
+      hasRun.current = true;
+      console.error('Error parsing user data:', error);
+      router.push('/login?error=invalid_data');
+    }
+    // Intentionally NOT depending on ctx/router — this must run exactly once
+    // per mount. The hasRun ref is the real guard; the array just needs to
+    // avoid re-running when searchParams' identity happens to change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black">

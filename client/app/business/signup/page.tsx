@@ -3,15 +3,17 @@
 import { useState, FormEvent, useEffect, useContext, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AuthContext } from "../context/AuthContext";
-import { Eye, EyeOff, Briefcase, ArrowRight } from "lucide-react";
+import { AuthContext } from "../../context/AuthContext";
+import { Eye, EyeOff, Building2, ShoppingBag, ArrowRight, ChevronDown } from "lucide-react";
 import {
-  validateLoginForm,
+  validateSignupForm,
   normalizeAuthErrorMessage,
-} from "../utils/authValidation";
-import { getRoleRedirectUrl } from "../utils/authRedirect";
+} from "../../utils/authValidation";
+import { getRoleRedirectUrl } from "../../utils/authRedirect";
 
 const API_URL = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"}/api`;
+
+type BusinessRole = "store_owner" | "wholesaler" | "home_business";
 
 interface AuthResponse {
   success: boolean;
@@ -26,8 +28,32 @@ interface AuthResponse {
   };
 }
 
-function CustomerLoginPageContent() {
+const BUSINESS_ROLES: { value: BusinessRole; label: string; icon: string; desc: string }[] = [
+  {
+    value: "store_owner",
+    label: "Store Owner",
+    icon: "🏪",
+    desc: "Retail store & offline merchant",
+  },
+  {
+    value: "wholesaler",
+    label: "Wholesaler",
+    icon: "📦",
+    desc: "Bulk supplier & B2B distributor",
+  },
+  {
+    value: "home_business",
+    label: "Home Business",
+    icon: "🏠",
+    desc: "Direct-to-consumer & artisan producer",
+  },
+];
+
+function BusinessSignupPageContent() {
+  const [role, setRole] = useState<BusinessRole>("store_owner");
+  const [fullname, setFullname] = useState("");
   const [email, setEmail] = useState("");
+  const [mobilenumber, setMobilenumber] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -45,9 +71,17 @@ function CustomerLoginPageContent() {
     if (errorParam === "google_auth_failed") {
       setError("Google authentication failed. Please try again.");
     }
+    const roleParam = searchParams.get("role");
+    if (roleParam === "wholesaler" || roleParam === "whole_saler") {
+      setRole("wholesaler");
+    } else if (roleParam === "home_business") {
+      setRole("home_business");
+    } else if (roleParam === "store_owner") {
+      setRole("store_owner");
+    }
   }, [searchParams]);
 
-  // Already logged in → redirect straight to the right place
+  // Already logged in → redirect straight to dashboard
   useEffect(() => {
     const token = localStorage.getItem("token");
     const userStr = localStorage.getItem("user");
@@ -62,7 +96,13 @@ function CustomerLoginPageContent() {
   }, [router]);
 
   const validateForm = () => {
-    const errors = validateLoginForm({ email, password });
+    const errors = validateSignupForm({
+      fullname,
+      email,
+      mobilenumber,
+      password,
+    });
+
     setFieldErrors(errors);
     setError("");
     return Object.keys(errors).length === 0;
@@ -77,16 +117,22 @@ function CustomerLoginPageContent() {
     setFieldErrors({});
 
     try {
-      const response = await fetch(`${API_URL}/auth/login`, {
+      const response = await fetch(`${API_URL}/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), password }),
+        body: JSON.stringify({
+          fullname: fullname.trim(),
+          email: email.trim(),
+          mobilenumber: mobilenumber.replace(/\D/g, ""),
+          password,
+          role, // Saved business role
+        }),
       });
 
       const data: AuthResponse = await response.json();
       if (!response.ok) {
         const normalizedMessage = normalizeAuthErrorMessage(data.message);
-        throw new Error(normalizedMessage || "Authentication failed");
+        throw new Error(normalizedMessage || "Registration failed");
       }
 
       if (data.success && data.data) {
@@ -98,10 +144,16 @@ function CustomerLoginPageContent() {
         }
         window.dispatchEvent(new CustomEvent("authChange"));
 
-        const destination = getRoleRedirectUrl(data.data.role);
-        setSuccessMessage("Logged in successfully!");
+        const roleName =
+          role === "store_owner"
+            ? "Store Owner"
+            : role === "wholesaler"
+            ? "Wholesaler"
+            : "Home Business";
+
+        setSuccessMessage(`Business account created as ${roleName}! Please check your email to verify your account.`);
         setShowSuccess(true);
-        setTimeout(() => router.push(destination), 1500);
+        setTimeout(() => router.push("/verify-email"), 1500);
       }
     } catch (err: any) {
       setError(err.message || "An error occurred. Please try again.");
@@ -110,15 +162,16 @@ function CustomerLoginPageContent() {
     }
   };
 
-  const handleGoogleLogin = () => {
-    window.location.href = `${API_URL}/auth/google`;
+  const handleGoogleSignup = () => {
+    // Preserve selected business role through OAuth
+    window.location.href = `${API_URL}/auth/google?role=${encodeURIComponent(role)}`;
   };
 
   return (
     <>
       {/* Background glows */}
-      <div className="pointer-events-none absolute -top-20 -left-20 h-96 w-96 rounded-full bg-yellow-600/20 blur-[100px]" />
-      <div className="pointer-events-none absolute top-0 left-0 h-64 w-64 rounded-full bg-orange-500/10 blur-[80px]" />
+      <div className="pointer-events-none absolute -top-20 -left-20 h-96 w-96 rounded-full bg-red-600/20 blur-[100px]" />
+      <div className="pointer-events-none absolute top-0 right-0 h-64 w-64 rounded-full bg-orange-500/10 blur-[80px]" />
 
       {/* Error toast */}
       {error && (
@@ -173,16 +226,84 @@ function CustomerLoginPageContent() {
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
 
         {/* Header */}
-        <div className="mb-6 text-center">
+        <div className="mb-4 text-center">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FF0000]/10 border border-[#FF0000]/30 text-[#FF0000] text-xs font-semibold uppercase tracking-wider mb-2">
+            <Building2 size={12} />
+            Business Portal
+          </div>
           <h2 className="text-3xl font-medium tracking-tight text-white/90">
-            Welcome Back
+            Register Business
           </h2>
-          <p className="mt-2 text-sm text-gray-400">
-            Sign in to your customer account
+          <p className="mt-1 text-sm text-gray-400">
+            Start selling and growing on Remise
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3">
+          {/* Business Role Selector Dropdown */}
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1.5 ml-2">
+              Select Business Type
+            </label>
+            <div className="relative">
+              <select
+                value={role}
+                onChange={(e) => setRole(e.target.value as BusinessRole)}
+                className="w-full appearance-none rounded-full border border-white/10 bg-black/40 px-6 py-3.5 pr-10 text-sm text-white focus:border-[#FF0000]/50 focus:bg-black/60 focus:outline-none transition-colors cursor-pointer"
+              >
+                {BUSINESS_ROLES.map((r) => (
+                  <option key={r.value} value={r.value} className="bg-gray-900 text-white">
+                    {r.icon} {r.label} — {r.desc}
+                  </option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">
+                <ChevronDown size={18} />
+              </div>
+            </div>
+          </div>
+
+          {/* Full Name */}
+          <div>
+            <input
+              type="text"
+              required
+              value={fullname}
+              onChange={(e) => {
+                setFullname(e.target.value);
+                setFieldErrors((prev) => ({ ...prev, fullname: "" }));
+              }}
+              placeholder="Business Contact Name / Full Name"
+              className="w-full rounded-full border border-white/10 bg-black/20 px-6 py-3.5 text-sm text-white placeholder-gray-500 focus:border-[#FF0000]/50 focus:bg-black/40 focus:outline-none transition-colors"
+            />
+            {fieldErrors.fullname && (
+              <p className="mt-1.5 ml-2 text-xs text-red-300">
+                {fieldErrors.fullname}
+              </p>
+            )}
+          </div>
+
+          {/* Mobile Number */}
+          <div>
+            <input
+              type="tel"
+              required
+              value={mobilenumber}
+              onChange={(e) => {
+                setMobilenumber(e.target.value);
+                setFieldErrors((prev) => ({ ...prev, mobilenumber: "" }));
+              }}
+              placeholder="Mobile Number"
+              maxLength={10}
+              className="w-full rounded-full border border-white/10 bg-black/20 px-6 py-3.5 text-sm text-white placeholder-gray-500 focus:border-[#FF0000]/50 focus:bg-black/40 focus:outline-none transition-colors"
+            />
+            {fieldErrors.mobilenumber && (
+              <p className="mt-1.5 ml-2 text-xs text-red-300">
+                {fieldErrors.mobilenumber}
+              </p>
+            )}
+          </div>
+
           {/* Email */}
           <div>
             <input
@@ -193,11 +314,11 @@ function CustomerLoginPageContent() {
                 setEmail(e.target.value);
                 setFieldErrors((prev) => ({ ...prev, email: "" }));
               }}
-              placeholder="Email Address"
-              className="w-full rounded-full border border-white/10 bg-black/20 px-6 py-4 text-sm text-white placeholder-gray-500 focus:border-[#FF0000]/50 focus:bg-black/40 focus:outline-none transition-colors"
+              placeholder="Business Email Address"
+              className="w-full rounded-full border border-white/10 bg-black/20 px-6 py-3.5 text-sm text-white placeholder-gray-500 focus:border-[#FF0000]/50 focus:bg-black/40 focus:outline-none transition-colors"
             />
             {fieldErrors.email && (
-              <p className="mt-2 text-xs text-red-300">{fieldErrors.email}</p>
+              <p className="mt-1.5 ml-2 text-xs text-red-300">{fieldErrors.email}</p>
             )}
           </div>
 
@@ -212,7 +333,7 @@ function CustomerLoginPageContent() {
                 setFieldErrors((prev) => ({ ...prev, password: "" }));
               }}
               placeholder="Password"
-              className="w-full rounded-full border border-white/10 bg-black/20 px-6 py-4 pr-24 text-sm text-white placeholder-gray-500 focus:border-[#FF0000]/50 focus:bg-black/40 focus:outline-none transition-colors"
+              className="w-full rounded-full border border-white/10 bg-black/20 px-6 py-3.5 pr-24 text-sm text-white placeholder-gray-500 focus:border-[#FF0000]/50 focus:bg-black/40 focus:outline-none transition-colors"
             />
             <button
               type="button"
@@ -225,7 +346,7 @@ function CustomerLoginPageContent() {
             <button
               type="submit"
               disabled={loading}
-              className="absolute right-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-[#FF0000] text-white shadow-lg transition-transform hover:scale-105 hover:bg-[#e00000] disabled:opacity-70"
+              className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-[#FF0000] text-white shadow-lg transition-transform hover:scale-105 hover:bg-[#e00000] disabled:opacity-70"
             >
               {loading ? (
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-black border-t-transparent" />
@@ -236,7 +357,7 @@ function CustomerLoginPageContent() {
                   viewBox="0 0 24 24"
                   strokeWidth={2.5}
                   stroke="currentColor"
-                  className="h-5 w-5"
+                  className="h-4 w-4"
                 >
                   <path
                     strokeLinecap="round"
@@ -248,34 +369,25 @@ function CustomerLoginPageContent() {
             </button>
           </div>
           {fieldErrors.password && (
-            <p className="text-xs text-red-300">{fieldErrors.password}</p>
+            <p className="mt-1.5 ml-2 text-xs text-red-300">{fieldErrors.password}</p>
           )}
-
-          <div className="text-right">
-            <Link
-              href="/forgot-password"
-              className="text-sm text-[#FF0000] hover:underline"
-            >
-              Forgot password?
-            </Link>
-          </div>
         </form>
 
         {/* Divider */}
-        <div className="relative my-5">
+        <div className="relative my-4">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-white/10" />
           </div>
           <div className="relative flex justify-center text-xs uppercase tracking-widest text-gray-500">
             <span className="bg-transparent px-2 backdrop-blur-xl">
-              Or continue with
+              Or register with Google
             </span>
           </div>
         </div>
 
         {/* Google */}
         <button
-          onClick={handleGoogleLogin}
+          onClick={handleGoogleSignup}
           className="flex w-full items-center justify-between rounded-full border border-white/10 bg-white/5 px-6 py-3.5 text-sm font-medium text-white transition hover:bg-white/10"
         >
           <div className="flex items-center gap-3">
@@ -297,7 +409,7 @@ function CustomerLoginPageContent() {
                 fill="#EA4335"
               />
             </svg>
-            <span>Google</span>
+            <span>Register as {role === "store_owner" ? "Store Owner" : role === "wholesaler" ? "Wholesaler" : "Home Business"}</span>
           </div>
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -315,27 +427,27 @@ function CustomerLoginPageContent() {
           </svg>
         </button>
 
-        {/* Signup Link */}
-        <p className="mt-5 text-center text-sm text-gray-400">
-          Don't have an account?{" "}
+        {/* Business Login Link */}
+        <p className="mt-4 text-center text-sm text-gray-400">
+          Already have a business account?{" "}
           <Link
-            href="/signup"
+            href="/business/login"
             className="font-medium text-[#FF0000] hover:text-red-400 hover:underline transition-colors"
           >
-            Sign up
+            Business Login
           </Link>
         </p>
 
-        {/* Business Portal Link */}
-        <div className="mt-6 border-t border-white/10 pt-4 text-center">
+        {/* Customer Signup Link */}
+        <div className="mt-5 border-t border-white/10 pt-4 text-center">
           <Link
-            href="/business/login"
+            href="/signup"
             className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors"
           >
-            <Briefcase size={14} className="text-[#FF0000]" />
-            <span>Are you a business?</span>
+            <ShoppingBag size={14} className="text-[#FF0000]" />
+            <span>Looking for personal shopping?</span>
             <span className="font-semibold text-white hover:underline flex items-center gap-0.5">
-              Business Login <ArrowRight size={12} />
+              Customer Signup <ArrowRight size={12} />
             </span>
           </Link>
         </div>
@@ -344,7 +456,7 @@ function CustomerLoginPageContent() {
   );
 }
 
-export default function CustomerLoginPage() {
+export default function BusinessSignupPage() {
   return (
     <section className="fixed inset-0 z-[9999] flex h-screen w-full items-center justify-center bg-black px-4 text-white overflow-hidden">
       <Suspense
@@ -357,7 +469,7 @@ export default function CustomerLoginPage() {
           </div>
         }
       >
-        <CustomerLoginPageContent />
+        <BusinessSignupPageContent />
       </Suspense>
     </section>
   );

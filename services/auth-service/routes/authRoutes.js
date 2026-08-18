@@ -16,7 +16,17 @@ router.post('/reset-password', resetPassword);
 router.post('/logout', protect, logout);
 router.post('/logout-all', protect, logoutAll);
 
-router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'], prompt: 'select_account' }));
+router.get('/google', (req, res, next) => {
+  const rawRole = req.query.role || req.query.state || '';
+  const allowedRoles = ['customer', 'user', 'store_owner', 'wholesaler', 'whole_saler', 'home_business'];
+  const role = allowedRoles.includes(rawRole) ? rawRole : 'customer';
+
+  passport.authenticate('google', {
+    scope: ['profile', 'email'],
+    prompt: 'select_account',
+    state: JSON.stringify({ role }),
+  })(req, res, next);
+});
 router.get('/google/callback',
   passport.authenticate('google', { session: false, failureRedirect: `${process.env.FRONTEND_URL || 'https://wow-frontedn-y73e.vercel.app'}/auth?error=google_auth_failed` }),
   googleCallback

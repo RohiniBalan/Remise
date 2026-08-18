@@ -33,9 +33,9 @@ const register = async (req, res, next) => {
       });
     }
 
-    // Only allow 'user' or 'store_owner' at self-registration — never 'admin' or 'moderator'
-    const allowedRoles = ['user', 'store_owner', 'whole_saler', 'home_business'];
-    const assignedRole = allowedRoles.includes(role) ? role : 'user';
+    // Only allow customer/user, store_owner, wholesaler, home_business at self-registration
+    const allowedRoles = ['customer', 'user', 'store_owner', 'wholesaler', 'whole_saler', 'home_business'];
+    const assignedRole = allowedRoles.includes(role) ? role : 'customer';
 
     // Generate email verification token (raw → store hashed)
     const rawVerifyToken    = crypto.randomBytes(32).toString('hex');

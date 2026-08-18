@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { CheckCircle, XCircle, Loader2, ShoppingBag } from 'lucide-react';
+import { getRoleRedirectUrl } from '../../utils/authRedirect';
 
 const API = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api`;
 
@@ -53,9 +54,7 @@ export default function VerifyEmailTokenPage() {
       setTimeout(() => {
         try {
           const user = JSON.parse(localStorage.getItem('user') || '{}');
-          if (user.role === 'store_owner') router.push('/store/dashboard');
-          else if (user.role === 'admin') router.push('/admin/dashboard');
-          else router.push('/');
+          router.push(getRoleRedirectUrl(user.role));
         } catch {
           router.push('/');
         }

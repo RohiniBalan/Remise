@@ -35,7 +35,7 @@ export default function WholesalerDashboard() {
 
   // Role guard — only wholesaler
   useEffect(() => {
-    if (user && user.role !== "whole_saler") {
+    if (user && user.role !== "whole_saler" && user.role !== "wholesaler") {
       router.push("/store/dashboard");
     }
   }, [user, router]);

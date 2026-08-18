@@ -67,8 +67,8 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['user', 'moderator', 'admin'],
-    default: 'user'
+    enum: ['customer', 'user', 'store_owner', 'wholesaler', 'whole_saler', 'home_business', 'moderator', 'admin'],
+    default: 'customer'
   },
   // --- NEW: Cart Storage ---
   cart: {

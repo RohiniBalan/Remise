@@ -2964,9 +2964,9 @@ export default function SellerDashboard() {
     Record<string, string>
   >({});
 
-  // Role guard — only whole_saler / home_business belong here
+  // Role guard — only wholesaler / home_business belong here
   useEffect(() => {
-    if (user && !["whole_saler", "home_business"].includes(user.role)) {
+    if (user && !["whole_saler", "wholesaler", "home_business"].includes(user.role)) {
       router.push("/store/dashboard");
     }
   }, [user, router]);
