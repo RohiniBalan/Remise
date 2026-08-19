@@ -1,7 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
+import { useRouter } from 'next/navigation';
 import Layout from '../layout/layout';
+import { AuthContext } from '../../context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   IndianRupee, 
@@ -189,6 +191,48 @@ const UniqueRevenueChart = () => {
 
 
 export default function DashboardPage() {
+  const router = useRouter();
+  const ctx = useContext(AuthContext) as any;
+
+  // Access control: only role === 'admin' may render this page.
+  // TODO: once ../layout/layout is shared, move this check there instead
+  // so every admin page is protected in one place rather than per-page.
+  const [checked, setChecked] = useState(false);
+  const [authorized, setAuthorized] = useState(false);
+
+  useEffect(() => {
+    const token = ctx?.token || localStorage.getItem('token');
+    const userStr = ctx?.user ? JSON.stringify(ctx.user) : localStorage.getItem('user');
+
+    if (!token || !userStr) {
+      router.replace('/admin/login');
+      return;
+    }
+
+    try {
+      const user = ctx?.user || JSON.parse(userStr);
+      if (user?.role !== 'admin') {
+        router.replace('/admin/login?error=not_admin');
+        return;
+      }
+      setAuthorized(true);
+    } catch {
+      router.replace('/admin/login');
+      return;
+    } finally {
+      setChecked(true);
+    }
+  }, [ctx, router]);
+
+  // Avoid flashing dashboard content before the role check resolves
+  if (!checked || !authorized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-300 border-t-gray-900" />
+      </div>
+    );
+  }
+
   return (
     <Layout>
       <div className="min-h-screen bg-gray-50 p-4 md:p-8">
