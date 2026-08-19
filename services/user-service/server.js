@@ -17,6 +17,7 @@ app.use(morgan('dev'));
 
 app.use('/api/user', userRoutes);
 app.use('/api/admin/users', adminUserRoutes);
+app.use('/api/admin/stats', adminUserRoutes);
 
 app.get('/health', (req, res) => res.json({ success: true, service: 'user-service' }));
 
@@ -26,9 +27,10 @@ app.use((err, req, res, next) => {
 });
 
 mongoose
-  .connect(process.env.MONGODB_URI)
+  .connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/wowlife_auth')
   .then(() => {
     const PORT = process.env.PORT || 3002;
+    console.log(`✅ User Service connected to database: ${process.env.MONGODB_URI || 'wowlife_auth'}`);
     app.listen(PORT, () => console.log(`✅ User Service running on port ${PORT}`));
   })
   .catch(err => { console.error('User Service — MongoDB error:', err); process.exit(1); });

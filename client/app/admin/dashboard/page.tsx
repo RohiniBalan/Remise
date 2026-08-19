@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Layout from '../layout/layout';
 import { AuthContext } from '../../context/AuthContext';
@@ -11,24 +11,26 @@ import {
   Users, 
   Gamepad2, 
   TrendingUp, 
-  TrendingDown,
   ShoppingBag,
-  MoreHorizontal
+  MoreHorizontal,
+  Store,
+  Truck,
+  Home,
+  UserCheck,
+  RefreshCw,
+  AlertCircle,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  ExternalLink
 } from 'lucide-react';
+import { adminApi, AdminDashboardStats, DashboardRecentOrder } from '../../api-services/adminApi';
 
-// --- Mock Data for Toy Shop Dashboard ---
-const recentOrders = [
-  { id: '#ORD-7031', product: 'Ferrari F1 Ultimate Collector', customer: 'Rahul Sharma', amount: '₹12,499', status: 'Delivered', date: 'Today, 10:42 AM' },
-  { id: '#ORD-7032', product: 'Robotic Coding Kit Pro', customer: 'Priya Patel', amount: '₹11,999', status: 'Processing', date: 'Today, 09:15 AM' },
-  { id: '#ORD-7033', product: 'Magic Artist Studio Pro', customer: 'Amit Kumar', amount: '₹5,499', status: 'Shipped', date: 'Yesterday, 04:30 PM' },
-  { id: '#ORD-7034', product: 'Premium LEGO Architecture', customer: 'Sneha Reddy', amount: '₹9,999', status: 'Delivered', date: 'Yesterday, 02:10 PM' },
-  { id: '#ORD-7035', product: 'Interactive Globe Explorer', customer: 'Vikram Singh', amount: '₹6,499', status: 'Processing', date: 'Yesterday, 11:20 AM' },
-];
-
-const topProducts = [
-  { name: 'AI Smart Companion Bot', category: 'Tech Toys', sales: 342, revenue: '₹30,77,658', trend: '+12%' },
-  { name: 'Ferrari F1 Diecast', category: 'Collectibles', sales: 289, revenue: '₹36,12,211', trend: '+8%' },
-  { name: 'LEGO Architecture', category: 'Building Blocks', sales: 256, revenue: '₹25,59,744', trend: '-3%' },
+// --- Static Top Products & Chart Data ---
+const fallbackTopProducts = [
+  { name: 'AI Smart Companion Bot', category: 'Tech Toys', sales: 342, trend: '+12%' },
+  { name: 'Ferrari F1 Diecast', category: 'Collectibles', sales: 289, trend: '+8%' },
+  { name: 'LEGO Architecture', category: 'Building Blocks', sales: 256, trend: '-3%' },
 ];
 
 const revenueData = [
@@ -189,20 +191,34 @@ const UniqueRevenueChart = () => {
   );
 };
 
-
 export default function DashboardPage() {
   const router = useRouter();
   const ctx = useContext(AuthContext) as any;
 
   // Access control: only role === 'admin' may render this page.
-  // TODO: once ../layout/layout is shared, move this check there instead
-  // so every admin page is protected in one place rather than per-page.
   const [checked, setChecked] = useState(false);
   const [authorized, setAuthorized] = useState(false);
 
+  // Dynamic Statistics State
+  const [stats, setStats] = useState<AdminDashboardStats>({
+    totalRevenue: 0,
+    totalOrders: 0,
+    activeCustomers: 0,
+    totalProducts: 0,
+    totalStoreOwners: 0,
+    totalWholesalers: 0,
+    totalHomeBusinesses: 0,
+    totalUsers: 0,
+    recentOrders: []
+  });
+  const [isLoadingStats, setIsLoadingStats] = useState(true);
+  const [statsError, setStatsError] = useState<string | null>(null);
+  const [recentOrders, setRecentOrders] = useState<DashboardRecentOrder[]>([]);
+
+  // 1. Auth Guard
   useEffect(() => {
-    const token = ctx?.token || localStorage.getItem('token');
-    const userStr = ctx?.user ? JSON.stringify(ctx.user) : localStorage.getItem('user');
+    const token = ctx?.token || (typeof window !== 'undefined' ? localStorage.getItem('token') : null);
+    const userStr = ctx?.user ? JSON.stringify(ctx.user) : (typeof window !== 'undefined' ? localStorage.getItem('user') : null);
 
     if (!token || !userStr) {
       router.replace('/admin/login');
@@ -224,7 +240,49 @@ export default function DashboardPage() {
     }
   }, [ctx, router]);
 
-  // Avoid flashing dashboard content before the role check resolves
+  // 2. Fetch Dynamic Dashboard Statistics
+  const fetchDashboardStats = useCallback(async () => {
+    setIsLoadingStats(true);
+    setStatsError(null);
+    try {
+      const token = ctx?.token || (typeof window !== 'undefined' ? localStorage.getItem('token') : '') || '';
+      if (!token) {
+        setStatsError('Authentication token not available');
+        setIsLoadingStats(false);
+        return;
+      }
+
+      const data = await adminApi.getDashboardStats(token);
+      setStats({
+        totalRevenue: data.totalRevenue ?? 0,
+        totalOrders: data.totalOrders ?? 0,
+        activeCustomers: data.activeCustomers ?? 0,
+        totalProducts: data.totalProducts ?? 0,
+        totalStoreOwners: data.totalStoreOwners ?? 0,
+        totalWholesalers: data.totalWholesalers ?? 0,
+        totalHomeBusinesses: data.totalHomeBusinesses ?? 0,
+        totalUsers: data.totalUsers ?? 0,
+      });
+
+      if (data.recentOrders && Array.isArray(data.recentOrders)) {
+        setRecentOrders(data.recentOrders);
+      }
+    } catch (err: any) {
+      console.error('Error fetching admin statistics:', err);
+      const msg = err.response?.data?.message || err.message || 'Failed to load real-time statistics';
+      setStatsError(msg);
+    } finally {
+      setIsLoadingStats(false);
+    }
+  }, [ctx?.token]);
+
+  useEffect(() => {
+    if (authorized) {
+      fetchDashboardStats();
+    }
+  }, [authorized, fetchDashboardStats]);
+
+  // Avoid flashing dashboard content before role check resolves
   if (!checked || !authorized) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -233,78 +291,178 @@ export default function DashboardPage() {
     );
   }
 
+  // Stat Card Configs (4 Existing + 4 New Cards)
+  const statCards = [
+    // 1. Existing: Total Revenue
+    {
+      id: 'total-revenue',
+      title: 'Total Revenue',
+      value: `₹${(stats.totalRevenue || 0).toLocaleString('en-IN')}`,
+      rawValue: stats.totalRevenue,
+      tag: 'Live Sales',
+      tagColor: 'text-emerald-600 bg-emerald-50',
+      icon: IndianRupee,
+      iconBg: 'bg-emerald-50 text-emerald-600',
+    },
+    // 2. Existing: Total Orders
+    {
+      id: 'total-orders',
+      title: 'Total Orders',
+      value: (stats.totalOrders || 0).toLocaleString('en-IN'),
+      rawValue: stats.totalOrders,
+      tag: 'All Time',
+      tagColor: 'text-blue-600 bg-blue-50',
+      icon: Package,
+      iconBg: 'bg-blue-50 text-blue-600',
+    },
+    // 3. Existing: Active Customers
+    {
+      id: 'active-customers',
+      title: 'Active Customers',
+      value: (stats.activeCustomers || 0).toLocaleString('en-IN'),
+      rawValue: stats.activeCustomers,
+      tag: 'Retail Buyers',
+      tagColor: 'text-purple-600 bg-purple-50',
+      icon: Users,
+      iconBg: 'bg-purple-50 text-purple-600',
+    },
+    // 4. Existing: Products in Catalog
+    {
+      id: 'products-catalog',
+      title: 'Products in Catalog',
+      value: (stats.totalProducts || 0).toLocaleString('en-IN'),
+      rawValue: stats.totalProducts,
+      tag: 'Active Catalog',
+      tagColor: 'text-yellow-700 bg-yellow-50',
+      icon: Gamepad2,
+      iconBg: 'bg-yellow-50 text-yellow-600',
+    },
+    // 5. NEW: Total Store Owners
+    {
+      id: 'store-owners',
+      title: 'Total Store Owners',
+      value: (stats.totalStoreOwners || 0).toLocaleString('en-IN'),
+      rawValue: stats.totalStoreOwners,
+      tag: 'Retailers',
+      tagColor: 'text-indigo-600 bg-indigo-50',
+      icon: Store,
+      iconBg: 'bg-indigo-50 text-indigo-600',
+    },
+    // 6. NEW: Total Wholesalers
+    {
+      id: 'wholesalers',
+      title: 'Total Wholesalers',
+      value: (stats.totalWholesalers || 0).toLocaleString('en-IN'),
+      rawValue: stats.totalWholesalers,
+      tag: 'B2B Suppliers',
+      tagColor: 'text-amber-700 bg-amber-50',
+      icon: Truck,
+      iconBg: 'bg-amber-50 text-amber-600',
+    },
+    // 7. NEW: Total Home Businesses
+    {
+      id: 'home-businesses',
+      title: 'Total Home Businesses',
+      value: (stats.totalHomeBusinesses || 0).toLocaleString('en-IN'),
+      rawValue: stats.totalHomeBusinesses,
+      tag: 'Local Producers',
+      tagColor: 'text-teal-700 bg-teal-50',
+      icon: Home,
+      iconBg: 'bg-teal-50 text-teal-600',
+    },
+    // 8. NEW: Total Users
+    {
+      id: 'total-users',
+      title: 'Total Users',
+      value: (stats.totalUsers || 0).toLocaleString('en-IN'),
+      rawValue: stats.totalUsers,
+      tag: 'Excluding Admins',
+      tagColor: 'text-sky-700 bg-sky-50',
+      icon: UserCheck,
+      iconBg: 'bg-sky-50 text-sky-600',
+    },
+  ];
+
   return (
     <Layout>
       <div className="min-h-screen bg-gray-50 p-4 md:p-8">
         
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Dashboard Overview</h1>
-          <p className="text-gray-500 text-sm mt-1">Welcome back! Here's what's happening at WOW Lifestyle today.</p>
+        {/* Header with Refresh Button */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Dashboard Overview</h1>
+            <p className="text-gray-500 text-sm mt-1">Real-time business performance & platform analytics.</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={fetchDashboardStats}
+              disabled={isLoadingStats}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-100 text-gray-700 text-sm font-semibold rounded-xl border border-gray-200 shadow-sm transition-all disabled:opacity-50"
+            >
+              <RefreshCw size={16} className={isLoadingStats ? 'animate-spin text-yellow-600' : 'text-gray-500'} />
+              <span>{isLoadingStats ? 'Updating...' : 'Refresh Stats'}</span>
+            </button>
+          </div>
         </div>
 
-        {/* 1. Key Metrics (Stat Cards) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          
-          {/* Card 1: Revenue */}
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col hover:shadow-md transition-shadow">
-            <div className="flex justify-between items-start mb-4">
-              <div className="p-3 bg-green-50 text-green-600 rounded-xl">
-                <IndianRupee size={24} />
+        {/* Error Notification Banner */}
+        <AnimatePresence>
+          {statsError && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 flex items-center justify-between shadow-sm"
+            >
+              <div className="flex items-center gap-3">
+                <AlertCircle size={20} className="text-red-500 flex-shrink-0" />
+                <div>
+                  <span className="font-semibold text-sm">Failed to load live statistics: </span>
+                  <span className="text-sm">{statsError}</span>
+                </div>
               </div>
-              <span className="flex items-center text-sm font-medium text-green-600 bg-green-50 px-2 py-1 rounded-full">
-                <TrendingUp size={14} className="mr-1" /> +15.3%
-              </span>
-            </div>
-            <h3 className="text-gray-500 text-sm font-medium mb-1">Total Revenue</h3>
-            <div className="text-3xl font-black text-gray-900">₹24,56,890</div>
-          </div>
+              <button
+                onClick={fetchDashboardStats}
+                className="text-xs font-bold text-red-700 bg-red-100 hover:bg-red-200 px-3 py-1.5 rounded-lg transition-colors ml-4 whitespace-nowrap"
+              >
+                Try Again
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-          {/* Card 2: Orders */}
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col hover:shadow-md transition-shadow">
-            <div className="flex justify-between items-start mb-4">
-              <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
-                <Package size={24} />
+        {/* 1. Key Metrics (8 Stat Cards: 4 Existing + 4 New Cards) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {statCards.map((card) => {
+            const IconComponent = card.icon;
+            return (
+              <div
+                key={card.id}
+                className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col hover:shadow-md transition-shadow relative overflow-hidden group"
+              >
+                <div className="flex justify-between items-start mb-4">
+                  <div className={`p-3 rounded-xl ${card.iconBg} transition-transform group-hover:scale-110 duration-200`}>
+                    <IconComponent size={24} />
+                  </div>
+                  <span className={`flex items-center text-xs font-semibold px-2.5 py-1 rounded-full ${card.tagColor}`}>
+                    {card.tag}
+                  </span>
+                </div>
+                <h3 className="text-gray-500 text-sm font-medium mb-1">{card.title}</h3>
+                
+                {isLoadingStats ? (
+                  <div className="h-9 w-28 bg-gray-100 animate-pulse rounded-lg mt-1" />
+                ) : (
+                  <div className="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight truncate" title={card.value}>
+                    {card.value}
+                  </div>
+                )}
               </div>
-              <span className="flex items-center text-sm font-medium text-green-600 bg-green-50 px-2 py-1 rounded-full">
-                <TrendingUp size={14} className="mr-1" /> +8.2%
-              </span>
-            </div>
-            <h3 className="text-gray-500 text-sm font-medium mb-1">Total Orders</h3>
-            <div className="text-3xl font-black text-gray-900">1,284</div>
-          </div>
-
-          {/* Card 3: Customers */}
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col hover:shadow-md transition-shadow">
-            <div className="flex justify-between items-start mb-4">
-              <div className="p-3 bg-purple-50 text-purple-600 rounded-xl">
-                <Users size={24} />
-              </div>
-              <span className="flex items-center text-sm font-medium text-red-500 bg-red-50 px-2 py-1 rounded-full">
-                <TrendingDown size={14} className="mr-1" /> -2.4%
-              </span>
-            </div>
-            <h3 className="text-gray-500 text-sm font-medium mb-1">Active Customers</h3>
-            <div className="text-3xl font-black text-gray-900">8,439</div>
-          </div>
-
-          {/* Card 4: Products */}
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col hover:shadow-md transition-shadow">
-            <div className="flex justify-between items-start mb-4">
-              <div className="p-3 bg-yellow-50 text-yellow-600 rounded-xl">
-                <Gamepad2 size={24} />
-              </div>
-              <span className="flex items-center text-sm font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-                New: 12
-              </span>
-            </div>
-            <h3 className="text-gray-500 text-sm font-medium mb-1">Products in Catalog</h3>
-            <div className="text-3xl font-black text-gray-900">452</div>
-          </div>
-
+            );
+          })}
         </div>
 
-        {/* 2. Main Content Grid (Charts & Lists) */}
+        {/* 2. Main Content Grid (Charts & Top Products) */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
           {/* Left Column: Unique Custom Chart Area */}
@@ -312,13 +470,11 @@ export default function DashboardPage() {
             <div className="flex justify-between items-center mb-6">
               <div>
                 <h3 className="text-lg font-bold text-gray-900">Revenue Overview</h3>
-                <p className="text-xs text-gray-500 mt-1">Last 7 Days Performance</p>
+                <p className="text-xs text-gray-500 mt-1">Performance Trend</p>
               </div>
-              <select className="bg-gray-50 border border-gray-200 text-sm rounded-lg px-3 py-1.5 outline-none focus:ring-2 focus:ring-yellow-500 font-medium text-gray-700 cursor-pointer">
-                <option>This Week</option>
-                <option>This Month</option>
-                <option>This Year</option>
-              </select>
+              <span className="text-xs font-semibold text-gray-600 bg-gray-100 px-3 py-1.5 rounded-lg">
+                Last 7 Days
+              </span>
             </div>
             
             {/* The Custom Graph */}
@@ -336,7 +492,7 @@ export default function DashboardPage() {
             </div>
             
             <div className="space-y-6 flex-1">
-              {topProducts.map((product, i) => (
+              {fallbackTopProducts.map((product, i) => (
                 <div key={i} className="flex items-center justify-between group">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-lg bg-yellow-50 flex items-center justify-center font-black text-yellow-600 border border-yellow-100 group-hover:bg-yellow-400 group-hover:text-black transition-colors">
@@ -355,8 +511,12 @@ export default function DashboardPage() {
               ))}
             </div>
 
-            <button className="w-full mt-6 py-3 text-sm font-bold text-gray-600 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl transition-colors">
-              View All Products
+            <button 
+              onClick={() => router.push('/admin/product')}
+              className="w-full mt-6 py-3 text-sm font-bold text-gray-600 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl transition-colors flex items-center justify-center gap-2"
+            >
+              <span>View All Products</span>
+              <ExternalLink size={14} />
             </button>
           </div>
 
@@ -365,48 +525,94 @@ export default function DashboardPage() {
         {/* 3. Recent Orders Table */}
         <div className="mt-8 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-            <h3 className="text-lg font-bold text-gray-900">Recent Orders</h3>
-            <button className="text-sm text-blue-600 font-medium hover:underline">View All</button>
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Recent Orders</h3>
+              <p className="text-xs text-gray-500 mt-0.5">Latest customer transactions from database</p>
+            </div>
+            <button 
+              onClick={() => router.push('/admin/order-history')}
+              className="text-sm text-blue-600 font-semibold hover:underline flex items-center gap-1"
+            >
+              <span>View All Orders</span>
+              <ExternalLink size={14} />
+            </button>
           </div>
+          
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
-                  <th className="p-4 font-bold">Order ID</th>
-                  <th className="p-4 font-bold">Product</th>
-                  <th className="p-4 font-bold">Customer</th>
-                  <th className="p-4 font-bold">Date</th>
-                  <th className="p-4 font-bold">Amount</th>
-                  <th className="p-4 font-bold">Status</th>
-                  <th className="p-4 font-bold text-center">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 text-sm">
-                {recentOrders.map((order, i) => (
-                  <tr key={i} className="hover:bg-gray-50 transition-colors">
-                    <td className="p-4 font-mono font-medium text-gray-900">{order.id}</td>
-                    <td className="p-4 font-semibold text-gray-800">{order.product}</td>
-                    <td className="p-4 text-gray-600">{order.customer}</td>
-                    <td className="p-4 text-gray-500">{order.date}</td>
-                    <td className="p-4 font-bold text-gray-900">{order.amount}</td>
-                    <td className="p-4">
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                        order.status === 'Delivered' ? 'bg-green-100 text-green-700' :
-                        order.status === 'Processing' ? 'bg-yellow-100 text-yellow-700' :
-                        'bg-blue-100 text-blue-700'
-                      }`}>
-                        {order.status}
-                      </span>
-                    </td>
-                    <td className="p-4 text-center">
-                      <button className="p-1 text-gray-400 hover:text-gray-800 transition-colors rounded hover:bg-gray-200">
-                        <MoreHorizontal size={18} />
-                      </button>
-                    </td>
+            {isLoadingStats ? (
+              <div className="p-12 flex flex-col items-center justify-center text-gray-400">
+                <RefreshCw size={28} className="animate-spin text-yellow-500 mb-3" />
+                <p className="text-sm font-medium">Loading live orders...</p>
+              </div>
+            ) : recentOrders.length === 0 ? (
+              <div className="p-12 text-center text-gray-500">
+                <Package size={36} className="mx-auto text-gray-300 mb-2" />
+                <p className="text-base font-semibold text-gray-700">No orders placed yet</p>
+                <p className="text-xs text-gray-400 mt-1">When customers place orders, they will appear here in real-time.</p>
+              </div>
+            ) : (
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
+                    <th className="p-4 font-bold">Order ID</th>
+                    <th className="p-4 font-bold">Product / Item</th>
+                    <th className="p-4 font-bold">Customer</th>
+                    <th className="p-4 font-bold">Date</th>
+                    <th className="p-4 font-bold">Amount</th>
+                    <th className="p-4 font-bold">Status</th>
+                    <th className="p-4 font-bold text-center">Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-gray-100 text-sm">
+                  {recentOrders.map((order, i) => (
+                    <tr key={order.id || order._id || i} className="hover:bg-gray-50 transition-colors">
+                      <td className="p-4 font-mono font-medium text-gray-900">{order.id}</td>
+                      <td className="p-4 font-semibold text-gray-800">
+                        {order.product}
+                        {order.itemCount > 1 && (
+                          <span className="ml-2 text-xs text-gray-500 font-normal">
+                            +{order.itemCount - 1} more
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-4 text-gray-600">
+                        <div className="font-medium text-gray-800">{order.customer}</div>
+                        {order.email && <div className="text-xs text-gray-400">{order.email}</div>}
+                      </td>
+                      <td className="p-4 text-gray-500 text-xs">{order.date}</td>
+                      <td className="p-4 font-bold text-gray-900">{order.amount}</td>
+                      <td className="p-4">
+                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
+                          order.status === 'Delivered' 
+                            ? 'bg-green-100 text-green-700' :
+                          order.status === 'Processing' 
+                            ? 'bg-yellow-100 text-yellow-700' :
+                          order.status === 'Shipped' 
+                            ? 'bg-blue-100 text-blue-700' :
+                          order.status === 'Cancelled'
+                            ? 'bg-red-100 text-red-700' :
+                            'bg-gray-100 text-gray-700'
+                        }`}>
+                          {order.status === 'Delivered' && <CheckCircle2 size={12} />}
+                          {order.status === 'Processing' && <Clock size={12} />}
+                          {order.status === 'Cancelled' && <XCircle size={12} />}
+                          <span>{order.status}</span>
+                        </span>
+                      </td>
+                      <td className="p-4 text-center">
+                        <button 
+                          onClick={() => router.push('/admin/order-history')}
+                          className="p-1.5 text-gray-400 hover:text-gray-800 transition-colors rounded-lg hover:bg-gray-200"
+                          title="View order details in Order History"
+                        >
+                          <MoreHorizontal size={18} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
 

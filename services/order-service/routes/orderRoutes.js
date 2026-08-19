@@ -3,7 +3,7 @@ const multer  = require('multer');
 const path    = require('path');
 const fs      = require('fs');
 const router = express.Router();
-const { getMyOrders, createOrder, getOrderByOrderId, updatePaymentStatus, getOrdersByStore, confirmQrPayment, createWholesaleOrder, getOrdersByBuyer, updateOrderStatus } = require('../controllers/orderController');
+const { getMyOrders, createOrder, getOrderByOrderId, updatePaymentStatus, getOrdersByStore, confirmQrPayment, createWholesaleOrder, getOrdersByBuyer, updateOrderStatus, getOrderStats } = require('../controllers/orderController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
 // Multer setup for QR payment screenshots
@@ -30,7 +30,8 @@ router.patch('/:orderId/confirm-payment', upload.single('screenshot'), confirmQr
 // Store owner-facing — orders placed against their store
 router.get('/store/:storeId', protect, getOrdersByStore);
 
-// Internal service-to-service (payment-service calls these)
+// Internal service-to-service (payment-service and admin stats call these)
+router.get('/internal/stats', getOrderStats);
 router.post('/internal', createOrder);
 router.get('/internal/:orderId', getOrderByOrderId);
 router.patch('/internal/:orderId/payment-status', updatePaymentStatus);

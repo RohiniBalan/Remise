@@ -7,8 +7,7 @@ import Layout from '../layout/layout';
 import axios from 'axios';
 import ReviewSection, { ReviewConfigData, ReviewItem, PhotoItem } from '../../components-sections/ReviewSection'; 
 
-const API_URL = "https://wow-lifebackend.onrender.com/api";
-
+import { API_URL } from '../../utils/api';
 const axiosInstance = axios.create({
   baseURL: API_URL,
   headers: { 'Content-Type': 'application/json' },

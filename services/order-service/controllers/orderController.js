@@ -214,10 +214,52 @@ const getOrdersByBuyer = async (req, res) => {
   }
 };
 
+// Stats: revenue, total orders and recent orders (internal / admin)
+const getOrderStats = async (req, res) => {
+  try {
+    const [revenueResult, totalOrders, recentOrdersRaw] = await Promise.all([
+      Order.aggregate([
+        {
+          $match: {
+            orderStatus: { $ne: 'Cancelled' },
+            paymentStatus: { $ne: 'FAILED' }
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            totalRevenue: { $sum: '$totalAmount' }
+          }
+        }
+      ]),
+      Order.countDocuments(),
+      Order.find().sort({ createdAt: -1 }).limit(5)
+    ]);
+
+    const totalRevenue = revenueResult.length > 0 && revenueResult[0].totalRevenue 
+      ? revenueResult[0].totalRevenue 
+      : 0;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        totalOrders,
+        totalRevenue,
+        recentOrders: recentOrdersRaw
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching order stats:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch order stats', error: error.message });
+  }
+};
+
 module.exports = {
   createOrder, getOrderByOrderId, updatePaymentStatus,
   getAllOrders, updateOrderStatus, getMyOrders,
   getOrdersByStore, confirmQrPayment,
   createWholesaleOrder, getOrdersByBuyer,
+  getOrderStats,
 };
+
 

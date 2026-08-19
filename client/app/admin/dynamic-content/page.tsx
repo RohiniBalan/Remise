@@ -9,7 +9,7 @@ import {
 import Layout from '../layout/layout'; // Importing your centralized Admin Layout
 
 // Define your backend API URL here
-const API_URL = "https://wow-lifebackend.onrender.com/api";
+import { API_URL } from '../../utils/api';
 
 export default function DynamicContentPage() {
   const router = useRouter();

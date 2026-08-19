@@ -30,6 +30,7 @@ const productRoutes = require('./routes/productRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
 const adminUserRoutes = require('./routes/adminUserRoutes');
 const adminOrderRoutes = require('./routes/adminOrderRoutes');
+const adminStatsRoutes = require('./routes/adminStatsRoutes');
 const myOrderRoutes = require('./routes/myOrderRoutes'); 
 const userRoutes = require('./routes/userRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
@@ -95,6 +96,7 @@ app.use('/api/admin/products', productRoutes);
 app.use('/api/admin/categories', categoryRoutes);
 app.use('/api/admin/users', adminUserRoutes);
 app.use('/api/admin/orders', adminOrderRoutes); 
+app.use('/api/admin/stats', adminStatsRoutes); 
 
 // Mount User routes
 app.use('/api/user', userRoutes);
@@ -200,6 +202,7 @@ mongoose.connect(mongoUri)
       console.log(`  - /api/admin/categories`);
       console.log(`  - /api/admin/users`);
       console.log(`  - /api/admin/orders`);
+      console.log(`  - /api/admin/stats`);
       console.log(`  - /api/user (Includes /cart/sync)`);
       console.log(`  - /api/payment`);
       console.log(`  - /api/orders (My Orders)`);

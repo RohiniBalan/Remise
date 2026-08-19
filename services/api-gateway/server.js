@@ -114,6 +114,10 @@ app.use('/api/admin/users',
   makeProxy(SERVICES.user, '/api/admin/users')
 );
 
+app.use('/api/admin/stats',
+  makeProxy(SERVICES.user, '/api/admin/stats')
+);
+
 app.use('/api/admin/products',
   makeProxy(SERVICES.product, '/api/admin/products')
 );

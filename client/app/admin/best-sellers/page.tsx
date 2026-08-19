@@ -6,8 +6,7 @@ import Layout from '../layout/layout';
 import axios from 'axios';
 import BestSellersSection, { BestSellerItem } from '../../components-sections/BestSellersSection'; 
 
-const API_URL = "https://wow-lifebackend.onrender.com/api";
-
+import { API_URL } from '../../utils/api';
 const axiosInstance = axios.create({
   baseURL: API_URL,
   headers: { 'Content-Type': 'application/json' },

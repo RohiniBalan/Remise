@@ -1,14 +1,33 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import { AuthContext } from '../../context/AuthContext';
 import './Layout.css';
+
+const resolveApiUrl = () => {
+  if (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_API_URL) {
+    const base = process.env.NEXT_PUBLIC_API_URL.replace(/\/+$/, '');
+    return base.endsWith('/api') ? base : `${base}/api`;
+  }
+  return 'https://wow-lifebackend.onrender.com/api';
+};
+
+const API_URL = resolveApiUrl();
 
 export default function Sidebar() {
   const router = useRouter();
   const pathname = usePathname(); // Tracks the current URL
+  const ctx = useContext(AuthContext) as any;
+
   const [activeItem, setActiveItem] = useState('Dashboard');
   const [isPortfolioOpen, setIsPortfolioOpen] = useState(true);
+  const [userData, setUserData] = useState<{ fullname?: string; email?: string; avatar?: string; role?: string }>({
+    fullname: '',
+    email: '',
+    avatar: '',
+    role: ''
+  });
 
   const menuItems: Array<{
     name: string;
@@ -45,6 +64,44 @@ export default function Sidebar() {
     { name: 'Settings', icon: '⚙️', path: '/admin/settings' },
   ];
 
+  // Fetch / Sync logged-in user profile from DB
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const storedUser = ctx?.user || (typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('user') || '{}') : {});
+        if (storedUser && (storedUser.fullname || storedUser.email)) {
+          setUserData(storedUser);
+        }
+
+        const rawToken = ctx?.token || (typeof window !== 'undefined' ? localStorage.getItem('token') : null);
+        const token = rawToken ? rawToken.replace(/['"]+/g, '') : null;
+
+        if (token) {
+          const res = await fetch(`${API_URL}/auth/profile`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Cache-Control': 'no-cache',
+            }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            const liveUser = data.user || data.data || data;
+            if (liveUser && (liveUser.fullname || liveUser.email)) {
+              setUserData(liveUser);
+              if (typeof window !== 'undefined') {
+                localStorage.setItem('user', JSON.stringify(liveUser));
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load profile in sidebar:', err);
+      }
+    };
+
+    loadProfile();
+  }, [ctx?.token, ctx?.user]);
+
   // Auto-sync the sidebar's active item based on the current URL
   useEffect(() => {
     if (!pathname) return;
@@ -79,12 +136,31 @@ export default function Sidebar() {
   };
 
   const handleLogout = () => {
+    if (ctx?.logout) {
+      ctx.logout();
+    }
     if (typeof window !== 'undefined') {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       router.push('/login');
     }
   };
+
+  const getInitials = (name?: string, email?: string) => {
+    if (name && name.trim()) {
+      const parts = name.trim().split(/\s+/);
+      if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+      return name.slice(0, 2).toUpperCase();
+    }
+    if (email && email.trim()) {
+      return email.slice(0, 2).toUpperCase();
+    }
+    return 'AD';
+  };
+
+  const displayName = userData.fullname || 'Admin User';
+  const displayEmail = userData.email || 'admin@remise.com';
+  const avatarInitials = getInitials(userData.fullname, userData.email);
 
   return (
     <aside className="sidebar">
@@ -144,11 +220,15 @@ export default function Sidebar() {
 
       {/* Footer Profile */}
       <div className="sidebar-footer">
-        <div className="user-card">
-          <div className="user-avatar">JD</div>
+        <div className="user-card" title={`${displayName} (${displayEmail})`}>
+          <div className="user-avatar">{avatarInitials}</div>
           <div className="user-info">
-            <h4>John Doe</h4>
-            <p>john@company.com</p>
+            <h4 style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px' }}>
+              {displayName}
+            </h4>
+            <p style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px' }}>
+              {displayEmail}
+            </p>
           </div>
         </div>
         <div 

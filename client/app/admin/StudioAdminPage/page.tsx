@@ -13,7 +13,7 @@ import axios from 'axios';
 import StudioShowcaseSection from '../../components-sections/StudioShowcaseSection';
 
 // API Configuration
-const API_URL = "https://wow-lifebackend.onrender.com/api";
+import { API_URL } from '../../utils/api';
 
 // Create axios instance with interceptors
 const axiosInstance = axios.create({

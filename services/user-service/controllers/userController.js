@@ -72,6 +72,8 @@ const getCart = async (req, res) => {
   }
 };
 
+const ORDER_SERVICE_URL = process.env.ORDER_SERVICE_URL || 'http://localhost:3004';
+
 const getAllUsers = async (req, res) => {
   try {
     const users = await User.find().select('-password').sort({ createdAt: -1 });
@@ -82,4 +84,94 @@ const getAllUsers = async (req, res) => {
   }
 };
 
-module.exports = { syncCart, getCart, getAllUsers };
+const getAdminDashboardStats = async (req, res) => {
+  try {
+    const [
+      activeCustomers,
+      totalStoreOwners,
+      totalWholesalers,
+      totalHomeBusinesses,
+      totalUsers,
+    ] = await Promise.all([
+      User.countDocuments({ role: { $in: ['customer', 'user'] } }),
+      User.countDocuments({ role: 'store_owner' }),
+      User.countDocuments({ role: { $in: ['wholesaler', 'whole_saler'] } }),
+      User.countDocuments({ role: 'home_business' }),
+      User.countDocuments({ role: { $ne: 'admin' } }),
+    ]);
+
+    let totalOrders = 0;
+    let totalRevenue = 0;
+    let recentOrders = [];
+    let totalProducts = 0;
+
+    // Fetch order stats from order-service
+    try {
+      const orderRes = await axios.get(`${ORDER_SERVICE_URL}/api/orders/internal/stats`);
+      if (orderRes.data?.success && orderRes.data?.data) {
+        totalOrders = orderRes.data.data.totalOrders || 0;
+        totalRevenue = orderRes.data.data.totalRevenue || 0;
+        recentOrders = (orderRes.data.data.recentOrders || []).map((order) => {
+          const firstItem = order.items && order.items.length > 0 ? order.items[0] : null;
+          return {
+            id: order.orderId ? `#${order.orderId}` : `#${order._id?.toString().slice(-6).toUpperCase()}`,
+            _id: order._id,
+            product: firstItem ? firstItem.title : (order.orderId || 'Order'),
+            itemCount: order.items ? order.items.length : 1,
+            customer: order.contactEmail || 'Customer',
+            email: order.contactEmail || '',
+            amount: `₹${(order.totalAmount || 0).toLocaleString('en-IN')}`,
+            rawAmount: order.totalAmount || 0,
+            status: order.orderStatus || 'Processing',
+            paymentStatus: order.paymentStatus || 'PENDING',
+            date: order.createdAt 
+              ? new Date(order.createdAt).toLocaleDateString('en-IN', {
+                  day: 'numeric',
+                  month: 'short',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })
+              : 'Recently'
+          };
+        });
+      }
+    } catch (err) {
+      console.error('Could not fetch order stats from order-service:', err.message);
+    }
+
+    // Fetch product total from product-service
+    try {
+      const prodRes = await axios.get(`${PRODUCT_SERVICE_URL}/api/products?limit=1`);
+      if (prodRes.data?.success) {
+        totalProducts = prodRes.data.total || prodRes.data.count || 0;
+      }
+    } catch (err) {
+      console.error('Could not fetch products total from product-service:', err.message);
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        totalRevenue,
+        totalOrders,
+        activeCustomers,
+        totalProducts,
+        totalStoreOwners,
+        totalWholesalers,
+        totalHomeBusinesses,
+        totalUsers,
+        recentOrders,
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching admin dashboard statistics:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch dashboard statistics',
+      error: error.message,
+    });
+  }
+};
+
+module.exports = { syncCart, getCart, getAllUsers, getAdminDashboardStats };
+

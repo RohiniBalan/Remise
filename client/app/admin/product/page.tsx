@@ -19,8 +19,16 @@ import {
 } from 'lucide-react';
 import Layout from '../layout/layout'; 
 
-// Define your backend API URL here
-const API_URL = "https://wow-lifebackend.onrender.com/api";
+// Dynamically resolve backend API URL
+const resolveApiUrl = () => {
+  if (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_API_URL) {
+    const base = process.env.NEXT_PUBLIC_API_URL.replace(/\/+$/, '');
+    return base.endsWith('/api') ? base : `${base}/api`;
+  }
+  return 'https://wow-lifebackend.onrender.com/api';
+};
+
+const API_URL = resolveApiUrl();
 
 interface ProductSpec {
   label: string;
