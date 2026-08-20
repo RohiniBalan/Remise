@@ -1,8 +1,8 @@
-// /components-seller/dashboard/IncomingOrdersTab.tsx
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ShoppingBag, RefreshCw } from "lucide-react";
 import { ORDER_STATUSES, STATUS_STYLE } from "./shared-utils";
+import PaginationControl from "../components-main/PaginationControl";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -29,7 +29,14 @@ interface IncomingOrdersTabProps {
 
 export function IncomingOrdersTab({ orders, token, onRefresh }: IncomingOrdersTabProps) {
   const [filter, setFilter] = useState<string>("all");
+  const [currentPage, setCurrentPage] = useState(1);
   const [updating, setUpdating] = useState<string | null>(null);
+
+  const ITEMS_PER_PAGE = 30;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filter]);
 
   const handleStatus = async (id: string, status: string) => {
     setUpdating(id);
@@ -55,6 +62,12 @@ export function IncomingOrdersTab({ orders, token, onRefresh }: IncomingOrdersTa
   ORDER_STATUSES.forEach((s) => {
     counts[s] = orders.filter((o: Order) => o.orderStatus === s).length;
   });
+
+  const paginatedOrders = filtered.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE,
+  );
+
 
   return (
     <div>
@@ -83,7 +96,7 @@ export function IncomingOrdersTab({ orders, token, onRefresh }: IncomingOrdersTa
         </div>
       ) : (
         <div className="space-y-3">
-          {filtered.map((o: Order) => (
+          {paginatedOrders.map((o: Order) => (
             <div
               key={o._id}
               className="bg-white rounded-2xl border border-[#BBD5DA] p-5 shadow-sm hover:shadow-md transition"
@@ -148,6 +161,15 @@ export function IncomingOrdersTab({ orders, token, onRefresh }: IncomingOrdersTa
           ))}
         </div>
       )}
+
+      {filtered.length > ITEMS_PER_PAGE && (
+        <PaginationControl
+          currentPage={currentPage}
+          totalItems={filtered.length}
+          itemsPerPage={ITEMS_PER_PAGE}
+          onPageChange={setCurrentPage}
+        />
+      )}
     </div>
   );
-}
+}

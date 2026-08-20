@@ -6,8 +6,10 @@ const router  = express.Router();
 const {
   registerStore, getMyStore, getStoreById,
   updateStore, getAllStores, verifyStore, syncOwnerRole,
-  getNearbyStores, getStoreInternal, getStoresByIds, getStoresByOwnerIds
+  getNearbyStores, getStoreInternal, getStoresByIds, getStoresByOwnerIds,
+  enrollDeliveryPortal
 } = require('../controllers/storeController');
+
 const { protect, verifyAdmin } = require('../middleware/authMiddleware');
 
 // Multer setup for store logos
@@ -30,10 +32,12 @@ const upload = multer({
 // Authenticated — must be before /:id to prevent 'me' matching as an id
 router.get('/me/my-store',  protect, getMyStore);
 router.post('/me/sync-role', protect, syncOwnerRole);
+router.patch('/delivery-portal/enroll', protect, enrollDeliveryPortal);
 router.post('/',            protect, upload.single('logo'), registerStore);
 router.post('/batch', getStoresByIds);
 router.post('/by-owners', protect, getStoresByOwnerIds);
 router.put('/:id',        protect, upload.single('logo'), updateStore);
+
 
 // Public — nearby search (must be before /:id)
 router.get('/nearby',     getNearbyStores);

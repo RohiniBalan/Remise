@@ -49,7 +49,12 @@ import {
   MicOff,
   Menu,
   Camera,
+  Navigation,
+  User,
+  Phone,
+  ExternalLink,
 } from "lucide-react";
+
 import {
   LineChart,
   Line,
@@ -86,7 +91,9 @@ import {
   VoiceLanguageOption,
 } from "../../hooks/useSpeechRecognition";
 import SupplierCartOrderModal from "../../components-main/SupplierCartOrderModal";
+import StoreDeliveryModal from "../../components-main/StoreDeliveryModal";
 import SupplierCompareDrawer, {
+
   ProductGroup,
   GroupedSupplier,
 } from "../../components-main/SupplierCompareDrawer";
@@ -95,7 +102,9 @@ import SupplierBrandListDrawer, {
   groupByTitle,
 } from "../../components-main/SupplierBrandListDrawer";
 import ConfirmModal from "../../components-main/ConfirmModal";
+import PaginationControl from "../../components-main/PaginationControl";
 import { indianStates, getCities } from "../../utils/indiaLocation";
+
 import TargetRevenueCard from "../../components-main/TargetRevenueCard";
 import { isAuthenticated, redirectToLogin } from "../../utils/authGuard";
 
@@ -155,10 +164,12 @@ type Tab =
   | "products"
   | "categories"
   | "orders"
+  | "deliveries"
   | "offers"
   | "customers"
   | "suppliers"
   | "settings";
+
 
 const ORDER_STATUSES = [
   "Pending",
@@ -185,6 +196,7 @@ function normalizeSmartOrder(o: any) {
   const items = o.items || [];
   return {
     _id: o._id,
+    orderId: o.orderId,
     status: o.orderStatus,
     offerTitle: items.length
       ? items.map((i: any) => `${i.quantity}x ${i.title}`).join(", ")
@@ -207,10 +219,16 @@ function normalizeSmartOrder(o: any) {
     paymentMethod: o.paymentMethod,
     paymentStatus: o.paymentStatus,
     deliveryStatus: o.deliveryStatus,
+    deliveryMode: o.deliveryMode,
+    deliveryPerson: o.deliveryPerson,
+    deliveryTimeline: o.deliveryTimeline,
+    deliveryToken: o.deliveryToken,
+    shippingAddress: o.shippingAddress,
     rawItems: items,
     _source: "smartOrder" as const,
   };
 }
+
 
 // Groups the merged orders array (offer orders + smart orders) by customer
 // identity, then looks for products the same customer bought in 2+ different
@@ -3229,7 +3247,15 @@ function ProductsTab({ products, categories, storeId, token, onRefresh }: any) {
 function OrdersTab({ orders, token, onRefresh }: any) {
   const [filter, setFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const [updating, setUpdating] = useState<string | null>(null);
+  const [selectedDeliveryOrder, setSelectedDeliveryOrder] = useState<any>(null);
+
+  const ITEMS_PER_PAGE = 30;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, filter]);
 
   const handleStatus = async (orderId: string, status: string) => {
     setUpdating(orderId);
@@ -3256,6 +3282,11 @@ function OrdersTab({ orders, token, onRefresh }: any) {
   ORDER_STATUSES.forEach((s) => {
     counts[s] = orders.filter((o: any) => o.status === s).length;
   });
+
+  const paginatedOrders = filtered.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE,
+  );
 
   return (
     <div>
@@ -3294,7 +3325,8 @@ function OrdersTab({ orders, token, onRefresh }: any) {
         </div>
       ) : (
         <div className="space-y-3">
-          {filtered.map((o: any) => (
+          {paginatedOrders.map((o: any) => (
+
             <div
               key={o._id}
               className="bg-white rounded-2xl border border-[#BBD5DA] p-5 shadow-sm hover:shadow-md transition"
@@ -3310,6 +3342,11 @@ function OrdersTab({ orders, token, onRefresh }: any) {
                     >
                       {o.status}
                     </span>
+                    {o.deliveryStatus && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200">
+                        Delivery: {o.deliveryStatus}
+                      </span>
+                    )}
                   </div>
                   <p className="text-gray-600 text-sm">
                     {o.customerName}
@@ -3374,13 +3411,30 @@ function OrdersTab({ orders, token, onRefresh }: any) {
                   <p className="text-gray-400 text-xs">Qty: {o.quantity}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-3 mt-4 pt-4 border-t border-[#F5F5F5]">
-                <span className="text-xs text-gray-400 font-mono">
+              <div className="flex items-center gap-2.5 mt-4 pt-4 border-t border-[#F5F5F5] flex-wrap">
+                <span className="text-xs text-gray-400 font-mono mr-auto">
                   #{o._id.slice(-6).toUpperCase()}
                 </span>
+
+                {/* Delivery Flow Button — Home Delivery Only & Disappears when Delivered */}
+                {o.deliveryMethod !== "pickup" &&
+                  (o.deliveryMethod === "delivery" || !!o.deliveryAddress) &&
+                  o.status !== "Delivered" &&
+                  o.deliveryStatus !== "Delivered" && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDeliveryOrder(o)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 text-xs font-bold border border-teal-200 transition"
+                    >
+                      <Truck size={13} />
+                      {o.deliveryToken ? "View Delivery Link" : "Manage Delivery"}
+                    </button>
+                  )}
+
+
                 {o._source === "smartOrder" || o.status === "Delivered" ? (
                   <span
-                    className={`ml-auto text-xs font-semibold px-3 py-1.5 rounded-xl border ${STATUS_STYLE[o.status] || "bg-gray-100 text-gray-600 border-gray-200"}`}
+                    className={`text-xs font-semibold px-3 py-1.5 rounded-xl border ${STATUS_STYLE[o.status] || "bg-gray-100 text-gray-600 border-gray-200"}`}
                   >
                     {o.status}
                   </span>
@@ -3389,7 +3443,7 @@ function OrdersTab({ orders, token, onRefresh }: any) {
                     value={o.status}
                     onChange={(e) => handleStatus(o._id, e.target.value)}
                     disabled={updating === o._id}
-                    className="ml-auto bg-[#F5F5F5] border border-[#BBD5DA] text-gray-700 text-sm rounded-xl px-3 py-1.5 outline-none focus:border-teal-400 transition cursor-pointer disabled:opacity-50"
+                    className="bg-[#F5F5F5] border border-[#BBD5DA] text-gray-700 text-sm rounded-xl px-3 py-1.5 outline-none focus:border-teal-400 transition cursor-pointer disabled:opacity-50"
                   >
                     {ORDER_STATUSES.map((s) => (
                       <option key={s}>{s}</option>
@@ -3404,11 +3458,420 @@ function OrdersTab({ orders, token, onRefresh }: any) {
           ))}
         </div>
       )}
+
+      {filtered.length > ITEMS_PER_PAGE && (
+        <PaginationControl
+          currentPage={currentPage}
+          totalItems={filtered.length}
+          itemsPerPage={ITEMS_PER_PAGE}
+          onPageChange={setCurrentPage}
+        />
+      )}
+
+      {selectedDeliveryOrder && (
+
+        <StoreDeliveryModal
+          order={selectedDeliveryOrder}
+          token={token}
+          isOpen={!!selectedDeliveryOrder}
+          onClose={() => setSelectedDeliveryOrder(null)}
+          onRefreshOrders={onRefresh}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Deliveries Tab (Who Delivered to Whom) ──────────────────────────────────
+
+function DeliveriesTab({ orders, token, onRefresh }: any) {
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [modeFilter, setModeFilter] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [selectedDeliveryOrder, setSelectedDeliveryOrder] = useState<any>(null);
+
+  const ITEMS_PER_PAGE = 30;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, statusFilter, modeFilter]);
+
+  // Filter only orders that involve home delivery or have delivery tracking data
+  const deliveryOrders = orders.filter((o: any) => {
+    const isDelivery =
+      o.deliveryMethod !== "pickup" &&
+      (o.deliveryMethod === "delivery" ||
+        !!o.deliveryAddress ||
+        !!o.deliveryPerson?.name ||
+        !!o.deliveryStatus);
+    return isDelivery;
+  });
+
+  const filtered = deliveryOrders.filter((o: any) => {
+    const personName = o.deliveryPerson?.name || "";
+    const personPhone = o.deliveryPerson?.phone || "";
+    const customerName = o.customerName || "";
+    const customerPhone = o.customerPhone || "";
+    const orderId = o.orderId || o._id || "";
+    const deliveryAddress = o.deliveryAddress || "";
+
+    const matchSearch =
+      !search ||
+      personName.toLowerCase().includes(search.toLowerCase()) ||
+      personPhone.includes(search) ||
+      customerName.toLowerCase().includes(search.toLowerCase()) ||
+      customerPhone.includes(search) ||
+      orderId.toLowerCase().includes(search.toLowerCase()) ||
+      deliveryAddress.toLowerCase().includes(search.toLowerCase());
+
+    const deliverySt =
+      o.deliveryStatus || (o.status === "Delivered" ? "Delivered" : "Pending");
+    const matchStatus = statusFilter === "all" || deliverySt === statusFilter;
+    const matchMode =
+      modeFilter === "all" || (o.deliveryMode || "own_delivery") === modeFilter;
+
+    return matchSearch && matchStatus && matchMode;
+  });
+
+  const paginatedDeliveries = filtered.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE,
+  );
+
+
+  // Delivery Stats
+  const totalCount = deliveryOrders.length;
+  const deliveredCount = deliveryOrders.filter(
+    (o: any) => o.deliveryStatus === "Delivered" || o.status === "Delivered",
+  ).length;
+  const outForDeliveryCount = deliveryOrders.filter(
+    (o: any) => o.deliveryStatus === "Out for Delivery",
+  ).length;
+  const pendingCount = deliveryOrders.filter(
+    (o: any) =>
+      !o.deliveryStatus ||
+      o.deliveryStatus === "Pending" ||
+      o.deliveryStatus === "Assigned",
+  ).length;
+
+  return (
+    <div className="space-y-5">
+      {/* Stat Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="bg-white rounded-2xl border border-[#BBD5DA] p-4 shadow-xs">
+          <div className="flex items-center gap-2 text-teal-600 mb-1">
+            <Truck size={16} />
+            <span className="text-xs font-bold uppercase tracking-wider text-gray-500">
+              Total Deliveries
+            </span>
+          </div>
+          <p className="text-2xl font-black text-gray-900">{totalCount}</p>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-green-200 bg-green-50/30 p-4 shadow-xs">
+          <div className="flex items-center gap-2 text-green-700 mb-1">
+            <CheckCircle2 size={16} />
+            <span className="text-xs font-bold uppercase tracking-wider text-green-800">
+              Delivered
+            </span>
+          </div>
+          <p className="text-2xl font-black text-green-700">{deliveredCount}</p>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-indigo-200 bg-indigo-50/30 p-4 shadow-xs">
+          <div className="flex items-center gap-2 text-indigo-700 mb-1">
+            <Navigation size={16} />
+            <span className="text-xs font-bold uppercase tracking-wider text-indigo-800">
+              Out for Delivery
+            </span>
+          </div>
+          <p className="text-2xl font-black text-indigo-700">
+            {outForDeliveryCount}
+          </p>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-amber-200 bg-amber-50/30 p-4 shadow-xs">
+          <div className="flex items-center gap-2 text-amber-700 mb-1">
+            <Clock size={16} />
+            <span className="text-xs font-bold uppercase tracking-wider text-amber-800">
+              Pending / Assigned
+            </span>
+          </div>
+          <p className="text-2xl font-black text-amber-700">{pendingCount}</p>
+        </div>
+      </div>
+
+      {/* Filter Bar */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search
+            size={15}
+            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"
+          />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by delivery person, customer, phone, address, or order ID…"
+            className="w-full pl-9 pr-4 py-2.5 bg-white border border-[#BBD5DA] rounded-xl text-sm outline-none focus:border-teal-400 transition"
+          />
+        </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="bg-white border border-[#BBD5DA] rounded-xl px-3 py-2.5 text-sm text-gray-700 outline-none focus:border-teal-400 transition"
+        >
+          <option value="all">All Statuses</option>
+          <option value="Delivered">Delivered</option>
+          <option value="Out for Delivery">Out for Delivery</option>
+          <option value="Picked Up">Picked Up</option>
+          <option value="Accepted">Accepted</option>
+          <option value="Assigned">Assigned</option>
+        </select>
+        <select
+          value={modeFilter}
+          onChange={(e) => setModeFilter(e.target.value)}
+          className="bg-white border border-[#BBD5DA] rounded-xl px-3 py-2.5 text-sm text-gray-700 outline-none focus:border-teal-400 transition"
+        >
+          <option value="all">All Delivery Modes</option>
+          <option value="own_delivery">Own Delivery Person</option>
+          <option value="portal_delivery">Remise Portal Network</option>
+          <option value="self_arrange">Self-Arranged</option>
+        </select>
+      </div>
+
+      {/* Deliveries List */}
+      {filtered.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-[#BBD5DA] py-16 text-center shadow-xs">
+          <Truck size={44} className="mx-auto text-gray-300 mb-3" />
+          <p className="text-base font-bold text-gray-700">
+            No delivery records found
+          </p>
+          <p className="text-xs text-gray-400 mt-1">
+            Orders with home delivery dispatch will appear here.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {paginatedDeliveries.map((o: any) => {
+            const currentDeliveryStatus =
+              o.deliveryStatus ||
+              (o.status === "Delivered" ? "Delivered" : "Assigned");
+            const isCompleted =
+              currentDeliveryStatus === "Delivered" ||
+              o.status === "Delivered";
+            const mapsUrl = o.deliveryAddress
+              ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(o.deliveryAddress)}`
+              : null;
+
+            return (
+              <div
+                key={o._id}
+                className="bg-white rounded-2xl border border-[#BBD5DA] p-5 shadow-xs hover:shadow-md transition"
+              >
+                {/* Header */}
+                <div className="flex items-center justify-between border-b border-gray-100 pb-3 flex-wrap gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-xs font-mono font-bold text-gray-900 bg-gray-100 px-2.5 py-1 rounded-lg">
+                      #{o.orderId || o._id.slice(-6).toUpperCase()}
+                    </span>
+                    <span className="text-xs text-gray-400">
+                      {new Date(o.createdAt).toLocaleString("en-IN", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`text-xs font-bold px-3 py-1 rounded-full border ${
+                        isCompleted
+                          ? "bg-green-100 text-green-800 border-green-200"
+                          : currentDeliveryStatus === "Out for Delivery"
+                          ? "bg-indigo-100 text-indigo-800 border-indigo-200"
+                          : "bg-teal-100 text-teal-800 border-teal-200"
+                      }`}
+                    >
+                      {currentDeliveryStatus}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Who Delivered to Whom Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4 border-b border-gray-100">
+                  {/* Left Column: Who Delivered */}
+                  <div className="bg-[#F8FAFC] rounded-xl p-4 border border-gray-200/80 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-teal-800 uppercase tracking-wider flex items-center gap-1.5">
+                        <Truck size={14} /> Who Delivered (Delivery Partner)
+                      </span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white border border-gray-200 text-gray-600">
+                        {o.deliveryMode === "portal_delivery"
+                          ? "Remise Portal Network"
+                          : o.deliveryMode === "self_arrange"
+                          ? "Self-Arranged"
+                          : "Own Delivery Person"}
+                      </span>
+                    </div>
+
+                    <div className="pt-1">
+                      <p className="text-sm font-bold text-gray-900">
+                        {o.deliveryPerson?.name ||
+                          (o.deliveryMode === "self_arrange"
+                            ? "Store Owner (Self-Delivery)"
+                            : "Assigned Delivery Partner")}
+                      </p>
+                      {o.deliveryPerson?.phone ? (
+                        <p className="text-xs text-gray-600 mt-0.5 flex items-center gap-1.5">
+                          <span>📞 {o.deliveryPerson.phone}</span>
+                          <a
+                            href={`tel:${o.deliveryPerson.phone}`}
+                            className="text-[11px] font-bold text-teal-700 hover:underline"
+                          >
+                            Call
+                          </a>
+                        </p>
+                      ) : (
+                        <p className="text-xs text-gray-400 mt-0.5 italic">
+                          Contact number not specified
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Timestamps */}
+                    <div className="text-[11px] text-gray-500 space-y-0.5 pt-1 border-t border-gray-200/60">
+                      {o.deliveryPerson?.assignedAt && (
+                        <p>
+                          Assigned:{" "}
+                          {new Date(
+                            o.deliveryPerson.assignedAt,
+                          ).toLocaleTimeString("en-IN", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                      )}
+                      {o.deliveryPerson?.deliveredAt && (
+                        <p className="text-green-700 font-semibold">
+                          Delivered:{" "}
+                          {new Date(
+                            o.deliveryPerson.deliveredAt,
+                          ).toLocaleTimeString("en-IN", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right Column: To Whom (Customer) */}
+                  <div className="bg-[#F8FAFC] rounded-xl p-4 border border-gray-200/80 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-teal-800 uppercase tracking-wider flex items-center gap-1.5">
+                        <User size={14} /> To Whom (Customer)
+                      </span>
+                      {o.customerPhone && (
+                        <a
+                          href={`tel:${o.customerPhone}`}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-gray-100 text-teal-800 rounded-lg text-[11px] font-bold border border-gray-200 transition"
+                        >
+                          <Phone size={11} /> Call Customer
+                        </a>
+                      )}
+                    </div>
+
+                    <div className="pt-1">
+                      <p className="text-sm font-bold text-gray-900">
+                        {o.customerName}
+                      </p>
+                      <p className="text-xs text-gray-600 mt-0.5 leading-relaxed">
+                        📍 {o.deliveryAddress || "Address not provided"}
+                      </p>
+                    </div>
+
+                    {mapsUrl && (
+                      <a
+                        href={mapsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-[11px] font-bold text-blue-600 hover:text-blue-700 pt-1"
+                      >
+                        <Navigation size={12} /> Open Map Navigation{" "}
+                        <ExternalLink size={10} />
+                      </a>
+                    )}
+                  </div>
+                </div>
+
+                {/* Items & Payment Footer */}
+                <div className="flex items-center justify-between pt-3 flex-wrap gap-2">
+                  <div className="flex items-center gap-2 flex-wrap text-xs text-gray-600">
+                    <span className="font-semibold text-gray-900">
+                      {o.offerTitle}
+                    </span>
+                    <span className="text-gray-400">·</span>
+                    <span className="font-bold text-teal-700">
+                      ₹{o.totalAmount}
+                    </span>
+                    <span className="text-gray-400">·</span>
+                    <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 text-[11px] font-medium">
+                      {o.paymentMethod === "qr"
+                        ? "QR Payment"
+                        : "Cash on Delivery"}{" "}
+                      ({o.paymentStatus === "SUCCESS" ? "Paid" : "Pending"})
+                    </span>
+                  </div>
+
+                  {/* If not yet delivered, button to manage delivery */}
+                  {!isCompleted && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDeliveryOrder(o)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 text-xs font-bold border border-teal-200 transition"
+                    >
+                      <Truck size={13} />
+                      {o.deliveryToken
+                        ? "View Delivery Link"
+                        : "Manage Delivery"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {filtered.length > ITEMS_PER_PAGE && (
+        <PaginationControl
+          currentPage={currentPage}
+          totalItems={filtered.length}
+          itemsPerPage={ITEMS_PER_PAGE}
+          onPageChange={setCurrentPage}
+        />
+      )}
+
+      {selectedDeliveryOrder && (
+
+        <StoreDeliveryModal
+          order={selectedDeliveryOrder}
+          token={token}
+          isOpen={!!selectedDeliveryOrder}
+          onClose={() => setSelectedDeliveryOrder(null)}
+          onRefreshOrders={onRefresh}
+        />
+      )}
     </div>
   );
 }
 
 // ── Offers Tab ────────────────────────────────────────────────────────────────
+
 function OffersTab({ offers, token, onRefresh }: any) {
   const [deleting, setDeleting] = useState<string | null>(null);
 
@@ -3543,6 +4006,13 @@ function OffersTab({ offers, token, onRefresh }: any) {
 function CustomersTab({ orders }: any) {
   const [search, setSearch] = useState("");
   const [onlyRecurring, setOnlyRecurring] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const ITEMS_PER_PAGE = 30;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, onlyRecurring]);
 
   const customers = buildCustomerInsights(orders);
 
@@ -3557,6 +4027,11 @@ function CustomersTab({ orders }: any) {
   });
 
   const recurringCount = customers.filter((c: any) => c.isRecurring).length;
+
+  const paginatedCustomers = filtered.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE,
+  );
 
   return (
     <div>
@@ -3595,7 +4070,8 @@ function CustomersTab({ orders }: any) {
         </div>
       ) : (
         <div className="space-y-3">
-          {filtered.map((c: any) => (
+          {paginatedCustomers.map((c: any) => (
+
             <div
               key={c.key}
               className="bg-white rounded-2xl border border-[#BBD5DA] p-5 shadow-sm hover:shadow-md transition"
@@ -3674,9 +4150,19 @@ function CustomersTab({ orders }: any) {
           ))}
         </div>
       )}
+
+      {filtered.length > ITEMS_PER_PAGE && (
+        <PaginationControl
+          currentPage={currentPage}
+          totalItems={filtered.length}
+          itemsPerPage={ITEMS_PER_PAGE}
+          onPageChange={setCurrentPage}
+        />
+      )}
     </div>
   );
 }
+
 
 // ── Suppliers Tab ──────────────────────────────────────────────────────────────
 function SuppliersTab({ token, store, categories }: any) {
@@ -4461,11 +4947,13 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "categories", label: "Categories", icon: <Layers size={15} /> },
   { id: "products", label: "Products", icon: <Package size={15} /> },
   { id: "orders", label: "Orders", icon: <ShoppingBag size={15} /> },
+  { id: "deliveries", label: "Deliveries", icon: <Truck size={15} /> },
   { id: "suppliers", label: "Order Stock", icon: <Truck size={15} /> },
   { id: "offers", label: "Offers", icon: <Tag size={15} /> },
   { id: "customers", label: "Customers", icon: <Users size={15} /> },
   { id: "settings", label: "Settings", icon: <Settings size={15} /> },
 ];
+
 
 // ── Main Dashboard ────────────────────────────────────────────────────────────
 export default function StoreDashboard() {
@@ -4889,6 +5377,9 @@ export default function StoreDashboard() {
             {tab === "orders" && (
               <OrdersTab orders={orders} token={token!} onRefresh={loadData} />
             )}
+            {tab === "deliveries" && (
+              <DeliveriesTab orders={orders} token={token!} onRefresh={loadData} />
+            )}
             {tab === "suppliers" && (
               <SuppliersTab
                 token={token!}
@@ -4896,6 +5387,7 @@ export default function StoreDashboard() {
                 categories={categories}
               />
             )}
+
             {tab === "offers" && (
               <OffersTab offers={offers} token={token!} onRefresh={loadData} />
             )}

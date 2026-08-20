@@ -18,6 +18,8 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import Layout from '../layout/layout'; 
+import PaginationControl from '../../components-main/PaginationControl';
+
 
 // Dynamically resolve backend API URL
 const resolveApiUrl = () => {
@@ -68,6 +70,8 @@ export default function AdminProductPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit'); 
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 30;
   
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState<string | null>(null);
@@ -381,10 +385,20 @@ export default function AdminProductPage() {
     }
   };
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
   const filteredProducts = products.filter(p => 
     (p.title?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || 
     (p.brand?.toLowerCase() || '').includes(searchTerm.toLowerCase())
   );
+
+  const paginatedProducts = filteredProducts.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
 
   const inputClass = "w-full px-4 py-2.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all bg-gray-50/50";
   const labelClass = "block text-sm font-semibold text-gray-700 mb-1.5";
@@ -470,7 +484,7 @@ export default function AdminProductPage() {
                     </td>
                   </tr>
                 ) : (
-                  filteredProducts.map((product, idx) => {
+                  paginatedProducts.map((product, idx) => {
                     const displayImg = (product.images && product.images.length > 0) ? product.images[0] : product.imageUrl;
                     return (
                       <tr key={product._id || product.id || idx} className="hover:bg-gray-50/50 transition-colors group">
@@ -517,8 +531,20 @@ export default function AdminProductPage() {
               </tbody>
             </table>
           </div>
+
+          {filteredProducts.length > ITEMS_PER_PAGE && (
+            <div className="p-4 border-t border-gray-100">
+              <PaginationControl
+                currentPage={currentPage}
+                totalItems={filteredProducts.length}
+                itemsPerPage={ITEMS_PER_PAGE}
+                onPageChange={setCurrentPage}
+              />
+            </div>
+          )}
         </div>
       </div>
+
 
       <AnimatePresence>
         {isModalOpen && (

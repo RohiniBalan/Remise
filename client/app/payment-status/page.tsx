@@ -2,8 +2,10 @@
 
 import React, { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { CheckCircle, XCircle, Loader2, RefreshCw, ShoppingBag } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, RefreshCw, ShoppingBag, Download, FileText } from 'lucide-react';
 import { useCart } from '@/app/components-main/CartContext';
+import { smartOrderApi } from '@/app/api-services/smartOrderApi';
+import InvoiceViewModal from '@/app/components-main/InvoiceViewModal';
 
 function PaymentStatusContent() {
   const router = useRouter();
@@ -13,6 +15,7 @@ function PaymentStatusContent() {
   const { setBuyNowItem } = useCart();
   const [status, setStatus] = useState<'LOADING' | 'SUCCESS' | 'FAILED' | 'PENDING'>('LOADING');
   const [errorMessage, setErrorMessage] = useState('');
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
 
   const checkPaymentStatus = async () => {
     if (!orderId) {
@@ -23,14 +26,19 @@ function PaymentStatusContent() {
 
     setStatus('LOADING');
     try {
-      const response = await fetch(`http://localhost:5000/api/payment/status/${orderId}`);
+      const BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+      // Attempt status check via gateway or fallback to monolith
+      let response = await fetch(`${BASE}/api/payment/status/${orderId}`);
+      if (!response.ok) {
+        response = await fetch(`http://localhost:5000/api/payment/status/${orderId}`);
+      }
       const data = await response.json();
 
       if (response.ok && data.success) {
         if (data.status === 'SUCCESS') {
           setStatus('SUCCESS');
           setBuyNowItem(null); 
-          // localStorage.removeItem('cart'); // Uncomment to clear the global cart!
+          // localStorage.removeItem('cart');
         } else if (data.status === 'PENDING') {
           setStatus('PENDING');
         } else {
@@ -66,21 +74,45 @@ function PaymentStatusContent() {
 
         {status === 'SUCCESS' && (
           <div className="flex flex-col items-center">
-            <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mb-6">
+            <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mb-5 border border-green-200">
               <CheckCircle size={48} className="text-green-500" />
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Order Placed Successfully!</h2>
-            <p className="text-gray-500 mb-8">
+            <p className="text-gray-500 text-sm mb-6">
               Thank you for your purchase. Your payment was successful and your order <strong>{orderId}</strong> has been confirmed.
             </p>
+
+            {/* Bill Summary Actions */}
+            {orderId && (
+              <div className="w-full space-y-3 mb-6">
+                <a
+                  href={smartOrderApi.getInvoicePdfUrl(orderId)}
+                  download={`Invoice-${orderId}.pdf`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full flex items-center justify-center gap-2 py-3.5 bg-teal-600 hover:bg-teal-700 text-white font-bold uppercase tracking-wider rounded-xl transition shadow-md shadow-teal-600/20 text-xs"
+                >
+                  <Download size={16} /> Download Bill (PDF)
+                </a>
+
+                <button 
+                  onClick={() => setShowInvoiceModal(true)}
+                  className="w-full flex items-center justify-center gap-2 py-3 bg-teal-50 hover:bg-teal-100 text-teal-800 font-semibold rounded-xl transition border border-teal-200 text-xs"
+                >
+                  <FileText size={16} /> View Invoice Details
+                </button>
+              </div>
+            )}
+
             <button 
               onClick={() => router.push('/category/art')}
-              className="w-full flex items-center justify-center gap-2 py-4 bg-[#C9A84C] text-black font-bold uppercase tracking-widest rounded-xl hover:bg-[#E2BE6A] transition-colors"
+              className="w-full flex items-center justify-center gap-2 py-3.5 bg-[#C9A84C] text-black font-bold uppercase tracking-widest rounded-xl hover:bg-[#E2BE6A] transition-colors text-xs"
             >
-              <ShoppingBag size={20} /> Continue Shopping
+              <ShoppingBag size={18} /> Continue Shopping
             </button>
           </div>
         )}
+
 
         {status === 'FAILED' && (
           <div className="flex flex-col items-center">
@@ -131,9 +163,18 @@ function PaymentStatusContent() {
         )}
 
       </div>
+
+      {orderId && (
+        <InvoiceViewModal
+          orderId={orderId}
+          isOpen={showInvoiceModal}
+          onClose={() => setShowInvoiceModal(false)}
+        />
+      )}
     </div>
   );
 }
+
 
 export default function PaymentStatusPage() {
   return (

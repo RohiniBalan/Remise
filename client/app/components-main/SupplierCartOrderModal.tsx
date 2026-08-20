@@ -10,11 +10,14 @@ import {
   Truck,
   QrCode,
   Wallet,
+  FileText,
+  Download,
 } from "lucide-react";
 import { smartOrderApi } from "../api-services/smartOrderApi";
 import { storeApi } from "../api-services/storeApi";
 import { orderApi } from "../api-services/orderApi";
 import { indianStates, getCities } from "../utils/indiaLocation";
+import InvoiceViewModal from "@/app/components-main/InvoiceViewModal";
 
 interface CartOrderItem {
   productId: string;
@@ -41,15 +44,20 @@ export interface SupplierOrderPrefill {
   address?: string; city?: string; state?: string; pinCode?: string;
 }
 
-export default function SupplierCartOrderModal({
-  groups, prefill, token, onClose, onComplete,
-}: {
+interface Props {
   groups: CartOrderGroup[];
-  prefill?: SupplierOrderPrefill; token: string; onClose: () => void; onComplete: () => void;
-}) {
+  prefill?: SupplierOrderPrefill;
+  token: string;
+  onComplete: () => void;
+  onClose: () => void;
+}
+
+export default function SupplierCartOrderModal({ groups, prefill, token, onComplete, onClose }: Props) {
   const [index, setIndex] = useState(0);
   const [step, setStep] = useState<FlowStep>("confirming");
   const [errorMsg, setErrorMsg] = useState("");
+  const [lastPlacedOrderId, setLastPlacedOrderId] = useState<string | null>(null);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
 
   const chosen = groups[index];
   const isLast = index === groups.length - 1;
@@ -176,6 +184,9 @@ export default function SupplierCartOrderModal({
       );
 
       const placedOrder = res.data.data;
+      if (placedOrder?.orderId) {
+        setLastPlacedOrderId(placedOrder.orderId);
+      }
 
       if (paymentMethod === "qr" && placedOrder?.orderId) {
         await smartOrderApi.confirmQrPayment(
@@ -542,32 +553,116 @@ export default function SupplierCartOrderModal({
           )}
 
           {step === "success" && (
-            <div className="flex flex-col items-center gap-3 py-6 text-center">
-              <CheckCircle size={48} className="text-green-600" />
+            <div className="flex flex-col items-center gap-4 py-4 text-center">
+              <div className="w-14 h-14 rounded-full bg-green-50 flex items-center justify-center border border-green-200">
+                <CheckCircle size={36} className="text-green-600" />
+              </div>
+
               <div>
-                <p className="font-bold text-gray-900">Order Placed!</p>
-                <p className="text-sm text-gray-500 mt-1">
-                  Your order from <strong>{chosen.storeName}</strong> is
+                <p className="font-bold text-gray-900 text-lg">Order Confirmed!</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Your wholesale order from <strong>{chosen.storeName}</strong> is
                   confirmed —{" "}
                   {deliveryMethod === "pickup"
                     ? "ready for self pickup"
                     : "out for delivery"}
                   , paying via{" "}
-                  {paymentMethod === "qr" ? "QR code" : "cash/invoice"}.
+                  {paymentMethod === "qr" ? "UPI / QR code" : "cash/invoice"}.
                 </p>
               </div>
-              <button
-                onClick={handleContinueOrFinish}
-                className="mt-2 px-6 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-semibold rounded-xl text-sm transition"
-              >
-                {isLast
-                  ? "Done"
-                  : `Continue to Order ${index + 2} of ${groups.length}`}
-              </button>
+
+              {/* Bill Card */}
+              <div className="w-full bg-[#F8FAFC] border border-[#BBD5DA] rounded-xl p-4 text-left space-y-3">
+                <div className="flex items-center justify-between border-b border-gray-200 pb-2">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-teal-700 bg-teal-50 px-1.5 py-0.5 rounded">
+                      Verified Bill
+                    </span>
+                    <h4 className="text-sm font-bold text-gray-900 mt-0.5">
+                      {chosen.storeName}
+                    </h4>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xs font-bold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">
+                      ● PAID
+                    </span>
+                    {lastPlacedOrderId && (
+                      <p className="text-[10px] text-gray-500 mt-0.5">
+                        #{lastPlacedOrderId}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                  <div>
+                    <span className="text-gray-400 block text-[10px]">Buyer:</span>
+                    <span className="font-medium text-gray-800">
+                      {[form.firstName, form.lastName].filter(Boolean).join(" ") || "Store Owner"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400 block text-[10px]">Payment Method:</span>
+                    <span className="font-medium text-teal-800">
+                      {paymentMethod === "qr" ? "UPI / QR Payment" : "Cash / Invoice on Delivery"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="border-t border-gray-200 pt-2 flex justify-between items-center text-xs">
+                  <span className="text-gray-500">{chosen.items.length} product(s)</span>
+                  <span className="font-bold text-sm text-gray-900">
+                    Total: ₹{chosen.totalAmount.toLocaleString("en-IN")}
+                  </span>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex flex-col w-full gap-2 pt-1">
+                {lastPlacedOrderId && (
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowInvoiceModal(true)}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl border border-teal-600 text-teal-700 hover:bg-teal-50 text-xs font-bold transition"
+                    >
+                      <FileText size={14} /> View Invoice
+                    </button>
+                    <a
+                      href={smartOrderApi.getInvoicePdfUrl(lastPlacedOrderId)}
+                      download={`Invoice-${lastPlacedOrderId}.pdf`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition shadow-sm"
+                    >
+                      <Download size={14} /> Download Bill (PDF)
+                    </a>
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleContinueOrFinish}
+                  className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl text-xs transition"
+                >
+                  {isLast
+                    ? "Done"
+                    : `Continue to Order ${index + 2} of ${groups.length}`}
+                </button>
+              </div>
             </div>
           )}
         </div>
       </div>
+
+      {lastPlacedOrderId && (
+        <InvoiceViewModal
+          orderId={lastPlacedOrderId}
+          isOpen={showInvoiceModal}
+          onClose={() => setShowInvoiceModal(false)}
+        />
+      )}
     </div>
   );
 }
+

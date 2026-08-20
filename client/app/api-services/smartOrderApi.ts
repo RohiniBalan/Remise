@@ -45,4 +45,46 @@ getNearbyStores: (lat: number, lng: number, radius = 10, storeType?: string) =>
     if (screenshot) fd.append('screenshot', screenshot);
     return axios.patch(`${BASE}/api/orders/${orderId}/confirm-payment`, fd);
   },
+
+  // Fetch structured invoice / bill data for a confirmed order
+  getInvoice: (orderId: string) =>
+    axios.get(`${BASE}/api/orders/${orderId}/invoice`),
+
+  // URL for downloading the official PDF invoice
+  getInvoicePdfUrl: (orderId: string) =>
+    `${BASE}/api/orders/${orderId}/invoice/pdf`,
+
+  // Store Owner: Generate unique delivery link for an order
+  generateDeliveryLink: (orderId: string, payload: { deliveryPersonName?: string; deliveryPersonPhone?: string; notes?: string }, token: string) =>
+    axios.post(`${BASE}/api/orders/${orderId}/delivery-link`, payload, {
+      headers: { Authorization: `Bearer ${token}` }
+    }),
+
+  // Store Owner: Set delivery mode (own_delivery, portal_delivery, self_arrange)
+  setDeliveryMode: (orderId: string, payload: { mode: 'own_delivery' | 'portal_delivery' | 'self_arrange'; notes?: string }, token: string) =>
+    axios.patch(`${BASE}/api/orders/${orderId}/delivery-mode`, payload, {
+      headers: { Authorization: `Bearer ${token}` }
+    }),
+
+  // Store Owner: Direct delivery status update
+  updateDeliveryStatusDirect: (orderId: string, payload: { status: string; notes?: string }, token: string) =>
+    axios.patch(`${BASE}/api/orders/${orderId}/delivery-status`, payload, {
+      headers: { Authorization: `Bearer ${token}` }
+    }),
+
+  // Delivery Person: Get delivery portal details via secure token
+  getDeliveryPortalOrder: (token: string) =>
+    axios.get(`${BASE}/api/orders/delivery-portal/${token}`),
+
+  // Delivery Person: Update delivery status via token
+  updateDeliveryPortalStatus: (token: string, payload: { status: string; note?: string; deliveryPersonName?: string; deliveryPersonPhone?: string }) =>
+    axios.patch(`${BASE}/api/orders/delivery-portal/${token}/status`, payload),
+
+  // Store Owner: Join / Update Remise Delivery Portal Network
+  enrollDeliveryPortal: (payload: { enabled?: boolean; hasOwnDelivery?: boolean }, token: string) =>
+    axios.patch(`${BASE}/api/stores/delivery-portal/enroll`, payload, {
+      headers: { Authorization: `Bearer ${token}` }
+    }),
 };
+
+

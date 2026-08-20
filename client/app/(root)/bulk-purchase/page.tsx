@@ -773,7 +773,11 @@ export default function BulkPurchasePage() {
                             }
                           }}
                           placeholder="Type in English or Tanglish…"
-                          className="w-full bg-[#DFF1F1] border border-teal-300 rounded-lg px-2 py-1 text-sm outline-none pr-6"
+                          className={`w-full rounded-lg px-2 py-1 text-sm outline-none pr-6 border ${
+                            isLight
+                              ? "bg-[#DFF1F1] border-teal-300 text-gray-900 placeholder-gray-400"
+                              : "bg-white/10 border-teal-500 text-white placeholder-gray-400"
+                          }`}
                         />
                         <Languages
                           size={12}
@@ -794,7 +798,7 @@ export default function BulkPurchasePage() {
                       <button
                         onClick={() => setEditingId(item.id)}
                         className={`w-full flex items-center gap-1.5 text-left text-sm font-medium truncate hover:text-teal-500 transition
-                            ${item.checked ? `line-through ${isLight ? "text-gray-400" : "text-gray-600"}` : isLight ? "text-gray-800" : "text-gray-100"}`}
+                            ${item.checked ? `line-through ${isLight ? "text-gray-400" : "text-gray-600"}` : isLight ? "text-gray-800" : "text-white"}`}
                       >
                         {item.needsClarification && (
                           <HelpCircle
@@ -808,7 +812,7 @@ export default function BulkPurchasePage() {
                               className={
                                 isLight
                                   ? "text-gray-300 italic"
-                                  : "text-gray-600 italic"
+                                  : "text-gray-400 italic"
                               }
                             >
                               tap to name
@@ -830,8 +834,8 @@ export default function BulkPurchasePage() {
                       placeholder="e.g. Lifebuoy"
                       className={`w-full bg-transparent border rounded-lg px-2 py-1.5 sm:py-1 text-sm font-medium outline-none transition ${
                         isLight
-                          ? "border-[#BBD5DA] sm:border-transparent sm:hover:border-[#BBD5DA] focus:bg-[#DFF1F1] focus:border-teal-400 text-gray-700 placeholder-gray-300"
-                          : "border-white/10 sm:border-transparent sm:hover:border-white/20 focus:bg-white/10 focus:border-teal-400 text-gray-200 placeholder-gray-600"
+                          ? "border-[#BBD5DA] sm:border-transparent sm:hover:border-[#BBD5DA] focus:bg-[#DFF1F1] focus:border-teal-400 text-gray-800 placeholder-gray-400"
+                          : "border-white/10 sm:border-transparent sm:hover:border-white/20 focus:bg-white/10 focus:border-teal-400 text-white placeholder-gray-400"
                       }`}
                     />
                   );
@@ -845,11 +849,12 @@ export default function BulkPurchasePage() {
                       placeholder="e.g. 2 kg"
                       className={`w-full bg-transparent border rounded-lg px-2 py-1.5 sm:py-1 text-sm font-medium outline-none transition ${
                         isLight
-                          ? "border-[#BBD5DA] sm:border-transparent sm:hover:border-[#BBD5DA] focus:bg-[#DFF1F1] focus:border-teal-400 text-teal-700 placeholder-gray-300"
-                          : "border-white/10 sm:border-transparent sm:hover:border-white/20 focus:bg-white/10 focus:border-teal-400 text-teal-400 placeholder-gray-600"
+                          ? "border-[#BBD5DA] sm:border-transparent sm:hover:border-[#BBD5DA] focus:bg-[#DFF1F1] focus:border-teal-400 text-teal-700 placeholder-gray-400"
+                          : "border-white/10 sm:border-transparent sm:hover:border-white/20 focus:bg-white/10 focus:border-teal-400 text-white placeholder-gray-400"
                       }`}
                     />
                   );
+
 
                   const checkboxBtn = (
                     <button
@@ -980,8 +985,13 @@ export default function BulkPurchasePage() {
             quantity: it.quantity,
           }))}
           onClose={() => setShowCompare(false)}
+          onOrderSuccess={() => {
+            setItems([]);
+            setEditingId(null);
+          }}
         />
       )}
     </div>
   );
 }
+

@@ -61,8 +61,14 @@ const storeSchema = new mongoose.Schema({
 
   targetRevenue: { type: Number, default: 0 },
 
+  // Delivery Portal Network Enrollment
+  deliveryPortalEnabled: { type: Boolean, default: false },
+  deliveryPortalJoinedAt: { type: Date, default: null },
+  hasOwnDelivery: { type: Boolean, default: null },
+
   createdAt: { type: Date, default: Date.now }
 });
+
 
 storeSchema.index({ location: '2dsphere' });
 storeSchema.index({ ownerId: 1 });

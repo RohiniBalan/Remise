@@ -8,6 +8,7 @@ import {
   XCircle, Eye, X, Loader2, User as UserIcon, Mail, Phone, AlertCircle 
 } from 'lucide-react';
 import Layout from '../layout/layout';
+import PaginationControl from '../../components-main/PaginationControl';
 
 // Dynamically resolve backend API URL
 const resolveApiUrl = () => {
@@ -47,7 +48,11 @@ export default function OrderHistoryPage() {
   const [orders, setOrders] = useState<OrderData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
   const [selectedOrder, setSelectedOrder] = useState<OrderData | null>(null);
+  
+  const ITEMS_PER_PAGE = 30;
+
   
   // Toast State
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' });
@@ -107,11 +112,21 @@ export default function OrderHistoryPage() {
     }
   };
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
   const filteredOrders = orders.filter(o => 
     (o.orderId && o.orderId.toLowerCase().includes(searchTerm.toLowerCase())) || 
     (o.contactEmail && o.contactEmail.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (o.userId?.fullname && o.userId.fullname.toLowerCase().includes(searchTerm.toLowerCase()))
   );
+
+  const paginatedOrders = filteredOrders.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
 
   const getPaymentBadge = (status: string) => {
     switch (status) {
@@ -177,7 +192,7 @@ export default function OrderHistoryPage() {
                 ) : filteredOrders.length === 0 ? (
                   <tr><td colSpan={5} className="px-6 py-16 text-center"><Package size={48} className="mb-4 opacity-50 mx-auto text-gray-400" /><p className="text-base font-medium text-gray-900">No orders found</p></td></tr>
                 ) : (
-                  filteredOrders.map((order) => (
+                  paginatedOrders.map((order) => (
                     <tr key={order._id} className="hover:bg-gray-50/80 transition-colors">
                       <td className="px-6 py-4">
                         <p className="font-bold text-gray-900">{order.orderId}</p>
@@ -224,7 +239,19 @@ export default function OrderHistoryPage() {
               </tbody>
             </table>
           </div>
+
+          {filteredOrders.length > ITEMS_PER_PAGE && (
+            <div className="p-4 border-t border-gray-100">
+              <PaginationControl
+                currentPage={currentPage}
+                totalItems={filteredOrders.length}
+                itemsPerPage={ITEMS_PER_PAGE}
+                onPageChange={setCurrentPage}
+              />
+            </div>
+          )}
         </div>
+
 
         {/* Modal */}
         <AnimatePresence>

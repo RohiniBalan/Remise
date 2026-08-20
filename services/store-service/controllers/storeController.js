@@ -446,6 +446,39 @@ const getStoresByOwnerIds = async (req, res) => {
   }
 };
 
+// Store Owner: Enroll in Remise Delivery Portal Network
+const enrollDeliveryPortal = async (req, res) => {
+  try {
+    const store = await Store.findOne({ ownerId: req.user.id });
+    if (!store) {
+      return res.status(404).json({ success: false, message: 'Store not found.' });
+    }
+
+    const { enabled = true, hasOwnDelivery = false } = req.body;
+    store.deliveryPortalEnabled = enabled;
+    store.hasOwnDelivery = hasOwnDelivery;
+    if (enabled && !store.deliveryPortalJoinedAt) {
+      store.deliveryPortalJoinedAt = new Date();
+    }
+
+    await store.save();
+
+    res.json({
+      success: true,
+      message: enabled
+        ? 'Successfully joined the Remise Delivery Portal network.'
+        : 'Delivery Portal network preferences updated.',
+      data: {
+        deliveryPortalEnabled: store.deliveryPortalEnabled,
+        deliveryPortalJoinedAt: store.deliveryPortalJoinedAt,
+        hasOwnDelivery: store.hasOwnDelivery
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 module.exports = {
   registerStore,
   getMyStore,
@@ -458,4 +491,6 @@ module.exports = {
   getStoreInternal,
   getStoresByIds,
   getStoresByOwnerIds,
+  enrollDeliveryPortal,
 };
+

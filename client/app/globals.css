@@ -1,26 +1,17 @@
-﻿@tailwind base;
+@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
+  --foreground-rgb: 17, 24, 39;
+  --background-start-rgb: 255, 255, 255;
   --background-end-rgb: 255, 255, 255;
-    --sidebar-width: 260px;
+  --sidebar-width: 260px;
   --navbar-height: 70px;
   --primary-color: #4f46e5; /* Indigo */
   --bg-color: #f3f4f6;
   --sidebar-bg: #1e1e24;
   --text-light: #e5e7eb;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
-
-  }
 }
 
 html {
@@ -29,12 +20,7 @@ html {
 
 body {
   color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
+  background-color: #ffffff;
   overflow-x: hidden;
   min-height: 100vh;
 }
@@ -42,6 +28,94 @@ body {
 * {
   box-sizing: border-box;
 }
+
+/* ==========================================================================
+   Universal Form Control Styling & Contrast Rules
+   Guarantees that all inputs, textareas, select elements, and dropdown options
+   always have visible, crisp, readable text across both Light and Dark themes.
+   ========================================================================== */
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="file"]),
+select,
+textarea {
+  color: #111827;
+}
+
+/* Fix dropdown options inside select elements to prevent white-on-white issues across browser engines */
+select option,
+select optgroup,
+datalist option {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  -webkit-text-fill-color: #111827 !important;
+  font-weight: 500;
+}
+
+/* Ensure placeholder text is distinct and readable */
+input::placeholder,
+textarea::placeholder {
+  color: #6b7280;
+  opacity: 1;
+}
+
+/* Dark mode and explicitly styled light-text inputs */
+.dark input:not([class*="text-gray-800"]):not([class*="text-gray-900"]):not([class*="text-black"]):not([class*="bg-white"]):not([class*="bg-[#DFF1F1]"]):not([class*="bg-amber-50"]),
+.dark select:not([class*="text-gray-800"]):not([class*="text-gray-900"]):not([class*="text-black"]):not([class*="bg-white"]),
+.dark textarea:not([class*="text-gray-800"]):not([class*="text-gray-900"]):not([class*="text-black"]):not([class*="bg-white"]),
+[data-theme="dark"] input:not([class*="text-gray-800"]):not([class*="text-gray-900"]):not([class*="text-black"]):not([class*="bg-white"]):not([class*="bg-[#DFF1F1]"]):not([class*="bg-amber-50"]),
+[data-theme="dark"] select:not([class*="text-gray-800"]):not([class*="text-gray-900"]):not([class*="text-black"]):not([class*="bg-white"]),
+[data-theme="dark"] textarea:not([class*="text-gray-800"]):not([class*="text-gray-900"]):not([class*="text-black"]):not([class*="bg-white"]),
+input.text-white,
+input[class*="text-white"],
+textarea.text-white,
+textarea[class*="text-white"],
+select.text-white,
+select[class*="text-white"],
+input[class*="bg-[#111]"],
+input[class*="bg-gray-900"],
+input[class*="bg-black"],
+input[class*="bg-gray-950"],
+textarea[class*="bg-[#111]"],
+textarea[class*="bg-gray-900"],
+textarea[class*="bg-black"],
+textarea[class*="bg-gray-950"] {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder,
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder,
+input[class*="placeholder-gray-400"]::placeholder,
+input[class*="placeholder-gray-500"]::placeholder,
+input[class*="placeholder-gray-600"]::placeholder {
+  color: #9ca3af !important;
+  -webkit-text-fill-color: #9ca3af !important;
+}
+
+/* Ensure disabled inputs maintain legible text */
+input:disabled,
+select:disabled,
+textarea:disabled {
+  color: #6b7280;
+  -webkit-text-fill-color: #6b7280;
+  background-color: #f3f4f6;
+  cursor: not-allowed;
+}
+
+.dark input:disabled,
+.dark select:disabled,
+.dark textarea:disabled,
+[data-theme="dark"] input:disabled,
+[data-theme="dark"] select:disabled,
+[data-theme="dark"] textarea:disabled {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: #6b7280;
+  -webkit-text-fill-color: #6b7280;
+}
+
+
 
 
 /* Layout.css */

@@ -3,7 +3,13 @@ const multer  = require('multer');
 const path    = require('path');
 const fs      = require('fs');
 const router = express.Router();
-const { getMyOrders, createOrder, getOrderByOrderId, updatePaymentStatus, getOrdersByStore, confirmQrPayment, createWholesaleOrder, getOrdersByBuyer, updateOrderStatus, getOrderStats } = require('../controllers/orderController');
+const {
+  getMyOrders, createOrder, getOrderByOrderId, updatePaymentStatus,
+  getOrdersByStore, confirmQrPayment, createWholesaleOrder, getOrdersByBuyer,
+  updateOrderStatus, getOrderStats, getOrderInvoice, downloadOrderInvoicePdf,
+  generateDeliveryLink, getDeliveryPortalOrder, updateDeliveryPortalStatus,
+  setDeliveryMode, updateDeliveryStatusDirect
+} = require('../controllers/orderController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
 // Multer setup for QR payment screenshots
@@ -23,12 +29,25 @@ const upload = multer({
   }
 });
 
+// Delivery Portal (Token authenticated — no login required for delivery person)
+router.get('/delivery-portal/:token', getDeliveryPortalOrder);
+router.patch('/delivery-portal/:token/status', updateDeliveryPortalStatus);
+
 // User-facing
 router.get('/my-orders', getMyOrders);
 router.patch('/:orderId/confirm-payment', upload.single('screenshot'), confirmQrPayment);
 
+// Invoice / Bill Generation & Download (Available after confirmed payment)
+router.get('/:orderId/invoice', getOrderInvoice);
+router.get('/:orderId/invoice/pdf', downloadOrderInvoicePdf);
+
 // Store owner-facing — orders placed against their store
 router.get('/store/:storeId', protect, getOrdersByStore);
+
+// Store owner delivery management
+router.post('/:orderId/delivery-link', protect, generateDeliveryLink);
+router.patch('/:orderId/delivery-mode', protect, setDeliveryMode);
+router.patch('/:orderId/delivery-status', protect, updateDeliveryStatusDirect);
 
 // Internal service-to-service (payment-service and admin stats call these)
 router.get('/internal/stats', getOrderStats);
@@ -43,3 +62,5 @@ router.get('/buyer/:buyerId',    protect, authorize('user','store_owner'), getOr
 router.patch('/:id/seller-status', protect, authorize('whole_saler', 'home_business'), updateOrderStatus);
 
 module.exports = router;
+
+

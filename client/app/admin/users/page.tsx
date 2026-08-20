@@ -8,6 +8,7 @@ import {
   CheckCircle2, AlertCircle, Mail, Phone, Loader2
 } from 'lucide-react';
 import Layout from '../layout/layout'; // Importing your centralized Admin Layout
+import PaginationControl from '../../components-main/PaginationControl';
 
 // Dynamically resolve backend API URL
 const resolveApiUrl = () => {
@@ -38,6 +39,9 @@ export default function AdminUserManagementPage() {
   const [users, setUsers] = useState<UserData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 30;
+
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ 
     show: false, message: '', type: 'success' 
   });
@@ -90,11 +94,21 @@ export default function AdminUserManagementPage() {
     setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 4000);
   };
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
   const filteredUsers = users.filter(user => 
     (user.fullname?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || 
     (user.email?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
     (user.mobilenumber || '').includes(searchTerm)
   );
+
+  const paginatedUsers = filteredUsers.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
 
   const getInitials = (name: string) => {
     if (!name) return 'U';
@@ -182,7 +196,7 @@ export default function AdminUserManagementPage() {
                     </td>
                   </tr>
                 ) : (
-                  filteredUsers.map((user) => (
+                  paginatedUsers.map((user) => (
                     <tr key={user._id} className="hover:bg-gray-50/50 transition-colors group">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-4">
@@ -245,8 +259,19 @@ export default function AdminUserManagementPage() {
               </tbody>
             </table>
           </div>
+
+          {filteredUsers.length > ITEMS_PER_PAGE && (
+            <div className="p-4 border-t border-gray-100">
+              <PaginationControl
+                currentPage={currentPage}
+                totalItems={filteredUsers.length}
+                itemsPerPage={ITEMS_PER_PAGE}
+                onPageChange={setCurrentPage}
+              />
+            </div>
+          )}
         </div>
       </div>
     </Layout>
   );
-}
+}

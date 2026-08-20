@@ -8,4 +8,10 @@ export const orderApi = {
 
   getMyWholesaleOrders: (buyerId: string, token: string) =>
     axios.get(`${BASE}/api/orders/buyer/${buyerId}`, { headers: auth(token) }),
-};
+
+  getInvoice: (orderId: string) =>
+    axios.get(`${BASE}/api/orders/${orderId}/invoice`),
+
+  getInvoicePdfUrl: (orderId: string) =>
+    `${BASE}/api/orders/${orderId}/invoice/pdf`,
+};

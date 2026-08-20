@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, ChevronRight, Loader2, PackageX, Circle, Star } from 'lucide-react';
+import { Search, ChevronRight, Loader2, PackageX, Circle, Star, Download, FileText } from 'lucide-react';
 import NavbarHome from '@/app/components-main/NavbarHome';
 import { smartOrderApi } from '@/app/api-services/smartOrderApi';
+import InvoiceViewModal from '@/app/components-main/InvoiceViewModal';
 
 interface OrderItem {
   productId: string;
@@ -21,6 +22,7 @@ interface OrderData {
   paymentMethod: string;
   paymentStatus: string;
   orderStatus: string;
+  deliveryStatus?: string;
   createdAt: string;
   items: OrderItem[];
 }
@@ -30,6 +32,7 @@ interface DisplayOrder extends OrderData {
   orderDate: string;
   deliveryDate: string;
 }
+
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
@@ -45,6 +48,8 @@ export default function MyOrdersPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [orders, setOrders] = useState<OrderData[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedInvoiceOrderId, setSelectedInvoiceOrderId] = useState<string | null>(null);
+
 
   // UI Filters state
   const [statusFilters, setStatusFilters] = useState<string[]>([]);
@@ -138,12 +143,21 @@ export default function MyOrdersPage() {
   });
 
   // Dynamic UI formatting based on Real DB Status
-  const getStatusUI = (status: string, orderDate: string, deliveryDate: string) => {
-    if (status === 'Delivered') {
+  const getStatusUI = (status: string, orderDate: string, deliveryDate: string, deliveryStatus?: string) => {
+    if (status === 'Delivered' || deliveryStatus === 'Delivered') {
       return { dot: 'bg-green-600', text: `Delivered on ${deliveryDate}`, subText: 'Your item has been delivered.' };
     }
-    if (status === 'Cancelled') {
+    if (status === 'Cancelled' || deliveryStatus === 'Cancelled') {
       return { dot: 'bg-red-500', text: `Cancelled on ${orderDate}`, subText: 'Your order was cancelled.' };
+    }
+    if (deliveryStatus === 'Out for Delivery') {
+      return { dot: 'bg-indigo-600', text: `Out for Delivery`, subText: 'Delivery partner is on the way to your address.' };
+    }
+    if (deliveryStatus === 'Picked Up') {
+      return { dot: 'bg-blue-600', text: `Picked Up from Store`, subText: 'Item collected by delivery partner, on the way soon.' };
+    }
+    if (deliveryStatus === 'Accepted' || deliveryStatus === 'Assigned') {
+      return { dot: 'bg-teal-600', text: `Delivery Partner Assigned`, subText: 'A delivery partner is preparing to pick up your order.' };
     }
     if (status === 'Shipped') {
       return { dot: 'bg-blue-500', text: `Shipped, arriving by ${deliveryDate}`, subText: 'Your item is on the way.' };
@@ -151,6 +165,7 @@ export default function MyOrdersPage() {
     // Default / Processing
     return { dot: 'bg-yellow-500', text: `Processing, expected by ${deliveryDate}`, subText: 'Your order is currently being packed.' };
   };
+
 
   return (
     <div className={`min-h-screen ${theme === 'light' ? 'bg-[#f1f3f6]' : 'bg-[#0a0a0a]'} font-sans pb-12`}>
@@ -225,7 +240,8 @@ export default function MyOrdersPage() {
                 </div>
               ) : (
                 filteredOrders.map(order => {
-                  const statusUI = getStatusUI(order.displayStatus, order.orderDate, order.deliveryDate);
+                  const statusUI = getStatusUI(order.displayStatus, order.orderDate, order.deliveryDate, order.deliveryStatus);
+
 
                   return (
                     <div
@@ -249,12 +265,36 @@ export default function MyOrdersPage() {
                             {statusUI.subText}
                           </p>
                         </div>
-                        <div className={`flex items-center gap-4 text-xs ${theme === 'light' ? 'text-gray-500' : 'text-gray-400'}`}>
+                        <div className={`flex flex-wrap items-center gap-3 text-xs ${theme === 'light' ? 'text-gray-500' : 'text-gray-400'}`}>
                           <span>Order #{order.orderId}</span>
                           <span>Placed {order.orderDate}</span>
                           <span className={`text-sm font-semibold ${theme === 'light' ? 'text-gray-900' : 'text-gray-100'}`}>
                             ₹{order.totalAmount.toLocaleString()}
                           </span>
+
+                          {(order.paymentStatus === 'SUCCESS' || order.paymentMethod === 'cod' || order.paymentMethod === 'cash') && (
+                            <div className="flex items-center gap-1.5 ml-1">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedInvoiceOrderId(order.orderId)}
+                                className="flex items-center gap-1 px-2.5 py-1 rounded bg-teal-50 hover:bg-teal-100 text-teal-800 text-[11px] font-semibold border border-teal-200 transition"
+                                title="View Tax Invoice"
+                              >
+                                <FileText size={12} /> Invoice
+                              </button>
+                              <a
+                                href={smartOrderApi.getInvoicePdfUrl(order.orderId)}
+                                download={`Invoice-${order.orderId}.pdf`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 px-2.5 py-1 rounded bg-teal-600 hover:bg-teal-700 text-white text-[11px] font-semibold transition"
+                                title="Download PDF Bill"
+                              >
+                                <Download size={12} /> PDF
+                              </a>
+                            </div>
+                          )}
+
                         </div>
                       </div>
 
@@ -298,6 +338,14 @@ export default function MyOrdersPage() {
           </div>
         </div>
       </div>
+
+      {selectedInvoiceOrderId && (
+        <InvoiceViewModal
+          orderId={selectedInvoiceOrderId}
+          isOpen={!!selectedInvoiceOrderId}
+          onClose={() => setSelectedInvoiceOrderId(null)}
+        />
+      )}
     </div>
   );
-}
+}

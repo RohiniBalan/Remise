@@ -331,8 +331,8 @@ function BusinessLoginPageContent() {
           </Link>
         </p>
 
-        {/* Customer Login link */}
-        <div className="mt-6 border-t border-white/10 pt-4 text-center">
+        {/* Customer Login link & Admin Link */}
+        <div className="mt-6 border-t border-white/10 pt-4 flex flex-col items-center gap-2.5 text-center">
           <Link
             href="/login"
             className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors"
@@ -343,11 +343,19 @@ function BusinessLoginPageContent() {
               Customer Login <ArrowRight size={12} />
             </span>
           </Link>
+
+          <Link
+            href="/admin/login"
+            className="text-[11px] text-gray-500 hover:text-gray-300 transition-colors"
+          >
+            Admin Portal →
+          </Link>
         </div>
       </div>
     </>
   );
 }
+
 
 export default function BusinessLoginPage() {
   return (

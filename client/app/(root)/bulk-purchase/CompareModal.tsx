@@ -16,12 +16,16 @@ import {
   Wallet,
   ChevronLeft,
   ChevronRight,
+  FileText,
+  Download,
 } from "lucide-react";
 import { AuthContext } from "../../context/AuthContext";
 import { smartOrderApi, CartItem } from "../../api-services/smartOrderApi";
 import { storeApi } from "../../api-services/storeApi";
 import { productApi } from "../../api-services/productApi";
 import { indianStates, getCities } from "../../utils/indiaLocation";
+import InvoiceViewModal from "@/app/components-main/InvoiceViewModal";
+
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -84,10 +88,13 @@ const normalizeTitle = (s?: string) =>
 export default function CompareModal({
   items,
   onClose,
+  onOrderSuccess,
 }: {
   items: CartItem[];
   onClose: () => void;
+  onOrderSuccess?: () => void;
 }) {
+
   const ctx = useContext(AuthContext) as any;
   const user: any = ctx?.user || null;
   const token: string | null =
@@ -103,6 +110,8 @@ export default function CompareModal({
   const [orderPlaced, setOrderPlaced] = useState<{ orderId: string } | null>(
     null,
   );
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+
 
   // ── Carousel (one store card at a time) ────────────────────────────────
   const [carouselIndex, setCarouselIndex] = useState(0);
@@ -388,6 +397,7 @@ const [deliveryMethod, setDeliveryMethod] = useState<"pickup" | "delivery" | nul
 
       setOrderPlaced({ orderId });
       setStep("success");
+      onOrderSuccess?.();
     } catch (err: any) {
       setErrorMsg(
         err.response?.data?.message ||
@@ -397,6 +407,7 @@ const [deliveryMethod, setDeliveryMethod] = useState<"pickup" | "delivery" | nul
       setStep("payment");
     }
   };
+
 
   const total = results.length;
   const goPrev = () => setCarouselIndex((i) => (i - 1 + total) % total);
@@ -1098,30 +1109,113 @@ const [deliveryMethod, setDeliveryMethod] = useState<"pickup" | "delivery" | nul
 
           {/* ── Step: success ────────────────────────────────────────────── */}
           {step === "success" && chosen && (
-            <div className="flex flex-col items-center gap-3 py-6 text-center">
-              <CheckCircle2 size={48} className="text-green-600" />
+            <div className="flex flex-col items-center gap-4 py-4 text-center">
+              <div className="w-14 h-14 rounded-full bg-green-50 flex items-center justify-center border border-green-200">
+                <CheckCircle2 size={36} className="text-green-600" />
+              </div>
+              
               <div>
-                <p className="font-bold text-gray-900">Order Placed!</p>
-                <p className="text-sm text-gray-500 mt-1">
-                  Your order from <strong>{chosen.storeName}</strong> is
-                  confirmed —{" "}
-                  {deliveryMethod === "pickup"
-                    ? "ready for self pickup"
-                    : "out for home delivery"}
-                  , paying via {paymentMethod === "qr" ? "QR code" : "cash"}.
-                  You and the store have been notified.
+                <p className="font-bold text-gray-900 text-lg">
+                  Order & Payment Confirmed!
+                </p>
+                <p className="text-xs text-gray-500 mt-1 max-w-sm">
+                  Your order from <strong>{chosen.storeName}</strong> has been
+                  successfully placed via {paymentMethod === "qr" ? "UPI / QR Code" : "Cash on Delivery"} (
+                  {deliveryMethod === "pickup" ? "Self Pickup" : "Home Delivery"}).
                 </p>
               </div>
-              <button
-                onClick={onClose}
-                className="mt-2 px-6 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-semibold rounded-xl text-sm transition"
-              >
-                Done
-              </button>
+
+              {/* Verified Bill Card */}
+              <div className="w-full bg-[#F8FAFC] border border-[#BBD5DA] rounded-xl p-4 text-left space-y-3">
+                <div className="flex items-center justify-between border-b border-gray-200 pb-2">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-teal-700 bg-teal-50 px-1.5 py-0.5 rounded">
+                      Verified Bill
+                    </span>
+                    <h4 className="text-sm font-bold text-gray-900 mt-0.5">
+                      {chosen.storeName}
+                    </h4>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xs font-bold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">
+                      ● PAID
+                    </span>
+                    {orderPlaced?.orderId && (
+                      <p className="text-[10px] text-gray-500 mt-0.5">
+                        #{orderPlaced.orderId}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                  <div>
+                    <span className="text-gray-400 block text-[10px]">Customer:</span>
+                    <span className="font-medium text-gray-800">
+                      {[form.firstName, form.lastName].filter(Boolean).join(" ") || "Customer"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400 block text-[10px]">Payment Method:</span>
+                    <span className="font-medium text-teal-800">
+                      {paymentMethod === "qr" ? "UPI / QR Payment" : "Cash on Delivery"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="border-t border-gray-200 pt-2">
+                  <div className="flex justify-between items-center text-xs text-gray-600">
+                    <span>{items.length} item{items.length !== 1 ? "s" : ""}</span>
+                    <span className="font-bold text-sm text-gray-900">
+                      Total: ₹{chosen.totalAmount.toFixed(0)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions: Download Bill, View Invoice, Done */}
+              <div className="flex flex-col w-full gap-2 pt-1">
+                {orderPlaced?.orderId && (
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowInvoiceModal(true)}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl border border-teal-600 text-teal-700 hover:bg-teal-50 text-xs font-bold transition"
+                    >
+                      <FileText size={14} /> View Invoice
+                    </button>
+                    <a
+                      href={smartOrderApi.getInvoicePdfUrl(orderPlaced.orderId)}
+                      download={`Invoice-${orderPlaced.orderId}.pdf`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition shadow-sm"
+                    >
+                      <Download size={14} /> Download Bill (PDF)
+                    </a>
+                  </div>
+                )}
+                
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl text-xs transition"
+                >
+                  Done
+                </button>
+              </div>
             </div>
           )}
         </div>
       </div>
+
+      {orderPlaced?.orderId && (
+        <InvoiceViewModal
+          orderId={orderPlaced.orderId}
+          isOpen={showInvoiceModal}
+          onClose={() => setShowInvoiceModal(false)}
+        />
+      )}
     </div>
   );
 }
