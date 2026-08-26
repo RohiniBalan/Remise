@@ -535,7 +535,7 @@ function NewOfferPageContent() {
 
       await offersApi.create(fd, token);
 
-      router.push("/store/dashboard?tab=offers");
+      router.push("/store/dashboard");
     } catch (err: any) {
       setError(err.response?.data?.message || "Failed to publish offer.");
     } finally {
@@ -571,9 +571,10 @@ function NewOfferPageContent() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
           <Link
             href="/store/dashboard?tab=offers"
-            className="flex items-center gap-1.5 sm:gap-2 text-sm text-gray-600 hover:text-teal-700 transition font-semibold shrink-0 bg-[#F5F5F5] hover:bg-[#DFF1F1] px-3 py-1.5 rounded-xl border border-[#BBD5DA]"
+            className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-semibold text-gray-700 hover:text-teal-700 transition bg-[#F5F5F5] hover:bg-[#DFF1F1] px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl border border-[#BBD5DA] shrink-0"
           >
-            <ArrowLeft size={16} /> Offers
+            <ArrowLeft size={16} className="text-teal-700" />
+            <span>Offers</span>
           </Link>
 
           <div className="flex items-center gap-2 min-w-0">
@@ -606,31 +607,34 @@ function NewOfferPageContent() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        {/* Hero text with Back Button */}
-        <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex items-start gap-3.5">
-            <Link
-              href="/store/dashboard?tab=offers"
-              className="mt-0.5 w-10 h-10 rounded-xl bg-white border border-[#BBD5DA] hover:border-teal-400 hover:bg-[#DFF1F1] flex items-center justify-center text-gray-700 hover:text-teal-700 transition shadow-sm shrink-0"
-              title="Back to Offers"
-              aria-label="Back to Offers"
-            >
-              <ArrowLeft size={18} />
-            </Link>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-1">
-                Publish New Offer
-              </h1>
-              <p className="text-gray-500 text-xs sm:text-sm">
-                Customers near{" "}
-                <span className="font-semibold text-gray-700">{store.name}</span>{" "}
-                will be notified instantly.
-              </p>
+        {/* Back navigation button */}
+        <div className="mb-4 sm:mb-6">
+          <Link
+            href="/store/dashboard?tab=offers"
+            className="inline-flex items-center gap-2 text-xs sm:text-sm font-semibold text-teal-800 hover:text-teal-950 transition group"
+          >
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-white border border-[#BBD5DA] group-hover:border-teal-400 group-hover:bg-[#DFF1F1] flex items-center justify-center transition shadow-2xs">
+              <ArrowLeft size={15} className="text-teal-700 group-hover:-translate-x-0.5 transition-transform" />
             </div>
+            <span>Back to Offers</span>
+          </Link>
+        </div>
+
+        {/* Hero text */}
+        <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-1">
+              Publish New Offer
+            </h1>
+            <p className="text-gray-500 text-xs sm:text-sm">
+              Customers near{" "}
+              <span className="font-semibold text-gray-700">{store.name}</span>{" "}
+              will be notified instantly.
+            </p>
           </div>
           <button
             onClick={() => setShowScan(true)}
-            className="flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition shrink-0 shadow-sm w-full sm:w-auto"
+            className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition shrink-0 shadow-sm"
           >
             <ScanLine size={16} /> Scan Paper to Auto-fill
           </button>

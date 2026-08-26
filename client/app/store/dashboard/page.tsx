@@ -5094,12 +5094,13 @@ export default function StoreDashboard() {
   const [loadError, setLoadError] = useState("");
   const [noStore, setNoStore] = useState(false);
 
+  // Sync tab with URL search param e.g. /store/dashboard?tab=offers
   useEffect(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
-      const tabParam = params.get("tab") as Tab;
+      const tabParam = params.get("tab");
       if (tabParam && TABS.some((t) => t.id === tabParam)) {
-        setTab(tabParam);
+        setTab(tabParam as Tab);
       }
     }
   }, []);
