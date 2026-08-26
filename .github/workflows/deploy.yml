@@ -26,7 +26,8 @@ jobs:
             cd ${{ secrets.VPS_PROJECT_PATH }}
 
             echo "Pulling latest code..."
-            git pull origin main
+            git fetch origin main
+            git reset --hard origin/main
 
             echo "Building frontend..."
             cd client
