@@ -2762,23 +2762,23 @@ function CategoriesTab({ categories, products, token, onRefresh }: any) {
   };
 
   return (
-    <div className="max-w-xl space-y-5">
+    <div className="max-w-xl space-y-4 sm:space-y-5 w-full">
       {/* Add form */}
-      <div className="bg-white rounded-2xl border border-[#BBD5DA] p-5 shadow-sm">
-        <h3 className="text-sm font-bold text-gray-900 mb-4">
+      <div className="bg-white rounded-2xl border border-[#BBD5DA] p-4 sm:p-5 shadow-sm">
+        <h3 className="text-sm font-bold text-gray-900 mb-3 sm:mb-4">
           Add New Category
         </h3>
-        <form onSubmit={handleAdd} className="flex gap-3">
+        <form onSubmit={handleAdd} className="flex gap-2 sm:gap-3">
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. Skincare"
-            className="flex-1 bg-white border border-[#BBD5DA] rounded-xl px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 transition placeholder-gray-400"
+            className="flex-1 min-w-0 w-full bg-white border border-[#BBD5DA] rounded-xl px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm text-gray-900 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 transition placeholder-gray-400"
           />
           <button
             type="submit"
             disabled={saving || !name.trim()}
-            className="flex items-center gap-2 bg-[#FF0000] hover:bg-[#e00000] disabled:opacity-50 text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition"
+            className="flex items-center justify-center gap-1.5 sm:gap-2 bg-[#FF0000] hover:bg-[#e00000] disabled:opacity-50 text-white px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition shrink-0 whitespace-nowrap"
           >
             {saving ? (
               <RefreshCw size={14} className="animate-spin" />
@@ -2793,7 +2793,7 @@ function CategoriesTab({ categories, products, token, onRefresh }: any) {
 
       {/* Categories list */}
       <div className="bg-white rounded-2xl border border-[#BBD5DA] shadow-sm overflow-hidden">
-        <div className="px-5 py-3 border-b border-[#BBD5DA] bg-[#F9F9F9]">
+        <div className="px-4 sm:px-5 py-3 border-b border-[#BBD5DA] bg-[#F9F9F9]">
           <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">
             All Categories ({mergedCategories.length})
           </p>
@@ -2807,22 +2807,22 @@ function CategoriesTab({ categories, products, token, onRefresh }: any) {
             {mergedCategories.map((c) => (
               <li
                 key={c._id}
-                className="flex items-center justify-between px-5 py-3.5 hover:bg-[#F9F9F9] transition"
+                className="flex items-center justify-between px-3.5 sm:px-5 py-3 sm:py-3.5 hover:bg-[#F9F9F9] transition gap-2"
               >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-[#DFF1F1] flex items-center justify-center">
+                <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
+                  <div className="w-8 h-8 rounded-lg bg-[#DFF1F1] flex items-center justify-center shrink-0">
                     <Layers size={14} className="text-teal-600" />
                   </div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-semibold text-gray-900">
+                  <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0">
+                    <span className="text-xs sm:text-sm font-semibold text-gray-900 break-words">
                       {c.name}
                     </span>
                     {c.isDefault && (
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[#F5F5F5] text-gray-500">
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[#F5F5F5] text-gray-500 shrink-0">
                         Default
                       </span>
                     )}
-                    <span className="text-[11px] font-semibold text-teal-700 bg-[#DFF1F1] border border-[#BBD5DA] px-2 py-0.5 rounded-full">
+                    <span className="text-[10px] sm:text-[11px] font-semibold text-teal-700 bg-[#DFF1F1] border border-[#BBD5DA] px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap">
                       {countByCategory[c.name] || 0} product
                       {(countByCategory[c.name] || 0) !== 1 ? "s" : ""}
                     </span>
@@ -2831,7 +2831,7 @@ function CategoriesTab({ categories, products, token, onRefresh }: any) {
                 {!c.isDefault && (
                   <button
                     onClick={() => handleDelete(c)}
-                    className="text-gray-300 hover:text-[#FF0000] hover:bg-red-50 p-2 rounded-lg transition"
+                    className="text-gray-300 hover:text-[#FF0000] hover:bg-red-50 p-1.5 sm:p-2 rounded-lg transition shrink-0 ml-1"
                   >
                     <Trash2 size={14} />
                   </button>
