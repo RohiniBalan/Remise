@@ -31,7 +31,7 @@ getNearbyStores: (lat: number, lng: number, radius = 10, storeType?: string) =>
     storeId: string;
     storeName: string;
     deliveryMethod: 'pickup' | 'delivery';
-    paymentMethod: 'cod' | 'qr';
+    paymentMethod: 'cod' | 'qr' | 'razorpay' | 'cashfree';
   }, token?: string | null) =>
     axios.post(`${BASE}/api/payment/initiate`, {
       ...payload,
@@ -39,10 +39,11 @@ getNearbyStores: (lat: number, lng: number, radius = 10, storeType?: string) =>
       redirectUrl: typeof window !== 'undefined' ? `${window.location.origin}/my-orders` : '/my-orders',
     }, token ? { headers: { Authorization: `Bearer ${token}` } } : undefined),
 
-  // Customer self-declares a QR payment as complete; optional screenshot proof.
-  confirmQrPayment: (orderId: string, screenshot?: File | null) => {
+  // Customer self-declares a QR payment as complete; optional screenshot proof and UTR.
+  confirmQrPayment: (orderId: string, screenshot?: File | null, utr?: string | null) => {
     const fd = new FormData();
     if (screenshot) fd.append('screenshot', screenshot);
+    if (utr) fd.append('utr', utr);
     return axios.patch(`${BASE}/api/orders/${orderId}/confirm-payment`, fd);
   },
 

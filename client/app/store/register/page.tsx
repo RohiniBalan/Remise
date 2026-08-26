@@ -108,6 +108,8 @@ export default function StoreRegisterPage() {
     phone: "",
     email: user?.email || "",
     category: "Other",
+    pan: "",
+    gstin: "",
     street: "",
     city: "",
     state: "",
@@ -198,6 +200,22 @@ export default function StoreRegisterPage() {
     if (!token) {
       setError("You must be logged in.");
       return;
+    }
+    if (!form.pan.trim()) {
+      setError("PAN number is mandatory.");
+      return;
+    }
+    const PAN_REGEX = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+    if (!PAN_REGEX.test(form.pan.trim().toUpperCase())) {
+      setError("Please enter a valid 10-character PAN number (e.g. ABCDE1234F).");
+      return;
+    }
+    if (form.gstin.trim()) {
+      const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+      if (!GSTIN_REGEX.test(form.gstin.trim().toUpperCase())) {
+        setError("Please enter a valid 15-character GSTIN (e.g. 22AAAAA0000A1Z5).");
+        return;
+      }
     }
     if (!form.latitude || !form.longitude) {
       setError("Store location is required.");
@@ -396,6 +414,40 @@ export default function StoreRegisterPage() {
                 rows={3}
                 placeholder="Tell customers what you sell…"
               />
+            </div>
+          </div>
+
+          {/* ── Tax & Legal Verification ─────────────────────────── */}
+          <div className="bg-white rounded-2xl border border-[#BBD5DA] p-6 shadow-sm space-y-4">
+            <div>
+              <h2 className="font-semibold text-gray-800">Tax & Business Verification</h2>
+              <p className="text-xs text-gray-400 mt-0.5">
+                Required for marketplace compliance and payouts.
+              </p>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <Label>PAN Number * <span className="text-red-500 font-normal">(Mandatory)</span></Label>
+                <Input
+                  required
+                  value={form.pan}
+                  onChange={(e) => set("pan", e.target.value.toUpperCase())}
+                  placeholder="e.g. ABCDE1234F"
+                  maxLength={10}
+                />
+                <p className="text-[11px] text-gray-400 mt-1">10-character Permanent Account Number</p>
+              </div>
+              <div>
+                <Label>GSTIN Number <span className="text-gray-400 font-normal">(Optional)</span></Label>
+                <Input
+                  value={form.gstin}
+                  onChange={(e) => set("gstin", e.target.value.toUpperCase())}
+                  placeholder="e.g. 22AAAAA0000A1Z5"
+                  maxLength={15}
+                />
+                <p className="text-[11px] text-gray-400 mt-1">15-digit Goods and Services Tax ID</p>
+              </div>
             </div>
           </div>
 

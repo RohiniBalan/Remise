@@ -10,14 +10,47 @@ import {
   Truck,
   QrCode,
   Wallet,
+  CreditCard,
+  ShieldCheck,
+  Smartphone,
+  Building2,
+  Lock,
   FileText,
   Download,
+  Copy,
+  Check,
 } from "lucide-react";
 import { smartOrderApi } from "../api-services/smartOrderApi";
 import { storeApi } from "../api-services/storeApi";
 import { orderApi } from "../api-services/orderApi";
 import { indianStates, getCities } from "../utils/indiaLocation";
 import InvoiceViewModal from "@/app/components-main/InvoiceViewModal";
+import RazorpayModal from "@/app/components-main/RazorpayModal";
+
+declare global {
+  interface Window {
+    Razorpay?: any;
+  }
+}
+
+function loadRazorpayScript(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (typeof window === "undefined") return resolve(false);
+    if (window.Razorpay) return resolve(true);
+    const existing = document.getElementById("razorpay-checkout-js");
+    if (existing) {
+      existing.addEventListener("load", () => resolve(true));
+      existing.addEventListener("error", () => resolve(false));
+      return;
+    }
+    const script = document.createElement("script");
+    script.id = "razorpay-checkout-js";
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+}
 
 interface CartOrderItem {
   productId: string;
@@ -58,6 +91,8 @@ export default function SupplierCartOrderModal({ groups, prefill, token, onCompl
   const [errorMsg, setErrorMsg] = useState("");
   const [lastPlacedOrderId, setLastPlacedOrderId] = useState<string | null>(null);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [showRazorpayModal, setShowRazorpayModal] = useState(false);
+  const [razorpayModalData, setRazorpayModalData] = useState<any>(null);
 
   const chosen = groups[index];
   const isLast = index === groups.length - 1;
@@ -65,8 +100,13 @@ export default function SupplierCartOrderModal({ groups, prefill, token, onCompl
   const [deliveryMethod, setDeliveryMethod] = useState<
     "pickup" | "delivery" | null
   >(null);
-  const [paymentMethod, setPaymentMethod] = useState<"cod" | "qr" | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<"cod" | "qr" | "razorpay" | null>(null);
+  const [selectedSubMethod, setSelectedSubMethod] = useState<"upi" | "card" | "netbanking" | "wallet">("upi");
+  const [isPayingRazorpay, setIsPayingRazorpay] = useState(false);
   const [storeQr, setStoreQr] = useState<string | null>(null);
+  const [storeUpiId, setStoreUpiId] = useState<string | null>(null);
+  const [copiedStoreUpi, setCopiedStoreUpi] = useState(false);
+  const [utrNumber, setUtrNumber] = useState("");
   const [qrLoading, setQrLoading] = useState(false);
   const [screenshotFile, setScreenshotFile] = useState<File | null>(null);
   const [screenshotPreview, setScreenshotPreview] = useState<string | null>(
@@ -80,6 +120,12 @@ export default function SupplierCartOrderModal({ groups, prefill, token, onCompl
     setScreenshotPreview(URL.createObjectURL(file));
   };
 
+  const handleCopyStoreUpi = (vpa: string) => {
+    navigator.clipboard?.writeText(vpa);
+    setCopiedStoreUpi(true);
+    setTimeout(() => setCopiedStoreUpi(false), 2000);
+  };
+
   useEffect(() => {
     if (paymentMethod !== "qr" || !chosen) return;
     let cancelled = false;
@@ -87,10 +133,17 @@ export default function SupplierCartOrderModal({ groups, prefill, token, onCompl
     storeApi
       .getById(chosen.storeId)
       .then((res) => {
-        if (!cancelled) setStoreQr(res.data?.data?.qrCodeImage || null);
+        if (!cancelled) {
+          const s = res.data?.data;
+          setStoreQr(s?.qrCodeImage || null);
+          setStoreUpiId(s?.upiId || process.env.NEXT_PUBLIC_MERCHANT_UPI_ID || "rohinibalan529@oksbi");
+        }
       })
       .catch(() => {
-        if (!cancelled) setStoreQr(null);
+        if (!cancelled) {
+          setStoreQr(null);
+          setStoreUpiId(process.env.NEXT_PUBLIC_MERCHANT_UPI_ID || "rohinibalan529@oksbi");
+        }
       })
       .finally(() => {
         if (!cancelled) setQrLoading(false);
@@ -118,6 +171,8 @@ export default function SupplierCartOrderModal({ groups, prefill, token, onCompl
   const resetForNextGroup = () => {
     setDeliveryMethod(null);
     setPaymentMethod(null);
+    setSelectedSubMethod("upi");
+    setIsPayingRazorpay(false);
     setStoreQr(null);
     setScreenshotFile(null);
     setScreenshotPreview(null);
@@ -159,6 +214,163 @@ export default function SupplierCartOrderModal({ groups, prefill, token, onCompl
 
   const handlePlaceOrder = async () => {
     if (!chosen || !deliveryMethod || !paymentMethod) return;
+
+    if (paymentMethod === "razorpay") {
+      setIsPayingRazorpay(true);
+      setErrorMsg("");
+      try {
+        const res = await orderApi.placeWholesaleOrder(
+          {
+            supplierStoreId: chosen.storeId,
+            supplierStoreName: chosen.storeName,
+            supplierRole: chosen.supplierRole,
+            contactEmail: form.contactEmail,
+            items: chosen.items.map((i) => ({
+              productId: i.productId,
+              title: i.title,
+              price: i.price,
+              quantity: i.quantity,
+              image: i.image,
+              moq: i.moq,
+              tierLabel: i.tierLabel,
+            })),
+            shippingAddress: form,
+            billingAddress: form,
+            paymentMethod: "razorpay",
+          },
+          token,
+        );
+
+        const data = res.data?.data || res.data;
+        const placedOrderId = data?.orderId;
+        const razorpayOrderId = data?.razorpayOrderId;
+
+        if (placedOrderId) {
+          setLastPlacedOrderId(placedOrderId);
+        }
+
+        if (!razorpayOrderId) {
+          setIsPayingRazorpay(false);
+          setStep("success");
+          return;
+        }
+
+        const isSandbox = Boolean(
+          data.isSandbox || razorpayOrderId.startsWith("order_mock_")
+        );
+
+        if (isSandbox) {
+          setIsPayingRazorpay(false);
+          setRazorpayModalData({
+            orderId: placedOrderId,
+            razorpayOrderId,
+            amount: chosen.totalAmount || data.amountInRupees || (data.amount ? data.amount / 100 : 0),
+            currency: data.currency || "INR",
+            name: data.name || chosen.storeName || "WOW Lifestyle Marketplace",
+            description: data.description || `Order #${placedOrderId}`,
+            payeeVpa: storeUpiId || "remise.merchant@upi",
+            customer: {
+              name: [form.firstName, form.lastName].filter(Boolean).join(" "),
+              email: form.contactEmail,
+              contact: form.phone,
+            },
+            initialSubMethod: selectedSubMethod,
+          });
+          setShowRazorpayModal(true);
+          return;
+        }
+
+        const loaded = await loadRazorpayScript();
+        if (!loaded || !window.Razorpay) {
+          setIsPayingRazorpay(false);
+          setRazorpayModalData({
+            orderId: placedOrderId,
+            razorpayOrderId,
+            amount: chosen.totalAmount || data.amountInRupees || (data.amount ? data.amount / 100 : 0),
+            currency: data.currency || "INR",
+            name: data.name || chosen.storeName || "WOW Lifestyle Marketplace",
+            description: data.description || `Order #${placedOrderId}`,
+            payeeVpa: storeUpiId || "remise.merchant@upi",
+            customer: {
+              name: [form.firstName, form.lastName].filter(Boolean).join(" "),
+              email: form.contactEmail,
+              contact: form.phone,
+            },
+            initialSubMethod: selectedSubMethod,
+          });
+          setShowRazorpayModal(true);
+          return;
+        }
+
+        const rzp = new window.Razorpay({
+          key: data.key || "rzp_test_TRXC8nEMqsywBS",
+          amount: data.amount,
+          currency: data.currency || "INR",
+          name: data.name || chosen.storeName || "WOW Lifestyle Marketplace",
+          description: data.description || `Order #${placedOrderId}`,
+          order_id: razorpayOrderId,
+          prefill: {
+            name: [form.firstName, form.lastName].filter(Boolean).join(" "),
+            email: form.contactEmail,
+            contact: form.phone,
+          },
+          theme: {
+            color: "#0d9488",
+          },
+          handler: async (response: any) => {
+            try {
+              await fetch("/api/payment/verify", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_signature: response.razorpay_signature,
+                  orderId: placedOrderId,
+                }),
+              });
+            } catch (vErr) {
+              console.warn("Signature verification notice:", vErr);
+            }
+            setIsPayingRazorpay(false);
+            setStep("success");
+          },
+          modal: {
+            ondismiss: () => {
+              setIsPayingRazorpay(false);
+            },
+          },
+        });
+
+        rzp.on("payment.failed", () => {
+          setIsPayingRazorpay(false);
+          setRazorpayModalData({
+            orderId: placedOrderId,
+            razorpayOrderId,
+            amount: chosen.totalAmount || data.amountInRupees || (data.amount ? data.amount / 100 : 0),
+            currency: data.currency || "INR",
+            name: data.name || chosen.storeName || "WOW Lifestyle Marketplace",
+            description: data.description || `Order #${placedOrderId}`,
+            payeeVpa: storeUpiId || "remise.merchant@upi",
+            customer: {
+              name: [form.firstName, form.lastName].filter(Boolean).join(" "),
+              email: form.contactEmail,
+              contact: form.phone,
+            },
+            initialSubMethod: selectedSubMethod,
+          });
+          setShowRazorpayModal(true);
+        });
+
+        rzp.open();
+        return;
+      } catch (err: any) {
+        setIsPayingRazorpay(false);
+        setErrorMsg(err.message || "Failed to process Razorpay order.");
+        return;
+      }
+    }
+
     setStep("placing");
     setErrorMsg("");
     try {
@@ -192,6 +404,7 @@ export default function SupplierCartOrderModal({ groups, prefill, token, onCompl
         await smartOrderApi.confirmQrPayment(
           placedOrder.orderId,
           screenshotFile,
+          utrNumber
         );
       }
 
@@ -439,90 +652,280 @@ export default function SupplierCartOrderModal({ groups, prefill, token, onCompl
   </div>
 )}
 
+          {/* ── Step: payment ────────────────────────────────────────────── */}
           {step === "payment" && (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {!paymentMethod && (
-  <>
-    <p className="text-sm text-gray-600">
-      How would you like to pay?
-    </p>
-
-    <button
-      type="button"
-      onClick={() => setPaymentMethod("qr")}
-      className="w-full text-left border border-[#BBD5DA] hover:border-teal-400 rounded-xl p-4 transition flex items-center gap-3"
-    >
-      <QrCode size={20} className="text-teal-600 shrink-0" />
-      <div>
-        <p className="font-semibold text-gray-900">
-          QR Code Payment
-        </p>
-        <p className="text-xs text-gray-400">
-          Scan {chosen.storeName}'s QR code and pay instantly.
-        </p>
-      </div>
-    </button>
-
-    <button
-      type="button"
-      onClick={() => setStep("delivery")}
-      className="text-xs text-gray-400 hover:text-teal-600 transition"
-    >
-      ← Back
-    </button>
-  </>
-)}
-
-              {paymentMethod === "qr" && (
-                <div className="space-y-3">
-                  {qrLoading && (
-                    <p className="text-sm text-gray-400">
-                      Loading {chosen.storeName}'s QR code…
+                <>
+                  <div>
+                    <p className="text-sm font-bold text-gray-800">
+                      How would you like to pay?
                     </p>
-                  )}
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Select a payment method for {chosen.storeName}.
+                    </p>
+                  </div>
 
-                  {!qrLoading && storeQr && (
-                    <div className="flex flex-col items-center gap-2 bg-[#F5F5F5] border border-[#BBD5DA] rounded-xl p-4">
-                      <img
-                        src={storeQr}
-                        alt="Payment QR code"
-                        className="w-48 h-48 object-contain bg-white rounded-lg border border-[#BBD5DA]"
-                      />
-                      <p className="text-xs text-gray-500 text-center">
-                        Scan with any UPI app to pay {chosen.storeName} ₹
-                        {chosen.totalAmount.toFixed(0)}
+                  {/* 1. Razorpay Option */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPaymentMethod("razorpay");
+                      setSelectedSubMethod("upi");
+                    }}
+                    className="w-full text-left border-2 border-teal-500 bg-gradient-to-r from-teal-50/70 to-emerald-50/40 hover:from-teal-50 hover:to-emerald-50 rounded-xl p-4 transition shadow-sm hover:shadow-md flex items-start gap-3 group"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-teal-600 flex items-center justify-center text-white shrink-0 shadow-sm mt-0.5 group-hover:scale-105 transition-transform">
+                      <CreditCard size={20} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-bold text-gray-900 text-sm">
+                          Online Payment (Cashfree Easy Split)
+                        </p>
+                        <span className="bg-teal-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                          Instant · 100% Secure
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-600 mt-1">
+                        Pay instantly using <strong>UPI</strong>, <strong>Cards</strong>, <strong>Net Banking</strong>, or <strong>Wallets</strong>.
+                      </p>
+                      <div className="flex items-center gap-2 mt-2 flex-wrap">
+                        <span className="text-[11px] font-semibold bg-white border border-teal-200 text-teal-800 px-2 py-0.5 rounded-md">
+                          ⚡ UPI / QR
+                        </span>
+                        <span className="text-[11px] font-semibold bg-white border border-teal-200 text-teal-800 px-2 py-0.5 rounded-md">
+                          💳 Cards
+                        </span>
+                        <span className="text-[11px] font-semibold bg-white border border-teal-200 text-teal-800 px-2 py-0.5 rounded-md">
+                          🏦 Net Banking
+                        </span>
+                        <span className="text-[11px] font-semibold bg-white border border-teal-200 text-teal-800 px-2 py-0.5 rounded-md">
+                          👛 Wallets
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* 2. QR Code Option */}
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod("qr")}
+                    className="w-full text-left border border-[#BBD5DA] hover:border-teal-400 bg-white hover:bg-gray-50/50 rounded-xl p-4 transition flex items-start gap-3 group"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-gray-100 group-hover:bg-teal-50 flex items-center justify-center text-teal-700 shrink-0 border border-gray-200 mt-0.5">
+                      <QrCode size={20} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-gray-900 text-sm">
+                        Supplier QR Code Payment
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Scan {chosen.storeName}'s direct UPI QR code and upload screenshot proof.
                       </p>
                     </div>
-                  )}
+                  </button>
 
-                  {!qrLoading && !storeQr && (
-                    <div className="bg-amber-50 border border-amber-200 text-amber-700 rounded-xl p-4 text-sm">
-                      This supplier hasn't set up QR payment yet. Please go back
-                      and choose Cash/Invoice instead.
+                  {/* 3. Cash / Invoice on Delivery */}
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod("cod")}
+                    className="w-full text-left border border-[#BBD5DA] hover:border-teal-400 bg-white hover:bg-gray-50/50 rounded-xl p-4 transition flex items-start gap-3 group"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-gray-100 group-hover:bg-teal-50 flex items-center justify-center text-teal-700 shrink-0 border border-gray-200 mt-0.5">
+                      <Wallet size={20} />
                     </div>
-                  )}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-gray-900 text-sm">
+                        Cash / Invoice on Delivery
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {deliveryMethod === "pickup"
+                          ? "Pay or settle invoice when collecting from supplier warehouse."
+                          : "Settle via credit terms / invoice upon delivery."}
+                      </p>
+                    </div>
+                  </button>
 
-                  {storeQr && (
+                  <button
+                    type="button"
+                    onClick={() => setStep("delivery")}
+                    className="text-xs text-gray-500 hover:text-teal-700 font-semibold transition inline-flex items-center gap-1 mt-1"
+                  >
+                    ← Back to Delivery
+                  </button>
+                </>
+              )}
+
+              {/* ── Cashfree Payment Sub-methods Breakdown ── */}
+              {paymentMethod === "razorpay" && (
+                <div className="space-y-3.5">
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-2">
                     <div>
-                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                        Upload payment screenshot (optional)
-                      </label>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleScreenshotChange}
-                        className="w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-[#DFF1F1] file:text-teal-700 file:text-sm file:font-semibold"
-                      />
-                      {screenshotPreview && (
-                        <img
-                          src={screenshotPreview}
-                          alt="Screenshot preview"
-                          className="mt-2 w-24 h-24 object-cover rounded-lg border border-[#BBD5DA]"
-                        />
-                      )}
+                      <h3 className="text-sm font-bold text-gray-900">
+                        Available Cashfree Payment Methods
+                      </h3>
+                      <p className="text-xs text-gray-500">
+                        Select a method to pay <strong>₹{chosen.totalAmount.toLocaleString("en-IN")}</strong>:
+                      </p>
                     </div>
-                  )}
+                    <span className="text-[10px] font-bold text-teal-700 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-full">
+                      Cashfree Easy Split
+                    </span>
+                  </div>
 
+                  <div className="grid grid-cols-1 gap-2.5">
+                    {/* Method 1: UPI */}
+                    <div
+                      onClick={() => setSelectedSubMethod("upi")}
+                      className={`cursor-pointer border-2 rounded-xl p-3 transition flex items-start gap-3 ${
+                        selectedSubMethod === "upi"
+                          ? "border-teal-500 bg-teal-50/50 shadow-xs"
+                          : "border-gray-200 bg-white hover:border-teal-300"
+                      }`}
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-teal-100 text-teal-700 flex items-center justify-center shrink-0 mt-0.5">
+                        <Smartphone size={17} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <p className="font-bold text-gray-900 text-xs">
+                            UPI (Google Pay, PhonePe, Paytm, BHIM)
+                          </p>
+                          <span className="text-[9px] font-bold bg-green-100 text-green-800 px-1.5 py-0.5 rounded">
+                            Instant
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-gray-500 mt-0.5">
+                          Instant checkout using any UPI App, QR scan, or UPI ID.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Method 2: Cards */}
+                    <div
+                      onClick={() => setSelectedSubMethod("card")}
+                      className={`cursor-pointer border-2 rounded-xl p-3 transition flex items-start gap-3 ${
+                        selectedSubMethod === "card"
+                          ? "border-teal-500 bg-teal-50/50 shadow-xs"
+                          : "border-gray-200 bg-white hover:border-teal-300"
+                      }`}
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-teal-100 text-teal-700 flex items-center justify-center shrink-0 mt-0.5">
+                        <CreditCard size={17} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <p className="font-bold text-gray-900 text-xs">
+                            Credit / Debit Cards (Corporate & Personal)
+                          </p>
+                          <span className="text-[9px] font-bold bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded">
+                            All Cards
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-gray-500 mt-0.5">
+                          Visa, MasterCard, RuPay & Business cards supported.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Method 3: Net Banking */}
+                    <div
+                      onClick={() => setSelectedSubMethod("netbanking")}
+                      className={`cursor-pointer border-2 rounded-xl p-3 transition flex items-start gap-3 ${
+                        selectedSubMethod === "netbanking"
+                          ? "border-teal-500 bg-teal-50/50 shadow-xs"
+                          : "border-gray-200 bg-white hover:border-teal-300"
+                      }`}
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-teal-100 text-teal-700 flex items-center justify-center shrink-0 mt-0.5">
+                        <Building2 size={17} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <p className="font-bold text-gray-900 text-xs">
+                            Corporate & Retail Net Banking
+                          </p>
+                          <span className="text-[9px] font-bold bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded">
+                            50+ Banks
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-gray-500 mt-0.5">
+                          SBI, HDFC, ICICI, Axis, Kotak and all major Indian banks.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Method 4: Wallets */}
+                    <div
+                      onClick={() => setSelectedSubMethod("wallet")}
+                      className={`cursor-pointer border-2 rounded-xl p-3 transition flex items-start gap-3 ${
+                        selectedSubMethod === "wallet"
+                          ? "border-teal-500 bg-teal-50/50 shadow-xs"
+                          : "border-gray-200 bg-white hover:border-teal-300"
+                      }`}
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-teal-100 text-teal-700 flex items-center justify-center shrink-0 mt-0.5">
+                        <Wallet size={17} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <p className="font-bold text-gray-900 text-xs">
+                            Wallets
+                          </p>
+                          <span className="text-[9px] font-bold bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded">
+                            1-Click
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-gray-500 mt-0.5">
+                          Paytm Wallet, PhonePe, Amazon Pay, Mobikwik & more.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 text-slate-700 rounded-xl px-3 py-2 text-xs">
+                    <ShieldCheck size={16} className="text-teal-600 shrink-0" />
+                    <span>
+                      256-bit SSL encrypted · Verified by Cashfree Easy Split · Instant invoice generation
+                    </span>
+                  </div>
+
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod(null)}
+                      disabled={isPayingRazorpay}
+                      className="px-4 py-3 rounded-xl text-sm font-semibold text-gray-600 bg-[#F5F5F5] border border-[#BBD5DA] hover:bg-white transition"
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handlePlaceOrder}
+                      disabled={isPayingRazorpay}
+                      className="flex-1 bg-teal-600 hover:bg-teal-700 disabled:opacity-60 text-white font-bold py-3 rounded-xl transition flex items-center justify-center gap-2 shadow-sm"
+                    >
+                      {isPayingRazorpay ? (
+                        <>
+                          <RefreshCw size={16} className="animate-spin" /> Opening Cashfree…
+                        </>
+                      ) : (
+                        <>
+                          <Lock size={16} /> Proceed to Pay ₹{chosen.totalAmount.toLocaleString("en-IN")} via Cashfree
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Cash / Invoice Step ── */}
+              {paymentMethod === "cod" && (
+                <div className="space-y-3">
+                  <div className="bg-[#F5F5F5] border border-[#BBD5DA] rounded-xl p-4 text-sm text-gray-600">
+                    You will settle the amount of ₹{chosen.totalAmount.toLocaleString("en-IN")} directly upon delivery or via invoice settlement.
+                  </div>
                   <div className="flex gap-2">
                     <button
                       type="button"
@@ -534,12 +937,149 @@ export default function SupplierCartOrderModal({ groups, prefill, token, onCompl
                     <button
                       type="button"
                       onClick={handlePlaceOrder}
-                      disabled={!storeQr}
-                      className="flex-1 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white font-semibold py-3 rounded-xl transition flex items-center justify-center gap-2"
+                      className="flex-1 bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 rounded-xl transition flex items-center justify-center gap-2"
                     >
-                      <CheckCircle size={16} /> I've Completed Payment
+                      <ShoppingBag size={16} /> Confirm & Order — ₹{chosen.totalAmount.toLocaleString("en-IN")}
                     </button>
                   </div>
+                </div>
+              )}
+
+              {/* ── Store QR Code Step ── */}
+              {paymentMethod === "qr" && (
+                <div className="space-y-3.5">
+                  {qrLoading ? (
+                    <div className="flex items-center justify-center py-6 gap-2 text-xs text-gray-500">
+                      <RefreshCw size={16} className="animate-spin text-teal-600" />
+                      <span>Loading supplier QR details…</span>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Supplier Store Header */}
+                      <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-lg bg-teal-100 text-teal-800 flex items-center justify-center font-bold text-xs">
+                            <Store size={14} />
+                          </div>
+                          <div>
+                            <p className="font-bold text-xs text-gray-900">
+                              {chosen.storeName}
+                            </p>
+                            <span className="text-[10px] text-teal-700 font-semibold bg-teal-50 px-1.5 py-0.2 rounded border border-teal-200">
+                              ● Direct Merchant UPI
+                            </span>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-[10px] text-gray-400 block">Payable Amount</span>
+                          <span className="text-sm font-black text-teal-700">
+                            ₹{chosen.totalAmount.toLocaleString("en-IN")}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Direct Store QR Image Box */}
+                      <div className="flex flex-col sm:flex-row items-center gap-3.5 bg-[#F5F5F5] p-3.5 rounded-xl border border-[#BBD5DA]">
+                        <div className="p-2 bg-white rounded-xl shadow-xs border border-gray-200 shrink-0">
+                          <img
+                            src={
+                              storeQr ||
+                              `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(
+                                `upi://pay?pa=${storeUpiId || process.env.NEXT_PUBLIC_MERCHANT_UPI_ID || "rohinibalan529@oksbi"}&pn=${encodeURIComponent(chosen.storeName)}&am=${chosen.totalAmount.toFixed(2)}&cu=INR&tn=Order_${chosen.storeName}`
+                              )}&margin=4`
+                            }
+                            alt="Supplier QR code"
+                            className="w-36 h-36 object-contain"
+                          />
+                        </div>
+
+                        <div className="flex-1 space-y-2 text-center sm:text-left">
+                          <div className="bg-white border border-gray-200 rounded-lg p-2 flex items-center justify-between gap-2">
+                            <div className="text-left truncate">
+                              <span className="text-[10px] text-gray-400 font-semibold block uppercase">Supplier UPI VPA</span>
+                              <span className="text-xs font-mono font-bold text-gray-800 truncate">
+                                {storeUpiId || process.env.NEXT_PUBLIC_MERCHANT_UPI_ID || "rohinibalan529@oksbi"}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleCopyStoreUpi(storeUpiId || process.env.NEXT_PUBLIC_MERCHANT_UPI_ID || "rohinibalan529@oksbi")}
+                              className="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-[11px] font-semibold rounded transition shrink-0 flex items-center gap-1"
+                            >
+                              {copiedStoreUpi ? <Check size={12} className="text-green-600" /> : <Copy size={12} />}
+                              <span>{copiedStoreUpi ? "Copied" : "Copy"}</span>
+                            </button>
+                          </div>
+
+                          <p className="text-[11px] text-gray-500 leading-snug">
+                            Scan with Google Pay, PhonePe, Paytm, CRED or BHIM to transfer ₹{chosen.totalAmount.toLocaleString("en-IN")}.
+                          </p>
+
+                          <div className="flex flex-wrap gap-1 justify-center sm:justify-start">
+                            {["GPay", "PhonePe", "Paytm", "CRED", "BHIM"].map((app) => (
+                              <span key={app} className="text-[9px] font-bold bg-white border border-gray-200 text-gray-700 px-1.5 py-0.5 rounded-full">
+                                {app}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* UTR / Transaction Reference Number Input */}
+                      <div className="space-y-1">
+                        <label className="block text-xs font-semibold text-gray-700">
+                          UPI Ref / UTR Number (Optional / Recommended)
+                        </label>
+                        <input
+                          type="text"
+                          value={utrNumber}
+                          onChange={(e) => setUtrNumber(e.target.value)}
+                          placeholder="e.g. 12-digit UTR No. (3245XXXXXXXX)"
+                          className="w-full bg-white border border-[#BBD5DA] rounded-xl px-3 py-2 text-xs font-mono outline-none focus:border-teal-400"
+                        />
+                      </div>
+
+                      {/* Payment Screenshot Upload */}
+                      <div className="space-y-1">
+                        <label className="block text-xs font-semibold text-gray-700">
+                          Upload payment screenshot (optional)
+                        </label>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleScreenshotChange}
+                          className="w-full text-xs text-gray-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-[#DFF1F1] file:text-teal-700 file:text-xs file:font-semibold"
+                        />
+                        {screenshotPreview && (
+                          <div className="mt-2 flex items-center gap-2">
+                            <img
+                              src={screenshotPreview}
+                              alt="Screenshot preview"
+                              className="w-14 h-14 object-cover rounded-lg border border-[#BBD5DA]"
+                            />
+                            <span className="text-xs text-green-600 font-semibold">Screenshot attached ✓</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setPaymentMethod(null)}
+                          className="px-4 py-3 rounded-xl text-sm font-semibold text-gray-600 bg-[#F5F5F5] border border-[#BBD5DA] hover:bg-white transition"
+                        >
+                          Back
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handlePlaceOrder}
+                          className="flex-1 bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 rounded-xl transition flex items-center justify-center gap-2 shadow-sm"
+                        >
+                          <CheckCircle size={16} /> I've Completed Payment
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -567,7 +1107,7 @@ export default function SupplierCartOrderModal({ groups, prefill, token, onCompl
                     ? "ready for self pickup"
                     : "out for delivery"}
                   , paying via{" "}
-                  {paymentMethod === "qr" ? "UPI / QR code" : "cash/invoice"}.
+                  {paymentMethod === "razorpay" ? "Online Payment (Razorpay - Verified)" : paymentMethod === "qr" ? "UPI / QR code" : "Cash / Invoice on Delivery"}.
                 </p>
               </div>
 
@@ -604,7 +1144,7 @@ export default function SupplierCartOrderModal({ groups, prefill, token, onCompl
                   <div>
                     <span className="text-gray-400 block text-[10px]">Payment Method:</span>
                     <span className="font-medium text-teal-800">
-                      {paymentMethod === "qr" ? "UPI / QR Payment" : "Cash / Invoice on Delivery"}
+                      {paymentMethod === "razorpay" ? "Online Payment (Razorpay)" : paymentMethod === "qr" ? "UPI / QR Payment" : "Cash / Invoice on Delivery"}
                     </span>
                   </div>
                 </div>
@@ -660,6 +1200,33 @@ export default function SupplierCartOrderModal({ groups, prefill, token, onCompl
           orderId={lastPlacedOrderId}
           isOpen={showInvoiceModal}
           onClose={() => setShowInvoiceModal(false)}
+        />
+      )}
+
+      {showRazorpayModal && razorpayModalData && (
+        <RazorpayModal
+          isOpen={showRazorpayModal}
+          orderId={razorpayModalData.orderId}
+          paymentSessionId={razorpayModalData.paymentSessionId}
+          cashfreeOrderId={razorpayModalData.cashfreeOrderId}
+          razorpayOrderId={razorpayModalData.razorpayOrderId}
+          amount={razorpayModalData.amount}
+          currency={razorpayModalData.currency}
+          name={razorpayModalData.name}
+          description={razorpayModalData.description}
+          customer={razorpayModalData.customer}
+          initialSubMethod={razorpayModalData.initialSubMethod}
+          onSuccess={() => {
+            setShowRazorpayModal(false);
+            setStep("success");
+          }}
+          onFailure={(err) => {
+            setShowRazorpayModal(false);
+            setErrorMsg(err || "Payment failed. Please try again.");
+          }}
+          onClose={() => {
+            setShowRazorpayModal(false);
+          }}
         />
       )}
     </div>

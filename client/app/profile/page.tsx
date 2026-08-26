@@ -30,6 +30,7 @@ import UserAvatarMenu from "../components-main/UserAvatarMenu";
 import NotificationBell from "../components-main/NotificationBell";
 import { indianStates, getCities } from "../utils/indiaLocation";
 import { productApi } from "../api-services/productApi";
+import { storeApi } from "../api-services/storeApi";
 
 type TabKey = "overview" | "addresses" | "security" | "store";
 
@@ -61,6 +62,13 @@ const GENDER_OPTIONS = [
   { key: "other", label: "Other" },
   { key: "prefer_not_to_say", label: "Prefer not to say" },
 ];
+
+const ROLE_LABELS: Record<string, string> = {
+  store_owner: "Store Owner",
+  whole_saler: "Wholesaler",
+  home_business: "Home Business",
+  admin: "Admin",
+};
 
 // Same list as DEFAULT_STORE_CATEGORIES in mobile's utils/storeCategories.ts —
 // kept in sync so the web Category dropdown matches the app.
@@ -301,6 +309,84 @@ export default function ProfilePage() {
 
     loadProfile();
   }, [API, router]);
+
+  useEffect(() => {
+  const loadStoreData = async () => {
+    if (!hasStoreAccess) return;
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    try {
+      const res = await storeApi.getMyStore(token);
+      const store = res.data?.data;
+      if (!store) return;
+
+      setForm((prev) => ({
+        ...prev,
+        profileData: {
+          ...prev.profileData,
+          storeProfile: {
+            ...(prev.profileData.storeProfile || {}),
+            name: store.name || prev.profileData.storeProfile?.name || "",
+            category:
+              store.category || prev.profileData.storeProfile?.category || "",
+            address:
+              [store.address?.street, store.address?.city, store.address?.state, store.address?.pinCode]
+                .filter(Boolean)
+                .join(", ") || prev.profileData.storeProfile?.address || "",
+            workingHours:
+              store.workingHours || prev.profileData.storeProfile?.workingHours || "",
+            deliveryRadius:
+              store.deliveryRadius || prev.profileData.storeProfile?.deliveryRadius || "",
+            minimumOrderAmount:
+              store.minimumOrderAmount ||
+              prev.profileData.storeProfile?.minimumOrderAmount ||
+              "",
+            description:
+              store.description || prev.profileData.storeProfile?.description || "",
+            status: store.status || prev.profileData.storeProfile?.status || "",
+          },
+          businessDetails: {
+            ...(prev.profileData.businessDetails || {}),
+            fssai:
+              store.fssai ||
+              store.businessDetails?.fssai ||
+              prev.profileData.businessDetails?.fssai ||
+              "",
+            gst:
+              store.gstin ||
+              store.businessDetails?.gstin ||
+              prev.profileData.businessDetails?.gst ||
+              "",
+            pan:
+              store.pan ||
+              store.businessDetails?.pan ||
+              prev.profileData.businessDetails?.pan ||
+              "",
+            license:
+              store.businessDetails?.license ||
+              prev.profileData.businessDetails?.license ||
+              "",
+            taxDetails:
+              store.businessDetails?.taxDetails ||
+              prev.profileData.businessDetails?.taxDetails ||
+              "",
+          },
+          upiId: store.upiId || prev.profileData.upiId || "",
+          verificationStatus: {
+            ...(prev.profileData.verificationStatus || {}),
+            status: store.isVerified
+              ? "Verified"
+              : prev.profileData.verificationStatus?.status || "Pending",
+          },
+        },
+      }));
+    } catch (err) {
+      console.log(err);
+    }
+  };
+
+  loadStoreData();
+}, [hasStoreAccess]);
 
   const updateProfile = async (
     payload: Partial<ProfileForm> & Record<string, any> = {},
@@ -576,8 +662,8 @@ export default function ProfilePage() {
                 </div>
                 <p className="mt-1 text-sm text-gray-500">{user?.email}</p>
                 <p className="mt-1 text-sm text-gray-500">
-                  {user?.role === "store_owner" ? "Store Owner" : "Customer"}
-                </p>
+  {ROLE_LABELS[user?.role as string] || "Customer"}
+</p>
               </div>
             </div>
             <button

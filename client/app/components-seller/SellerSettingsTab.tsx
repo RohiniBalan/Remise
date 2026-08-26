@@ -1,7 +1,7 @@
 // /components-seller/dashboard/SellerSettingsTab.tsx
 "use client";
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Save, RefreshCw, CheckCircle, QrCode } from "lucide-react";
+import { Save, RefreshCw, CheckCircle, CheckCircle2, QrCode } from "lucide-react";
 import { storeApi } from "../api-services/storeApi";
 import { Input, TextArea, Select } from "./FormComponents";
 import { mergeCategories, normalizeLoc, lookupPincode } from "./shared-utils";
@@ -19,10 +19,18 @@ export function SellerSettingsTab({ store, token, onRefresh, categories }: any) 
     state: store?.address?.state || "",
     pinCode: store?.address?.pinCode || "",
     targetRevenue: store?.targetRevenue ? String(store.targetRevenue) : "",
+    pan: store?.pan || store?.businessDetails?.pan || "",
+    gstin: store?.gstin || store?.businessDetails?.gstin || "",
+    legalBusinessName: store?.businessDetails?.legalBusinessName || "",
+    bankAccountNumber: store?.businessDetails?.bankAccount?.accountNumber || "",
+    bankIfsc: store?.businessDetails?.bankAccount?.ifscCode || "",
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [onboardingRoute, setOnboardingRoute] = useState(false);
   const [error, setError] = useState("");
+  const [showRazorpaySuccess, setShowRazorpaySuccess] = useState(false);
+
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
   const [upiId, setUpiId] = useState(store?.upiId || "");
@@ -106,6 +114,8 @@ export function SellerSettingsTab({ store, token, onRefresh, categories }: any) 
       fd.append("address[state]", form.state);
       fd.append("address[pinCode]", form.pinCode);
       fd.append("targetRevenue", form.targetRevenue);
+      fd.append("pan", form.pan.trim().toUpperCase());
+      fd.append("gstin", form.gstin.trim().toUpperCase());
       fd.append("upiId", upiId.trim());
       fd.append("fssai", isFoodCategory ? fssai.trim() : "");
       await storeApi.update(store._id, fd, token);
@@ -238,6 +248,32 @@ export function SellerSettingsTab({ store, token, onRefresh, categories }: any) 
           </Select>
         </div>
 
+        {/* Tax & Legal Identification */}
+        <div className="pt-2 border-t border-[#F5F5F5]">
+          <p className="text-sm font-semibold text-gray-800 mb-1">
+            Tax & Legal Identification
+          </p>
+          <p className="text-xs text-gray-400 mb-3">
+            PAN is mandatory for marketplace compliance and payouts.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Input
+              label="PAN Number * (Mandatory)"
+              placeholder="e.g. ABCDE1234F"
+              value={form.pan}
+              maxLength={10}
+              onChange={(e) => set("pan", e.target.value.toUpperCase())}
+            />
+            <Input
+              label="GSTIN Number (Optional)"
+              placeholder="e.g. 22AAAAA0000A1Z5"
+              value={form.gstin}
+              maxLength={15}
+              onChange={(e) => set("gstin", e.target.value.toUpperCase())}
+            />
+          </div>
+        </div>
+
         {/* UPI Payment QR Code */}
         <div className="pt-2 border-t border-[#F5F5F5]">
           <p className="text-sm font-semibold text-gray-800 mb-1">
@@ -278,6 +314,113 @@ export function SellerSettingsTab({ store, token, onRefresh, categories }: any) 
           </div>
         </div>
 
+        {/* Cashfree Easy Split Vendor Account Setup */}
+        <div className="pt-4 border-t border-[#F5F5F5]">
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <p className="text-sm font-semibold text-gray-800">
+                Cashfree Easy Split Marketplace Payments
+              </p>
+              <p className="text-xs text-gray-400">
+                Connect your Cashfree Vendor Account to automatically receive customer payments directly into your bank account.
+              </p>
+            </div>
+            <span
+              className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${
+                store?.cashfreeVendorId || store?.razorpayAccountId
+                  ? (store?.cashfreeVendorStatus === 'active' || store?.razorpayRouteStatus === 'active')
+                    ? 'bg-green-50 text-green-700 border-green-200'
+                    : 'bg-amber-50 text-amber-700 border-amber-200'
+                  : 'bg-gray-100 text-gray-600 border-gray-200'
+              }`}
+            >
+              {store?.cashfreeVendorId
+                ? `Easy Split: ${store?.cashfreeVendorStatus?.toUpperCase() || 'ACTIVE'}`
+                : store?.razorpayAccountId
+                ? `Vendor: CONNECTED`
+                : 'Easy Split: NOT CONNECTED'}
+            </span>
+          </div>
+
+          {(store?.cashfreeVendorId || store?.razorpayAccountId) && (
+            <div className="mb-3 p-3 bg-[#DFF1F1]/50 border border-[#BBD5DA] rounded-xl text-xs text-gray-700 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <span className="font-semibold text-teal-800">Cashfree Vendor ID:</span>{' '}
+                <code className="font-mono bg-white px-2 py-0.5 rounded border border-[#BBD5DA]">{store.cashfreeVendorId || `vendor_${store._id}`}</code>
+              </div>
+              <div>
+                <span className="font-semibold text-teal-800">Platform Commission:</span>{' '}
+                <span className="font-bold text-teal-900">{store.commissionPercentage ?? 10}%</span>
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <Input
+              label="Legal Business / Entity Name"
+              placeholder="e.g. John Doe Enterprises"
+              value={form.legalBusinessName || store?.businessDetails?.legalBusinessName || ""}
+              onChange={(e) => set("legalBusinessName", e.target.value)}
+            />
+            <Input
+              label="Bank Account Number"
+              placeholder="Account Number"
+              value={form.bankAccountNumber || store?.businessDetails?.bankAccount?.accountNumber || ""}
+              onChange={(e) => set("bankAccountNumber", e.target.value)}
+            />
+            <Input
+              label="Bank IFSC Code"
+              placeholder="e.g. HDFC0001234"
+              value={form.bankIfsc || store?.businessDetails?.bankAccount?.ifscCode || ""}
+              onChange={(e) => set("bankIfsc", e.target.value.toUpperCase())}
+            />
+          </div>
+
+          <div className="mt-3 flex justify-end">
+            <button
+              type="button"
+              onClick={async () => {
+                setOnboardingRoute(true);
+                setError("");
+                try {
+                  const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+                  const res = await fetch(`${API}/api/stores/me/cashfree-onboard`, {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({
+                      legalBusinessName: form.legalBusinessName || store?.businessDetails?.legalBusinessName || form.name,
+                      businessType: "individual",
+                      bankAccount: {
+                        accountNumber: form.bankAccountNumber || store?.businessDetails?.bankAccount?.accountNumber,
+                        ifscCode: form.bankIfsc || store?.businessDetails?.bankAccount?.ifscCode,
+                        beneficiaryName: form.name,
+                      },
+                    }),
+                  });
+                  const data = await res.json();
+                  if (res.ok && data.success) {
+                    onRefresh();
+                    setShowRazorpaySuccess(true);
+                  } else {
+                    setError(data.message || "Failed to onboard with Cashfree Easy Split.");
+                  }
+                } catch (err: any) {
+                  setError(`Onboarding error: ${err.message}`);
+                } finally {
+                  setOnboardingRoute(false);
+                }
+              }}
+              disabled={onboardingRoute}
+              className="px-4 py-2 bg-teal-700 hover:bg-teal-800 disabled:opacity-50 text-white text-xs font-semibold rounded-xl transition shadow-sm"
+            >
+              {onboardingRoute ? "Connecting…" : store?.cashfreeVendorId ? "Sync / Update Cashfree Vendor" : "Connect Cashfree Easy Split"}
+            </button>
+          </div>
+        </div>
+
         <div className="flex items-center gap-3 pt-2">
           <button
             type="submit"
@@ -300,7 +443,36 @@ export function SellerSettingsTab({ store, token, onRefresh, categories }: any) 
             </span>
           )}
         </div>
-      </form>
+            </form>
+
+      {showRazorpaySuccess && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          onClick={() => setShowRazorpaySuccess(false)}
+        >
+          <div
+            className="bg-white rounded-2xl border border-[#BBD5DA] w-full max-w-sm shadow-2xl p-6 text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+              <CheckCircle2 size={28} className="text-green-600" />
+            </div>
+            <p className="font-bold text-gray-900 mb-1">
+              Razorpay Route Connected
+            </p>
+            <p className="text-sm text-gray-500 mb-6">
+              Your linked account has been configured successfully. Customer
+              payments will now route directly to your bank account.
+            </p>
+            <button
+              onClick={() => setShowRazorpaySuccess(false)}
+              className="w-full py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-semibold rounded-xl text-sm transition"
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

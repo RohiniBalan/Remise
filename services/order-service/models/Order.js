@@ -2,6 +2,8 @@ const mongoose = require('mongoose');
 
 const orderItemSchema = new mongoose.Schema({
   productId: { type: String, required: true },
+  storeId:   { type: String, default: null },
+  storeName: { type: String, default: null },
   title: { type: String, required: true },
   brand: { type: String },
   price: { type: Number, required: true },
@@ -9,6 +11,26 @@ const orderItemSchema = new mongoose.Schema({
   image: { type: String },
   moq:       { type: Number },   
   tierLabel: { type: String },
+}, { _id: false });
+
+const vendorTransferSchema = new mongoose.Schema({
+  storeId: { type: String, required: true },
+  storeName: { type: String, default: '' },
+  vendorId: { type: String, default: null }, // Cashfree Vendor ID
+  cashfreeSplitId: { type: String, default: null }, // Cashfree Split ID / Reference
+  razorpayAccountId: { type: String, default: null }, // Preserved for historical records
+  razorpayTransferId: { type: String, default: null }, // Preserved for historical records
+  grossAmount: { type: Number, required: true }, // Total items amount for this vendor in INR
+  commissionAmount: { type: Number, required: true }, // Platform fee in INR
+  vendorAmount: { type: Number, required: true }, // Net vendor amount in INR
+  transferStatus: {
+    type: String,
+    enum: ['pending', 'processing', 'processed', 'failed', 'reversed'],
+    default: 'pending'
+  },
+  failureReason: { type: String, default: null },
+  processedAt: { type: Date, default: null },
+  updatedAt: { type: Date, default: Date.now }
 }, { _id: false });
 
 const addressSchema = new mongoose.Schema({
@@ -34,8 +56,22 @@ const orderSchema = new mongoose.Schema({
   shippingAddress: addressSchema,
   billingAddress: addressSchema,
   paymentMethod: { type: String, required: true },
-  paymentStatus: { type: String, enum: ['PENDING', 'SUCCESS', 'FAILED'], default: 'PENDING' },
+  paymentStatus: { type: String, enum: ['PENDING', 'SUCCESS', 'FAILED', 'REFUNDED'], default: 'PENDING' },
   orderStatus: { type: String, enum: ['Processing', 'Shipped', 'Delivered', 'Cancelled'], default: 'Processing' },
+  stockStatus: { type: String, enum: ['NONE', 'RESERVED', 'COMMITTED', 'RELEASED', 'RESTORED'], default: 'NONE' },
+  stockExpiresAt: { type: Date, default: null },
+
+  // Cashfree Easy Split & PG Fields
+  cashfreeOrderId: { type: String, default: null, index: true },
+  cashfreePaymentId: { type: String, default: null, index: true },
+  paymentSessionId: { type: String, default: null },
+
+  // Razorpay Route Marketplace Fields (Preserved for historical records)
+  razorpayOrderId: { type: String, default: null, index: true },
+  razorpayPaymentId: { type: String, default: null, index: true },
+  razorpaySignature: { type: String, default: null },
+  vendorTransfers: [vendorTransferSchema],
+
   // Delivery method chosen at checkout (Self Pickup vs Home Delivery) and its
   // own fulfillment status — kept separate from orderStatus, which tracks the
   // wider order lifecycle used by the admin panel.
@@ -82,6 +118,13 @@ orderSchema.index({ userId: 1 });
 orderSchema.index({ storeId: 1 });
 orderSchema.index({ contactEmail: 1 });
 orderSchema.index({ orderId: 1 });
+orderSchema.index({ cashfreeOrderId: 1 });
+orderSchema.index({ cashfreePaymentId: 1 });
+orderSchema.index({ razorpayOrderId: 1 });
+orderSchema.index({ razorpayPaymentId: 1 });
+orderSchema.index({ 'vendorTransfers.cashfreeSplitId': 1 });
+orderSchema.index({ 'vendorTransfers.razorpayTransferId': 1 });
 orderSchema.index({ createdAt: -1 });
 
 module.exports = mongoose.models.Order || mongoose.model('Order', orderSchema);
+

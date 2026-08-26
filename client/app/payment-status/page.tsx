@@ -68,7 +68,7 @@ function PaymentStatusContent() {
           <div className="flex flex-col items-center">
             <Loader2 size={64} className="animate-spin text-[#C9A84C] mb-6" />
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Verifying Payment</h2>
-            <p className="text-gray-500">Please wait while we securely confirm your transaction with PhonePe.</p>
+            <p className="text-gray-500">Please wait while we securely confirm your transaction.</p>
           </div>
         )}
 

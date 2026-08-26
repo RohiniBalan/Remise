@@ -7,7 +7,8 @@ const {
   registerStore, getMyStore, getStoreById,
   updateStore, getAllStores, verifyStore, syncOwnerRole,
   getNearbyStores, getStoreInternal, getStoresByIds, getStoresByOwnerIds,
-  enrollDeliveryPortal
+  enrollDeliveryPortal, onboardStoreCashfree, getStoreCashfreeStatus, updateStoreCashfreeInternal,
+  onboardStoreRazorpay, getStoreRazorpayStatus, updateStoreRazorpayInternal
 } = require('../controllers/storeController');
 
 const { protect, verifyAdmin } = require('../middleware/authMiddleware');
@@ -30,13 +31,18 @@ const upload = multer({
 });
 
 // Authenticated — must be before /:id to prevent 'me' matching as an id
-router.get('/me/my-store',  protect, getMyStore);
-router.post('/me/sync-role', protect, syncOwnerRole);
+router.get('/me/my-store',         protect, getMyStore);
+router.post('/me/sync-role',        protect, syncOwnerRole);
 router.patch('/delivery-portal/enroll', protect, enrollDeliveryPortal);
-router.post('/',            protect, upload.single('logo'), registerStore);
+router.post('/me/cashfree-onboard', protect, onboardStoreCashfree);
+router.get('/me/cashfree-status',   protect, getStoreCashfreeStatus);
+// Backwards-compatible aliases
+router.post('/me/razorpay-onboard', protect, onboardStoreRazorpay);
+router.get('/me/razorpay-status',   protect, getStoreRazorpayStatus);
+router.post('/',                   protect, upload.single('logo'), registerStore);
 router.post('/batch', getStoresByIds);
 router.post('/by-owners', protect, getStoresByOwnerIds);
-router.put('/:id',        protect, upload.single('logo'), updateStore);
+router.put('/:id',                 protect, upload.single('logo'), updateStore);
 
 
 // Public — nearby search (must be before /:id)
@@ -44,6 +50,8 @@ router.get('/nearby',     getNearbyStores);
 
 // Internal — service-to-service only (not exposed via gateway)
 router.get('/internal/:id', getStoreInternal);
+router.patch('/internal/:id/cashfree-status', updateStoreCashfreeInternal);
+router.patch('/internal/:id/razorpay-status', updateStoreRazorpayInternal);
 
 // Admin — full store listing (includes ownerId/phone/email, so it must not be public)
 router.get('/',             protect, verifyAdmin, getAllStores);

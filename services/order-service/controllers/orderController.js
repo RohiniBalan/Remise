@@ -1,6 +1,9 @@
 const crypto = require('crypto');
+const axios = require('axios');
 const Order = require('../models/Order');
 const { notifyCustomerOrderParties, notifyWholeSaleOrderParties } = require('../utils/notifications');
+
+const PRODUCT_SERVICE_URL = process.env.PRODUCT_SERVICE_URL || 'http://localhost:3003';
 
 
 // Internal: create order (called by payment-service)
@@ -62,17 +65,41 @@ const getOrderByOrderId = async (req, res) => {
 const updatePaymentStatus = async (req, res) => {
   try {
     const { orderId } = req.params;
-    const { paymentStatus } = req.body;
+    const { paymentStatus, stockStatus } = req.body;
+
+    const updateFields = { paymentStatus };
+    if (stockStatus) updateFields.stockStatus = stockStatus;
 
     const order = await Order.findOneAndUpdate(
       { orderId },
-      { paymentStatus },
+      updateFields,
       { new: true }
     );
     if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
     res.status(200).json({ success: true, data: order });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to update payment status', error: error.message });
+  }
+};
+
+// Internal: expire reservation and cancel order (called by product-service during expiration cleanup)
+const expireReservation = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const order = await Order.findOne({ orderId });
+    if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+
+    // Only expire if still in PENDING payment
+    if (order.paymentStatus === 'PENDING') {
+      order.paymentStatus = 'FAILED';
+      order.orderStatus = 'Cancelled';
+      order.stockStatus = 'RELEASED';
+      await order.save();
+    }
+
+    res.status(200).json({ success: true, message: 'Order reservation expired and marked failed', data: order });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to expire order reservation', error: error.message });
   }
 };
 
@@ -94,13 +121,35 @@ const updateOrderStatus = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid order status' });
     }
 
-    const order = await Order.findByIdAndUpdate(req.params.id, { orderStatus: status }, { new: true });
+    const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+
+    const previousStatus = order.orderStatus;
+    order.orderStatus = status;
+
+    // If transitioned to Cancelled, restore stock if it was committed or success
+    if (status === 'Cancelled' && previousStatus !== 'Cancelled') {
+      if (order.stockStatus === 'COMMITTED' || order.paymentStatus === 'SUCCESS') {
+        try {
+          await axios.post(`${PRODUCT_SERVICE_URL}/api/products/release-stock`, {
+            orderId: order.orderId,
+            items: order.items,
+            reason: 'order_cancelled',
+          });
+          order.stockStatus = 'RESTORED';
+        } catch (stockErr) {
+          console.error('[updateOrderStatus] Stock restoration error:', stockErr.message);
+        }
+      }
+    }
+
+    await order.save();
     res.status(200).json({ success: true, message: 'Order status updated successfully', data: order });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to update order status' });
   }
 };
+
 
 // User: get own orders
 const getMyOrders = async (req, res) => {
@@ -126,14 +175,32 @@ const getMyOrders = async (req, res) => {
   }
 };
 
-// Store owner: orders placed against their store (e.g. via Smart Order Comparison)
+// Store owner: orders placed against their store (matches storeId, items.storeId, or vendorTransfers.storeId)
 const getOrdersByStore = async (req, res) => {
   try {
+    const { storeId } = req.params;
+    if (!storeId) {
+      return res.status(400).json({ success: false, message: 'Store ID is required' });
+    }
+
     res.set('Cache-Control', 'no-store');
-    const orders = await Order.find({ storeId: req.params.storeId }).sort({ createdAt: -1 });
-    res.status(200).json({ success: true, data: orders });
+
+    const orders = await Order.find({
+      $or: [
+        { storeId: storeId },
+        { 'items.storeId': storeId },
+        { 'vendorTransfers.storeId': storeId }
+      ]
+    }).sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      count: orders.length,
+      data: orders
+    });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to fetch store orders' });
+    console.error('Error fetching store orders:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch store orders', error: error.message });
   }
 };
 
@@ -261,7 +328,6 @@ const getOrderStats = async (req, res) => {
   }
 };
 
-const axios = require('axios');
 const { generateInvoicePdf } = require('../utils/invoiceGenerator');
 
 const STORE_SERVICE_URL = process.env.STORE_SERVICE_URL || 'http://localhost:3005';
@@ -751,17 +817,149 @@ const updateDeliveryStatusDirect = async (req, res) => {
   }
 };
 
-module.exports = {
-  createOrder, getOrderByOrderId, updatePaymentStatus,
-  getAllOrders, updateOrderStatus, getMyOrders,
-  getOrdersByStore, confirmQrPayment,
-  createWholesaleOrder, getOrdersByBuyer,
-  getOrderStats,
-  getOrderInvoice, downloadOrderInvoicePdf,
-  generateDeliveryLink, getDeliveryPortalOrder, updateDeliveryPortalStatus,
-  setDeliveryMode, updateDeliveryStatusDirect
+// Internal: update Cashfree details (order ID, payment ID, session ID, status, transfers)
+const updateOrderCashfreeDetails = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const {
+      cashfreeOrderId,
+      cashfreePaymentId,
+      paymentSessionId,
+      razorpayOrderId,
+      razorpayPaymentId,
+      razorpaySignature,
+      paymentStatus,
+      stockStatus,
+      vendorTransfers
+    } = req.body;
+
+    const updateFields = {};
+    if (cashfreeOrderId !== undefined) updateFields.cashfreeOrderId = cashfreeOrderId;
+    if (cashfreePaymentId !== undefined) updateFields.cashfreePaymentId = cashfreePaymentId;
+    if (paymentSessionId !== undefined) updateFields.paymentSessionId = paymentSessionId;
+    if (razorpayOrderId !== undefined) updateFields.razorpayOrderId = razorpayOrderId;
+    if (razorpayPaymentId !== undefined) updateFields.razorpayPaymentId = razorpayPaymentId;
+    if (razorpaySignature !== undefined) updateFields.razorpaySignature = razorpaySignature;
+    if (paymentStatus !== undefined) updateFields.paymentStatus = paymentStatus;
+    if (stockStatus !== undefined) updateFields.stockStatus = stockStatus;
+    if (vendorTransfers && Array.isArray(vendorTransfers)) updateFields.vendorTransfers = vendorTransfers;
+
+    const order = await Order.findOneAndUpdate(
+      { orderId },
+      { $set: updateFields },
+      { new: true }
+    );
+    if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+    res.status(200).json({ success: true, data: order });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to update order payment details', error: error.message });
+  }
 };
 
+// Internal: update a vendor's transfer status in an order (Cashfree / Easy Split)
+const updateTransferStatus = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const {
+      cashfreeSplitId,
+      vendorId,
+      razorpayTransferId,
+      razorpayAccountId,
+      storeId,
+      transferStatus,
+      failureReason
+    } = req.body;
 
+    const order = await Order.findOne({ orderId });
+    if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+
+    let updated = false;
+    order.vendorTransfers = order.vendorTransfers || [];
+    for (const transfer of order.vendorTransfers) {
+      if (
+        (cashfreeSplitId && transfer.cashfreeSplitId === cashfreeSplitId) ||
+        (vendorId && transfer.vendorId === vendorId) ||
+        (razorpayTransferId && transfer.razorpayTransferId === razorpayTransferId) ||
+        (razorpayAccountId && transfer.razorpayAccountId === razorpayAccountId) ||
+        (storeId && transfer.storeId === storeId)
+      ) {
+        if (transferStatus) transfer.transferStatus = transferStatus;
+        if (cashfreeSplitId) transfer.cashfreeSplitId = cashfreeSplitId;
+        if (vendorId) transfer.vendorId = vendorId;
+        if (razorpayTransferId) transfer.razorpayTransferId = razorpayTransferId;
+        if (failureReason !== undefined) transfer.failureReason = failureReason;
+        if (transferStatus === 'processed') transfer.processedAt = new Date();
+        transfer.updatedAt = new Date();
+        updated = true;
+        break;
+      }
+    }
+
+    if (!updated && (vendorId || razorpayAccountId)) {
+      order.vendorTransfers.push({
+        storeId: storeId || 'unknown',
+        vendorId: vendorId || null,
+        cashfreeSplitId: cashfreeSplitId || null,
+        razorpayAccountId: razorpayAccountId || null,
+        razorpayTransferId: razorpayTransferId || null,
+        grossAmount: 0,
+        commissionAmount: 0,
+        vendorAmount: 0,
+        transferStatus: transferStatus || 'pending',
+        failureReason: failureReason || null,
+        processedAt: transferStatus === 'processed' ? new Date() : null,
+        updatedAt: new Date()
+      });
+    }
+
+    await order.save();
+    res.status(200).json({ success: true, data: order });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to update transfer status', error: error.message });
+  }
+};
+
+// Internal: get order by transfer ID
+const getOrderByTransferId = async (req, res) => {
+  try {
+    const { transferId } = req.params;
+    const order = await Order.findOne({
+      $or: [
+        { 'vendorTransfers.cashfreeSplitId': transferId },
+        { 'vendorTransfers.razorpayTransferId': transferId }
+      ]
+    });
+    if (!order) return res.status(404).json({ success: false, message: 'Order not found for this transfer ID' });
+    res.status(200).json({ success: true, data: order });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to fetch order by transfer ID', error: error.message });
+  }
+};
+
+module.exports = {
+  getAllOrders,
+  getMyOrders,
+  createOrder,
+  getOrderByOrderId,
+  updatePaymentStatus,
+  expireReservation,
+  getOrdersByStore,
+  confirmQrPayment,
+  createWholesaleOrder,
+  getOrdersByBuyer,
+  updateOrderStatus,
+  getOrderStats,
+  getOrderInvoice,
+  downloadOrderInvoicePdf,
+  generateDeliveryLink,
+  getDeliveryPortalOrder,
+  updateDeliveryPortalStatus,
+  setDeliveryMode,
+  updateDeliveryStatusDirect,
+  updateOrderCashfreeDetails,
+  updateOrderRazorpayDetails: updateOrderCashfreeDetails, // Backwards-compatible alias
+  updateTransferStatus,
+  getOrderByTransferId,
+};
 
 

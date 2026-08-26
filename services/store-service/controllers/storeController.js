@@ -43,7 +43,39 @@ const registerStore = async (req, res) => {
       ownerName,
       upiId,
       storeType,
+      pan,
+      gstin,
     } = req.body;
+
+    // PAN validation (Mandatory)
+    if (!pan || !pan.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "PAN number is mandatory.",
+      });
+    }
+
+    const trimmedPan = pan.trim().toUpperCase();
+    const PAN_REGEX = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+    if (!PAN_REGEX.test(trimmedPan)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid PAN format (expected 10 characters e.g. ABCDE1234F).",
+      });
+    }
+
+    // GSTIN validation (Optional)
+    let trimmedGstin = null;
+    if (gstin && gstin.trim()) {
+      trimmedGstin = gstin.trim().toUpperCase();
+      const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+      if (!GSTIN_REGEX.test(trimmedGstin)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid GSTIN format (expected 15 characters e.g. 22AAAAA0000A1Z5).",
+        });
+      }
+    }
 
     if (!latitude || !longitude) {
       return res
@@ -87,6 +119,14 @@ const registerStore = async (req, res) => {
       email,
       category,
       storeType: storeType || "store",
+      pan: trimmedPan,
+      gstin: trimmedGstin,
+      businessDetails: {
+        legalBusinessName: ownerName || name,
+        businessType: "individual",
+        pan: trimmedPan,
+        gstin: trimmedGstin,
+      },
       address:
         typeof address === "string" ? JSON.parse(address) : address || {},
       location: {
@@ -161,39 +201,97 @@ const getNearbyStores = async (req, res) => {
         });
     }
 
-    const radiusInMeters = parseFloat(radius) * 1000;
+    const parsedLat = parseFloat(lat);
+    const parsedLng = parseFloat(lng);
+    const parsedRadiusKm = parseFloat(radius) || 10;
+    const radiusInMeters = parsedRadiusKm * 1000;
 
-    const filter = {
-      isActive: true,
-      location: {
-        $near: {
-          $geometry: {
-            type: "Point",
-            coordinates: [parseFloat(lng), parseFloat(lat)],
+    let stores = [];
+
+    // 1. Try Mongo geospatial $near query
+    try {
+      const geoFilter = {
+        isActive: true,
+        location: {
+          $near: {
+            $geometry: {
+              type: "Point",
+              coordinates: [parsedLng, parsedLat],
+            },
+            $maxDistance: radiusInMeters,
           },
-          $maxDistance: radiusInMeters,
         },
-      },
-    };
-    if (storeType) filter.storeType = storeType;
+      };
+      if (storeType) {
+        if (storeType === "store") {
+          geoFilter.$or = [
+            { storeType: "store" },
+            { storeType: { $exists: false } },
+            { storeType: null },
+          ];
+        } else {
+          geoFilter.storeType = storeType;
+        }
+      }
+      stores = await Store.find(geoFilter).select("-ownerId").limit(50);
+    } catch (geoErr) {
+      console.warn(
+        "getNearbyStores: $near query fallback to manual calculation:",
+        geoErr.message
+      );
+      // Fallback: fetch active stores and compute distance manually
+      const fallbackFilter = { isActive: true };
+      if (storeType) {
+        if (storeType === "store") {
+          fallbackFilter.$or = [
+            { storeType: "store" },
+            { storeType: { $exists: false } },
+            { storeType: null },
+          ];
+        } else {
+          fallbackFilter.storeType = storeType;
+        }
+      }
+      stores = await Store.find(fallbackFilter).select("-ownerId").limit(100);
+    }
 
-    const stores = await Store.find(filter).select("-ownerId").limit(50);
+    // 2. Attach distance safely to each store
+    const R = 6371; // Earth radius in km
+    const storesWithDistance = stores
+      .map((s) => {
+        const coords = s.location?.coordinates;
+        let distKm = 0;
+        if (
+          Array.isArray(coords) &&
+          coords.length >= 2 &&
+          !isNaN(coords[0]) &&
+          !isNaN(coords[1])
+        ) {
+          const sLng = Number(coords[0]);
+          const sLat = Number(coords[1]);
+          const dLat = ((sLat - parsedLat) * Math.PI) / 180;
+          const dLng = ((sLng - parsedLng) * Math.PI) / 180;
+          const a =
+            Math.sin(dLat / 2) ** 2 +
+            Math.cos((parsedLat * Math.PI) / 180) *
+              Math.cos((sLat * Math.PI) / 180) *
+              Math.sin(dLng / 2) ** 2;
+          distKm = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        } else {
+          // If store has no coordinates, assign 0.5km for local dev/testing
+          distKm = 0.5;
+        }
 
-    // Attach distance to each store
-    const storesWithDistance = stores.map((s) => {
-      const [sLng, sLat] = s.location.coordinates;
-      const R = 6371;
-      const dLat = ((sLat - parseFloat(lat)) * Math.PI) / 180;
-      const dLng = ((sLng - parseFloat(lng)) * Math.PI) / 180;
-      const a =
-        Math.sin(dLat / 2) ** 2 +
-        Math.cos((parseFloat(lat) * Math.PI) / 180) *
-          Math.cos((sLat * Math.PI) / 180) *
-          Math.sin(dLng / 2) ** 2;
-      const distKm = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        const storeObj = s.toObject ? s.toObject() : s;
+        return {
+          ...storeObj,
+          distanceKm: parseFloat(distKm.toFixed(2)),
+        };
+      })
+      .filter((s) => s.distanceKm <= parsedRadiusKm);
 
-      return { ...s.toObject(), distanceKm: parseFloat(distKm.toFixed(2)) };
-    });
+    // Sort by distance ascending
+    storesWithDistance.sort((a, b) => a.distanceKm - b.distanceKm);
 
     res.json({
       success: true,
@@ -202,7 +300,7 @@ const getNearbyStores = async (req, res) => {
     });
   } catch (err) {
     console.error("getNearbyStores error:", err);
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ success: false, message: err.message || "Failed to retrieve nearby stores" });
   }
 };
 
@@ -264,8 +362,45 @@ const updateStore = async (req, res) => {
       longitude,
       upiId,
       targetRevenue,
-      fssai, // ← NEW
+      fssai,
+      pan,
+      gstin,
     } = req.body;
+
+    if (pan !== undefined) {
+      const trimmed = (pan || "").trim().toUpperCase();
+      if (trimmed) {
+        const PAN_REGEX = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+        if (!PAN_REGEX.test(trimmed)) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid PAN format (expected 10 characters e.g. ABCDE1234F).",
+          });
+        }
+        store.pan = trimmed;
+        if (!store.businessDetails) store.businessDetails = {};
+        store.businessDetails.pan = trimmed;
+      }
+    }
+
+    if (gstin !== undefined) {
+      const trimmed = (gstin || "").trim().toUpperCase();
+      if (trimmed) {
+        const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+        if (!GSTIN_REGEX.test(trimmed)) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid GSTIN format (expected 15 characters e.g. 22AAAAA0000A1Z5).",
+          });
+        }
+        store.gstin = trimmed;
+        if (!store.businessDetails) store.businessDetails = {};
+        store.businessDetails.gstin = trimmed;
+      } else {
+        store.gstin = null;
+        if (store.businessDetails) store.businessDetails.gstin = null;
+      }
+    }
 
     if (name) store.name = name;
     if (description) store.description = description;
@@ -479,6 +614,138 @@ const enrollDeliveryPortal = async (req, res) => {
   }
 };
 
+// Store Owner: Onboard / Link to Cashfree Easy Split
+const onboardStoreCashfree = async (req, res) => {
+  try {
+    const store = await Store.findOne({ ownerId: req.user.id });
+    if (!store) {
+      return res.status(404).json({ success: false, message: 'Store not found.' });
+    }
+
+    const {
+      legalBusinessName,
+      businessType = 'individual',
+      pan,
+      gstin,
+      bankAccount,
+      contactName
+    } = req.body;
+
+    // Update business details on store
+    store.businessDetails = store.businessDetails || {};
+    if (legalBusinessName) store.businessDetails.legalBusinessName = legalBusinessName;
+    if (businessType) store.businessDetails.businessType = businessType;
+    if (pan) {
+      store.pan = pan.trim().toUpperCase();
+      store.businessDetails.pan = pan.trim().toUpperCase();
+    }
+    if (gstin) {
+      store.gstin = gstin.trim().toUpperCase();
+      store.businessDetails.gstin = gstin.trim().toUpperCase();
+    }
+    if (bankAccount) {
+      store.businessDetails.bankAccount = {
+        accountNumber: bankAccount.accountNumber || store.businessDetails.bankAccount?.accountNumber,
+        ifscCode: (bankAccount.ifscCode || store.businessDetails.bankAccount?.ifscCode || '').toUpperCase(),
+        beneficiaryName: bankAccount.beneficiaryName || store.businessDetails.bankAccount?.beneficiaryName || store.name,
+      };
+    }
+
+    // Call payment-service to create or sync Cashfree Easy Split Vendor
+    const paymentServiceUrl = process.env.PAYMENT_SERVICE_URL || 'http://localhost:3005';
+    try {
+      const onboardPayload = {
+        storeId: store._id.toString(),
+        vendorId: store.cashfreeVendorId || `vendor_${store._id}`,
+        ownerId: store.ownerId,
+        ownerName: contactName || store.ownerName || req.user.name,
+        name: store.name,
+        email: store.email,
+        phone: store.phone,
+        legalBusinessName: legalBusinessName || store.businessDetails.legalBusinessName || store.name,
+        businessType: businessType || store.businessDetails.businessType || 'individual',
+        pan: pan || store.businessDetails.pan || store.pan,
+        gstin: gstin || store.businessDetails.gstin || store.gstin,
+        bankAccount: bankAccount || store.businessDetails.bankAccount,
+        address: store.address || {},
+      };
+
+      const onboardRes = await axios.post(`${paymentServiceUrl}/api/payment/vendor/onboard`, onboardPayload);
+      if (onboardRes.data.success && onboardRes.data.data) {
+        const { vendorId, status, kycStatus } = onboardRes.data.data;
+        if (vendorId) store.cashfreeVendorId = vendorId;
+        if (status) store.cashfreeVendorStatus = status.toLowerCase();
+        if (kycStatus) store.cashfreeKycStatus = kycStatus;
+      }
+    } catch (onboardErr) {
+      console.error('Failed to call payment-service for Cashfree onboarding:', onboardErr.response?.data || onboardErr.message);
+      await store.save();
+      return res.status(502).json({
+        success: false,
+        message: onboardErr.response?.data?.message || 'Failed to communicate with payment gateway for onboarding.',
+        data: store,
+      });
+    }
+
+    await store.save();
+
+    res.json({
+      success: true,
+      message: 'Cashfree Easy Split vendor onboarding configured successfully.',
+      data: store,
+    });
+  } catch (err) {
+    console.error('onboardStoreCashfree error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// Store Owner: Get Cashfree Easy Split Status
+const getStoreCashfreeStatus = async (req, res) => {
+  try {
+    const store = await Store.findOne({ ownerId: req.user.id });
+    if (!store) {
+      return res.status(404).json({ success: false, message: 'Store not found.' });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        storeId: store._id,
+        storeName: store.name,
+        cashfreeVendorId: store.cashfreeVendorId,
+        cashfreeVendorStatus: store.cashfreeVendorStatus || 'not_created',
+        cashfreeKycStatus: store.cashfreeKycStatus,
+        razorpayAccountId: store.razorpayAccountId, // Preserved for historical reference
+        commissionPercentage: store.commissionPercentage || 10,
+        businessDetails: store.businessDetails || {},
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// Internal: update store Cashfree status from payment-service / webhook
+const updateStoreCashfreeInternal = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { cashfreeVendorId, cashfreeVendorStatus, cashfreeKycStatus } = req.body;
+
+    const store = await Store.findById(id);
+    if (!store) return res.status(404).json({ success: false, message: 'Store not found.' });
+
+    if (cashfreeVendorId) store.cashfreeVendorId = cashfreeVendorId;
+    if (cashfreeVendorStatus) store.cashfreeVendorStatus = cashfreeVendorStatus;
+    if (cashfreeKycStatus) store.cashfreeKycStatus = cashfreeKycStatus;
+
+    await store.save();
+    res.json({ success: true, data: store });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 module.exports = {
   registerStore,
   getMyStore,
@@ -492,5 +759,14 @@ module.exports = {
   getStoresByIds,
   getStoresByOwnerIds,
   enrollDeliveryPortal,
+  onboardStoreCashfree,
+  getStoreCashfreeStatus,
+  updateStoreCashfreeInternal,
+  // Backwards-compatible aliases
+  onboardStoreRazorpay: onboardStoreCashfree,
+  getStoreRazorpayStatus: getStoreCashfreeStatus,
+  updateStoreRazorpayInternal: updateStoreCashfreeInternal,
 };
+
+
 

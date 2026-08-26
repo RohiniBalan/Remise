@@ -4,11 +4,12 @@ const path    = require('path');
 const fs      = require('fs');
 const router = express.Router();
 const {
-  getMyOrders, createOrder, getOrderByOrderId, updatePaymentStatus,
+  getMyOrders, createOrder, getOrderByOrderId, updatePaymentStatus, expireReservation,
   getOrdersByStore, confirmQrPayment, createWholesaleOrder, getOrdersByBuyer,
   updateOrderStatus, getOrderStats, getOrderInvoice, downloadOrderInvoicePdf,
   generateDeliveryLink, getDeliveryPortalOrder, updateDeliveryPortalStatus,
-  setDeliveryMode, updateDeliveryStatusDirect
+  setDeliveryMode, updateDeliveryStatusDirect,
+  updateOrderCashfreeDetails, updateOrderRazorpayDetails, updateTransferStatus, getOrderByTransferId
 } = require('../controllers/orderController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
@@ -54,6 +55,12 @@ router.get('/internal/stats', getOrderStats);
 router.post('/internal', createOrder);
 router.get('/internal/:orderId', getOrderByOrderId);
 router.patch('/internal/:orderId/payment-status', updatePaymentStatus);
+router.patch('/internal/:orderId/expire-reservation', expireReservation);
+router.patch('/internal/:orderId/cashfree-details', updateOrderCashfreeDetails);
+router.patch('/internal/:orderId/razorpay-details', updateOrderRazorpayDetails);
+router.patch('/internal/:orderId/transfer-status', updateTransferStatus);
+router.get('/internal/by-transfer/:transferId', getOrderByTransferId);
+
 
 // Store owner: orders THEY placed as a buyer (mirrors getOrdersByStore, but from the buyer's side)
 router.post('/wholesale',        protect, authorize('user','store_owner'), createWholesaleOrder);

@@ -4,6 +4,7 @@ const {
   upload,
   createProduct, getProducts, getProductById, getProductsByStore,
   getProductsByIds, updateProduct, deleteProduct, deductStock,
+  reserveStock, commitStock, releaseStock, expireReservations,
   matchCart, getGroupedSuppliers
 } = require('../controllers/productController');
 const { protect, authorize, verifyAdmin, verifyAdminOrStoreOwner } = require('../middleware/authMiddleware');
@@ -16,9 +17,14 @@ router.get('/store/:storeId', getProductsByStore);  // must be before /:id
 router.get('/:id',            getProductById);
 
 // ── Internal (service-to-service) ────────────────────────────────────────────
-router.post('/batch',         getProductsByIds);
-router.post('/deduct-stock',  deductStock);
-router.post('/match-cart',    matchCart);
+router.post('/batch',                getProductsByIds);
+router.post('/reserve-stock',        reserveStock);
+router.post('/commit-stock',         commitStock);
+router.post('/release-stock',        releaseStock);
+router.post('/expire-reservations',  expireReservations);
+router.post('/deduct-stock',         deductStock);
+router.post('/match-cart',           matchCart);
+
 
 // ── Admin or Store Owner or Sellers ──────────────────────────────────────────────────────
 router.post(  '/',    protect, authorize('admin','store_owner','whole_saler','home_business'), upload.single('image'), createProduct);

@@ -11,8 +11,21 @@ interface Order {
   orderId: string;
   contactEmail?: string;
   orderStatus: string;
+  paymentMethod?: string;
+  paymentStatus?: string;
   totalAmount: number;
   createdAt: string;
+  vendorTransfers?: Array<{
+    storeId: string;
+    storeName?: string;
+    razorpayAccountId?: string;
+    grossAmount: number;
+    commissionAmount: number;
+    vendorAmount: number;
+    transferStatus: string;
+    processedAt?: string;
+    failureReason?: string;
+  }>;
   items?: Array<{
     quantity: number;
     title: string;
@@ -91,54 +104,87 @@ export function IncomingOrdersTab({ orders, token, onRefresh }: IncomingOrdersTa
           <ShoppingBag size={40} className="mx-auto text-gray-200 mb-4" />
           <p className="text-lg font-semibold text-gray-700">No orders yet</p>
           <p className="text-gray-400 text-sm mt-1">
-            Orders placed by store owners will show up here.
+            Orders placed by customers will show up here.
           </p>
         </div>
       ) : (
         <div className="space-y-3">
-          {paginatedOrders.map((o: Order) => (
-            <div
-              key={o._id}
-              className="bg-white rounded-2xl border border-[#BBD5DA] p-5 shadow-sm hover:shadow-md transition"
-            >
-              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <p className="font-bold text-gray-900">{o.orderId}</p>
-                    <span
-                      className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
-                        STATUS_STYLE[o.orderStatus] || "bg-gray-100 text-gray-600 border-gray-200"
-                      }`}
-                    >
-                      {o.orderStatus}
-                    </span>
+          {paginatedOrders.map((o: Order) => {
+            const transfer = o.vendorTransfers?.[0];
+            return (
+              <div
+                key={o._id}
+                className="bg-white rounded-2xl border border-[#BBD5DA] p-5 shadow-sm hover:shadow-md transition"
+              >
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <p className="font-bold text-gray-900">{o.orderId}</p>
+                      <span
+                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                          STATUS_STYLE[o.orderStatus] || "bg-gray-100 text-gray-600 border-gray-200"
+                        }`}
+                      >
+                        {o.orderStatus}
+                      </span>
+                      <span
+                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                          o.paymentStatus === 'SUCCESS'
+                            ? 'bg-green-50 text-green-700 border-green-200'
+                            : o.paymentStatus === 'FAILED'
+                              ? 'bg-red-50 text-red-700 border-red-200'
+                              : 'bg-amber-50 text-amber-700 border-amber-200'
+                        }`}
+                      >
+                        Payment: {o.paymentStatus || 'PENDING'}
+                      </span>
+                      {transfer && (
+                        <span
+                          className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                            transfer.transferStatus === 'processed'
+                              ? 'bg-teal-50 text-teal-700 border-teal-200'
+                              : transfer.transferStatus === 'failed'
+                                ? 'bg-red-50 text-red-700 border-red-200'
+                                : 'bg-blue-50 text-blue-700 border-blue-200'
+                          }`}
+                        >
+                          Route Transfer: {transfer.transferStatus.toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-gray-600 text-sm">{o.contactEmail}</p>
+                    <div className="text-xs text-gray-500 mt-1 space-y-0.5">
+                      {o.items?.map((it, i) => (
+                        <p key={i}>
+                          {it.quantity}× {it.title}{" "}
+                          {it.tierLabel ? `(${it.tierLabel})` : ""} — ₹{it.price}
+                          /unit
+                        </p>
+                      ))}
+                    </div>
+                    {transfer && (
+                      <div className="mt-2 text-xs bg-[#F5F5F5] p-2 rounded-lg border border-[#BBD5DA] inline-block">
+                        <span className="text-gray-600">Your Settlement: </span>
+                        <strong className="text-teal-700">₹{transfer.vendorAmount}</strong>
+                        <span className="text-gray-400"> (Gross: ₹{transfer.grossAmount} − Fee: ₹{transfer.commissionAmount})</span>
+                      </div>
+                    )}
+                    <p className="text-gray-400 text-xs mt-1">
+                      {new Date(o.createdAt).toLocaleString("en-IN", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </p>
                   </div>
-                  <p className="text-gray-600 text-sm">{o.contactEmail}</p>
-                  <div className="text-xs text-gray-500 mt-1 space-y-0.5">
-                    {o.items?.map((it, i) => (
-                      <p key={i}>
-                        {it.quantity}× {it.title}{" "}
-                        {it.tierLabel ? `(${it.tierLabel})` : ""} — ₹{it.price}
-                        /unit
-                      </p>
-                    ))}
+                  <div className="text-right shrink-0">
+                    <p className="text-xl font-bold text-teal-700">
+                      ₹{o.totalAmount?.toLocaleString("en-IN")}
+                    </p>
                   </div>
-                  <p className="text-gray-400 text-xs mt-1">
-                    {new Date(o.createdAt).toLocaleString("en-IN", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </p>
                 </div>
-                <div className="text-right shrink-0">
-                  <p className="text-xl font-bold text-teal-700">
-                    ₹{o.totalAmount?.toLocaleString("en-IN")}
-                  </p>
-                </div>
-              </div>
               <div className="flex items-center gap-3 mt-4 pt-4 border-t border-[#F5F5F5]">
                 <span className="text-xs text-gray-400 font-mono">
                   #{o._id.slice(-6).toUpperCase()}
@@ -147,7 +193,7 @@ export function IncomingOrdersTab({ orders, token, onRefresh }: IncomingOrdersTa
                   value={o.orderStatus}
                   onChange={(e) => handleStatus(o._id, e.target.value)}
                   disabled={updating === o._id}
-                  className="ml-auto bg-[#F5F5F5] border border-[#BBD5DA] text-gray-700 text-sm rounded-xl px-3 py-1.5 outline-none focus:border-teal-400 transition cursor-pointer disabled:opacity-50"
+                  className="ml-auto bg-[#F5F5F5] border border-[#BBD5DA] text-black text-sm rounded-xl px-3 py-1.5 outline-none focus:border-teal-400 transition cursor-pointer disabled:opacity-50"
                 >
                   {ORDER_STATUSES.map((s) => (
                     <option key={s}>{s}</option>
@@ -158,7 +204,8 @@ export function IncomingOrdersTab({ orders, token, onRefresh }: IncomingOrdersTa
                 )}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -172,4 +219,4 @@ export function IncomingOrdersTab({ orders, token, onRefresh }: IncomingOrdersTa
       )}
     </div>
   );
-}
+}

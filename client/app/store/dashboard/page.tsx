@@ -1026,7 +1026,7 @@ function OverviewTab({
         <select
           value={range}
           onChange={(e) => setRange(e.target.value as DateRangeKey)}
-          className="col-span-1 bg-[#F5F5F5] border border-[#BBD5DA] rounded-xl px-3 py-2 text-sm text-gray-700 outline-none w-full sm:w-auto"
+          className="col-span-1 bg-[#F5F5F5] border border-[#BBD5DA] rounded-xl px-3 py-2 text-sm text-black outline-none w-full sm:w-auto"
         >
           <option value="today">Today</option>
           <option value="week">This Week</option>
@@ -1055,7 +1055,7 @@ function OverviewTab({
         <select
           value={category}
           onChange={(e) => setCategory(e.target.value)}
-          className="col-span-1 bg-[#F5F5F5] border border-[#BBD5DA] rounded-xl px-3 py-2 text-sm text-gray-700 outline-none w-full sm:w-auto"
+          className="col-span-1 bg-[#F5F5F5] border border-[#BBD5DA] rounded-xl px-3 py-2 text-sm text-black outline-none w-full sm:w-auto"
         >
           <option value="">All Categories</option>
           {mergedCategories.map((c) => (
@@ -1067,7 +1067,7 @@ function OverviewTab({
         <select
           value={productFilter}
           onChange={(e) => setProductFilter(e.target.value)}
-          className="col-span-1 bg-[#F5F5F5] border border-[#BBD5DA] rounded-xl px-3 py-2 text-sm text-gray-700 outline-none w-full sm:w-auto"
+          className="col-span-1 bg-[#F5F5F5] border border-[#BBD5DA] rounded-xl px-3 py-2 text-sm text-black outlie-none w-full sm:w-auto"
         >
           <option value="">All Products</option>
           {products.map((p: any) => (
@@ -4603,6 +4603,7 @@ function SuppliersTab({ token, store, categories }: any) {
 
 // ── Settings Tab ──────────────────────────────────────────────────────────────
 function SettingsTab({ store, token, onRefresh, categories }: any) {
+  const router = useRouter();
   const [form, setForm] = useState({
     name: store?.name || "",
     description: store?.description || "",
@@ -4614,11 +4615,18 @@ function SettingsTab({ store, token, onRefresh, categories }: any) {
     state: store?.address?.state || "",
     pinCode: store?.address?.pinCode || "",
     targetRevenue: store?.targetRevenue ? String(store.targetRevenue) : "",
+    pan: store?.pan || store?.businessDetails?.pan || "",
+    gstin: store?.gstin || store?.businessDetails?.gstin || "",
+    legalBusinessName: store?.businessDetails?.legalBusinessName || "",
+    bankAccountNumber: store?.businessDetails?.bankAccount?.accountNumber || "",
+    bankIfsc: store?.businessDetails?.bankAccount?.ifscCode || "",
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [onboardingRoute, setOnboardingRoute] = useState(false);
   const [error, setError] = useState("");
   const [cities, setCities] = useState<any[]>([]);
+  const [showRazorpaySuccess, setShowRazorpaySuccess] = useState(false);
 
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -4678,6 +4686,8 @@ function SettingsTab({ store, token, onRefresh, categories }: any) {
       fd.append("address[state]", form.state);
       fd.append("address[pinCode]", form.pinCode);
       fd.append("targetRevenue", form.targetRevenue);
+      fd.append("pan", form.pan.trim().toUpperCase());
+      fd.append("gstin", form.gstin.trim().toUpperCase());
       fd.append("upiId", upiId.trim());
       fd.append("fssai", isFoodCategory ? fssai.trim() : "");
       await storeApi.update(store._id, fd, token);
@@ -4688,6 +4698,41 @@ function SettingsTab({ store, token, onRefresh, categories }: any) {
       setError(err.response?.data?.message || "Failed to save settings.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleRazorpayOnboard = async () => {
+    setOnboardingRoute(true);
+    setError("");
+    try {
+      const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+      const res = await fetch(`${API}/api/stores/me/razorpay-onboard`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          legalBusinessName: form.legalBusinessName || store?.businessDetails?.legalBusinessName || form.name,
+          businessType: "individual",
+          bankAccount: {
+            accountNumber: form.bankAccountNumber || store?.businessDetails?.bankAccount?.accountNumber,
+            ifscCode: form.bankIfsc || store?.businessDetails?.bankAccount?.ifscCode,
+            beneficiaryName: form.name,
+          },
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        onRefresh();
+        setShowRazorpaySuccess(true);
+      } else {
+        setError(data.message || "Failed to onboard with Razorpay Route.");
+      }
+    } catch (err: any) {
+      setError(`Onboarding error: ${err.message}`);
+    } finally {
+      setOnboardingRoute(false);
     }
   };
 
@@ -4842,43 +4887,77 @@ function SettingsTab({ store, token, onRefresh, categories }: any) {
           </Select>
         </div>
 
-        <div className="pt-2 border-t border-[#F5F5F5]">
-          <p className="text-sm font-semibold text-gray-800 mb-1">
-            UPI Payment QR Code
-          </p>
-          <p className="text-xs text-gray-400 mb-3">
-            Enter your UPI ID to generate a scannable QR code. Customers who
-            choose QR Code payment will see this when they order from your
-            store.
-          </p>
-          <div className="flex items-start gap-4">
-            <div className="w-24 h-24 rounded-xl border-2 border-dashed border-[#BBD5DA] bg-[#F5F5F5] flex items-center justify-center overflow-hidden shrink-0">
-              {store?.qrCodeImage ? (
-                <img
-                  src={store.qrCodeImage}
-                  alt="UPI QR code"
-                  className="w-full h-full object-contain bg-white"
-                />
-              ) : (
-                <QrCode size={22} className="text-gray-300" />
-              )}
-            </div>
-            <div className="flex-1">
-              <Input
-                label="UPI ID"
-                placeholder="merchant@upi"
-                value={upiId}
-                onChange={(e) => setUpiId(e.target.value)}
-              />
-              {upiError && (
-                <p className="text-xs text-[#FF0000] mt-1">{upiError}</p>
-              )}
-              <p className="text-xs text-gray-400 mt-1">
-                {store?.qrCodeImage
-                  ? "Save changes to regenerate the QR code."
-                  : "Save a valid UPI ID to generate your QR code."}
+        {/* Cashfree Easy Split Vendor Account Setup */}
+        <div className="pt-4 border-t border-[#F5F5F5]">
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <p className="text-sm font-semibold text-gray-800">
+                Cashfree Easy Split Marketplace Payments
+              </p>
+              <p className="text-xs text-gray-400">
+                Connect your Cashfree Vendor Account to automatically receive customer payments directly into your bank account.
               </p>
             </div>
+            <span
+              className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${
+                store?.cashfreeVendorId || store?.razorpayAccountId
+                  ? (store?.cashfreeVendorStatus === 'active' || store?.razorpayRouteStatus === 'active')
+                    ? 'bg-green-50 text-green-700 border-green-200'
+                    : 'bg-amber-50 text-amber-700 border-amber-200'
+                  : 'bg-gray-100 text-gray-600 border-gray-200'
+              }`}
+            >
+              {store?.cashfreeVendorId
+                ? `Easy Split: ${store?.cashfreeVendorStatus?.toUpperCase() || 'ACTIVE'}`
+                : store?.razorpayAccountId
+                ? `Vendor: CONNECTED`
+                : 'Easy Split: NOT CONNECTED'}
+            </span>
+          </div>
+
+          {(store?.cashfreeVendorId || store?.razorpayAccountId) && (
+            <div className="mb-3 p-3 bg-[#DFF1F1]/50 border border-[#BBD5DA] rounded-xl text-xs text-gray-700 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <span className="font-semibold text-teal-800">Cashfree Vendor ID:</span>{' '}
+                <code className="font-mono bg-white px-2 py-0.5 rounded border border-[#BBD5DA]">{store.cashfreeVendorId || `vendor_${store._id}`}</code>
+              </div>
+              <div>
+                <span className="font-semibold text-teal-800">Platform Commission:</span>{' '}
+                <span className="font-bold text-teal-900">{store.commissionPercentage ?? 10}%</span>
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <Input
+              label="Legal Business / Entity Name"
+              placeholder="e.g. John Doe Enterprises"
+              value={form.legalBusinessName || store?.businessDetails?.legalBusinessName || ""}
+              onChange={(e) => set("legalBusinessName", e.target.value)}
+            />
+            <Input
+              label="Bank Account Number"
+              placeholder="Account Number"
+              value={form.bankAccountNumber || store?.businessDetails?.bankAccount?.accountNumber || ""}
+              onChange={(e) => set("bankAccountNumber", e.target.value)}
+            />
+            <Input
+              label="Bank IFSC Code"
+              placeholder="e.g. HDFC0001234"
+              value={form.bankIfsc || store?.businessDetails?.bankAccount?.ifscCode || ""}
+              onChange={(e) => set("bankIfsc", e.target.value.toUpperCase())}
+            />
+          </div>
+
+          <div className="mt-3 flex justify-end">
+            <button
+              type="button"
+              onClick={handleRazorpayOnboard}
+              disabled={onboardingRoute}
+              className="px-4 py-2 bg-teal-700 hover:bg-teal-800 disabled:opacity-50 text-white text-xs font-semibold rounded-xl transition shadow-sm"
+            >
+              {onboardingRoute ? "Connecting…" : store?.cashfreeVendorId ? "Sync / Update Cashfree Vendor" : "Connect Cashfree Easy Split"}
+            </button>
           </div>
         </div>
 
@@ -4937,6 +5016,35 @@ function SettingsTab({ store, token, onRefresh, categories }: any) {
           </div>
         )}
       </div>
+
+            {showRazorpaySuccess && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          onClick={() => setShowRazorpaySuccess(false)}
+        >
+          <div
+            className="bg-white rounded-2xl border border-[#BBD5DA] w-full max-w-sm shadow-2xl p-6 text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+              <CheckCircle2 size={28} className="text-green-600" />
+            </div>
+            <p className="font-bold text-gray-900 mb-1">
+              Razorpay Route Connected
+            </p>
+            <p className="text-sm text-gray-500 mb-6">
+              Your linked account has been configured successfully. Customer
+              payments will now route directly to your bank account.
+            </p>
+            <button
+              onClick={() => setShowRazorpaySuccess(false)}
+              className="w-full py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-semibold rounded-xl text-sm transition"
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,10 +1,10 @@
 const axios = require('axios');
 
 const NOTIFICATION_SERVICE_URL =
-  process.env.NOTIFICATION_SERVICE_URL || 'http://notification-service:3009';
+  process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:3009';
 
 const STORE_SERVICE_URL =
-  process.env.STORE_SERVICE_URL || 'http://store-service:3007';
+  process.env.STORE_SERVICE_URL || 'http://localhost:3007';
 
 const sendNotification = async ({
   userId,

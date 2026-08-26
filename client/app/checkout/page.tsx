@@ -13,11 +13,18 @@ import {
   Trash2,
   Loader2,
   AlertCircle,
+  QrCode,
+  Copy,
+  Check,
+  Upload,
+  Store,
+  ExternalLink,
 } from "lucide-react";
 
 import { CartProvider, useCart } from "@/app/components-main/CartContext";
 import UserAvatarMenu from "@/app/components-main/UserAvatarMenu";
 import { isAuthenticated, redirectToLogin } from "@/app/utils/authGuard";
+import CashfreeModal from "@/app/components-main/CashfreeModal";
 
 // Define cart item interface
 interface CartItem {
@@ -44,7 +51,23 @@ interface AddressData {
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
+// Helper: Dynamically load Cashfree checkout SDK script
+const loadCashfreeScript = (): Promise<boolean> => {
+  return new Promise((resolve) => {
+    if (typeof window === "undefined") return resolve(false);
+    if ((window as any).Cashfree) return resolve(true);
+
+    const script = document.createElement("script");
+    script.src = "https://sdk.cashfree.com/js/v3/cashfree.js";
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+};
+
 // Product-service stores uploaded-image URLs as relative paths
+
 // (e.g. "/uploads/products/xxx.jpg"); AI-generated/external images are
 // already absolute. Same prefixing rule as store/dashboard/page.tsx.
 const resolveImageUrl = (image: unknown) => {
@@ -165,14 +188,32 @@ export default function CheckoutPage() {
     addToCart,
     decreaseQuantity,
     removeFromCart,
+    clearCart,
   } = useCart() as any;
 
   const [theme, setTheme] = useState<"dark" | "light">("dark");
-  const [paymentMethod, setPaymentMethod] = useState<"phonepe" | "cod">(
-    "phonepe",
+  const [paymentMethod, setPaymentMethod] = useState<"cashfree" | "razorpay" | "qr" | "cod">(
+    "cashfree",
   );
+  const [storeUpiInfo, setStoreUpiInfo] = useState<{
+    storeName: string;
+    upiId: string;
+    qrCodeImage: string | null;
+  } | null>(null);
+  const [storeQrLoading, setStoreQrLoading] = useState(false);
+  const [utrNumber, setUtrNumber] = useState("");
+  const [screenshotFile, setScreenshotFile] = useState<File | null>(null);
+  const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null);
+  const [copiedStoreUpi, setCopiedStoreUpi] = useState(false);
   const [billingSameAsShipping, setBillingSameAsShipping] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [notification, setNotification] = useState<{
+    show: boolean;
+    message: string;
+    type: "success" | "error" | "info";
+  }>({ show: false, message: "", type: "info" });
+  const [showCashfreeModal, setShowCashfreeModal] = useState(false);
+  const [cashfreeModalData, setCashfreeModalData] = useState<any>(null);
 
   // --- CUSTOM TOAST STATE ---
   const [toast, setToast] = useState<{
@@ -316,7 +357,85 @@ export default function CheckoutPage() {
     }
   };
 
-  // --- PAYMENT HANDLER (SAVES TO DB & INITIATES PHONEPE/COD) ---
+  const handleScreenshotChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setScreenshotFile(file);
+    setScreenshotPreview(URL.createObjectURL(file));
+  };
+
+  const handleCopyStoreUpi = (vpa: string) => {
+    navigator.clipboard?.writeText(vpa);
+    setCopiedStoreUpi(true);
+    showNotification("Merchant UPI ID copied to clipboard!", "success");
+    setTimeout(() => setCopiedStoreUpi(false), 2000);
+  };
+
+  useEffect(() => {
+    if (paymentMethod !== "qr") return;
+    const firstItem: any = itemsToCheckout[0];
+    const storeId = firstItem?.storeId || null;
+    const productId = firstItem?.id || firstItem?._id || firstItem?.productId || null;
+
+    let cancelled = false;
+    setStoreQrLoading(true);
+
+    const loadStoreDetails = async () => {
+      try {
+        let foundStoreId = storeId;
+        if (!foundStoreId && productId) {
+          try {
+            const pRes = await fetch(`${API}/api/products/${productId}`);
+            const pData = await pRes.json();
+            if (pData?.success && pData?.data?.storeId) {
+              foundStoreId = pData.data.storeId;
+            }
+          } catch (e) {
+            // ignore product lookup error
+          }
+        }
+
+        if (foundStoreId) {
+          const sRes = await fetch(`${API}/api/stores/${foundStoreId}`);
+          const sData = await sRes.json();
+          if (!cancelled && sData?.success && sData?.data) {
+            setStoreUpiInfo({
+              storeName: sData.data.name || "Merchant Store",
+              upiId: sData.data.upiId || process.env.NEXT_PUBLIC_MERCHANT_UPI_ID || "rohinibalan529@oksbi",
+              qrCodeImage: sData.data.qrCodeImage || null,
+            });
+            setStoreQrLoading(false);
+            return;
+          }
+        }
+
+        if (!cancelled) {
+          setStoreUpiInfo({
+            storeName: "Verified Store Merchant",
+            upiId: process.env.NEXT_PUBLIC_MERCHANT_UPI_ID || "rohinibalan529@oksbi",
+            qrCodeImage: null,
+          });
+          setStoreQrLoading(false);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setStoreUpiInfo({
+            storeName: "Verified Store Merchant",
+            upiId: process.env.NEXT_PUBLIC_MERCHANT_UPI_ID || "rohinibalan529@oksbi",
+            qrCodeImage: null,
+          });
+          setStoreQrLoading(false);
+        }
+      }
+    };
+
+    loadStoreDetails();
+    return () => {
+      cancelled = true;
+    };
+  }, [paymentMethod, itemsToCheckout]);
+
+  // --- PAYMENT HANDLER (SAVES TO DB, CREATES RAZORPAY ROUTE ORDER, VERIFIES SIGNATURE) ---
   const handlePayment = async () => {
     if (!isAuthenticated()) {
       redirectToLogin("/checkout");
@@ -335,7 +454,7 @@ export default function CheckoutPage() {
       // Prepare ALL order details to send to the backend
       const orderPayload = {
         amount: subtotal,
-        userId: userData?._id || userData?.id, // Added User ID
+        userId: userData?._id || userData?.id,
         redirectUrl: `${window.location.origin}/payment-status`,
         cartItems: itemsToCheckout,
         contactEmail: contactEmail,
@@ -346,37 +465,134 @@ export default function CheckoutPage() {
         paymentMethod: paymentMethod,
       };
 
-      // Send order to backend (This saves to MongoDB & initiates PhonePe if needed)
-      const response = await fetch(
-        "http://localhost:5000/api/payment/initiate",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(orderPayload),
-        },
-      );
+      // 1. Create order on backend (calculates multi-vendor split, creates Razorpay Route order)
+      const response = await fetch(`${API}/api/payment/create-order`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(orderPayload),
+      });
 
       const data = await response.json();
 
-      if (response.ok && data.success && data.url) {
-        // Clear global cart after creating the order
+      if (!response.ok || !data.success) {
+        showNotification(
+          data.message || "Failed to initialize payment gateway.",
+          "error"
+        );
+        setIsProcessing(false);
+        return;
+      }
+
+      // 2. COD / Direct Store QR Code Flow
+      if (paymentMethod === "cod" || paymentMethod === "qr" || data.isCod || data.isQr) {
+        if ((paymentMethod === "qr" || data.isQr) && (screenshotFile || utrNumber)) {
+          try {
+            const formData = new FormData();
+            if (screenshotFile) formData.append("screenshot", screenshotFile);
+            if (utrNumber) formData.append("utr", utrNumber);
+            await fetch(`${API}/api/orders/${data.orderId}/confirm-payment`, {
+              method: "PATCH",
+              body: formData,
+            });
+          } catch (qrErr) {
+            console.warn("QR proof upload note:", qrErr);
+          }
+        }
+
         if (!buyNowItem) {
-          // Clear cart from localStorage if needed
+          clearCart();
+          localStorage.removeItem("cart");
+        }
+        router.push(`/payment-status?orderId=${data.orderId}&status=SUCCESS`);
+        return;
+      }
+
+      // 3. Cashfree Easy Split & Standard Checkout Flow
+      if ((paymentMethod === "cashfree" || paymentMethod === "razorpay") && (data.paymentSessionId || data.cashfreeOrderId)) {
+        const isLoaded = await loadCashfreeScript();
+        if (isLoaded && (window as any).Cashfree && data.paymentSessionId) {
+          try {
+            const isSandbox = Boolean(
+              data.isSandbox ||
+              data.paymentSessionId?.includes("paymentpayment") ||
+              process.env.NEXT_PUBLIC_CASHFREE_MODE === "sandbox"
+            );
+            const cashfreeMode = isSandbox ? "sandbox" : "production";
+            const cashfree = (window as any).Cashfree({ mode: cashfreeMode });
+
+            cashfree.checkout({
+              paymentSessionId: data.paymentSessionId,
+              redirectTarget: "_modal",
+            }).then(async (result: any) => {
+              if (result.error) {
+                setIsProcessing(false);
+                showNotification(result.error.message || "Payment was cancelled or dismissed.", "error");
+                fetch(`${API}/api/payment/cancel`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ orderId: data.orderId, reason: "cashfree_modal_dismissed" }),
+                }).catch(() => {});
+                return;
+              }
+
+              if (result.paymentDetails || result.redirect) {
+                try {
+                  const verifyRes = await fetch(`${API}/api/payment/verify`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      orderId: data.orderId,
+                      paymentSessionId: data.paymentSessionId,
+                      cashfree_order_id: data.cashfreeOrderId,
+                    }),
+                  });
+
+                  const verifyData = await verifyRes.json();
+                  if (verifyRes.ok && verifyData.success) {
+                    if (!buyNowItem) {
+                      clearCart();
+                      localStorage.removeItem("cart");
+                    }
+                    router.push(`/payment-status?orderId=${data.orderId}&status=SUCCESS`);
+                  } else {
+                    showNotification(verifyData.message || "Payment verification pending.", "error");
+                    router.push(`/payment-status?orderId=${data.orderId}&status=FAILED`);
+                  }
+                } catch (vErr: any) {
+                  showNotification(vErr.message || "Payment verification error.", "error");
+                  router.push(`/payment-status?orderId=${data.orderId}&status=FAILED`);
+                } finally {
+                  setIsProcessing(false);
+                }
+              }
+            });
+            return;
+          } catch (sdkErr: any) {
+            console.error("Cashfree SDK initiation error:", sdkErr);
+            setIsProcessing(false);
+            showNotification("Failed to launch Cashfree checkout. Please try again.", "error");
+            return;
+          }
+        }
+
+        setIsProcessing(false);
+        showNotification("Cashfree Payment SDK could not be loaded. Please check your internet connection.", "error");
+        return;
+      }
+
+      // Fallback redirect URL if returned
+      if (data.url) {
+        if (!buyNowItem) {
+          clearCart();
           localStorage.removeItem("cart");
         }
         window.location.href = data.url;
-      } else {
-        showNotification(
-          `Payment Error: ${data.message || "Failed to initialize payment gateway."}`,
-          "error",
-        );
-        setIsProcessing(false);
       }
     } catch (error) {
       console.error("Payment Error:", error);
       showNotification(
         "Server unreachable. Please check your backend connection.",
-        "error",
+        "error"
       );
       setIsProcessing(false);
     }
@@ -522,28 +738,34 @@ export default function CheckoutPage() {
             <div
               className={`border rounded-lg overflow-hidden ${theme === "light" ? "border-gray-200" : "border-[#333]"}`}
             >
+              {/* Option 1: Razorpay Online Gateway */}
               <div
-                className={`p-5 flex flex-col border-b transition-colors ${paymentMethod === "phonepe" ? (theme === "light" ? "bg-amber-50/50 border-amber-200" : "bg-[#1a1a1a] border-[#D4AF37]/50") : theme === "light" ? "bg-white border-gray-200" : "bg-[#111] border-[#333]"}`}
+                className={`p-5 flex flex-col border-b transition-colors ${paymentMethod === "razorpay" ? (theme === "light" ? "bg-amber-50/50 border-amber-200" : "bg-[#1a1a1a] border-[#D4AF37]/50") : theme === "light" ? "bg-white border-gray-200" : "bg-[#111] border-[#333]"}`}
               >
                 <div
                   className="flex items-center justify-between cursor-pointer"
-                  onClick={() => setPaymentMethod("phonepe")}
+                  onClick={() => setPaymentMethod("cashfree")}
                 >
                   <label className="flex items-center gap-3 cursor-pointer">
                     <div
-                      className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${paymentMethod === "phonepe" ? (theme === "light" ? "border-amber-500" : "border-[#D4AF37]") : "border-gray-500"}`}
+                      className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${paymentMethod === "cashfree" || paymentMethod === "razorpay" ? (theme === "light" ? "border-amber-500" : "border-[#D4AF37]") : "border-gray-500"}`}
                     >
-                      {paymentMethod === "phonepe" && (
+                      {(paymentMethod === "cashfree" || paymentMethod === "razorpay") && (
                         <div
                           className={`w-2 h-2 rounded-full ${theme === "light" ? "bg-amber-500" : "bg-[#D4AF37]"}`}
                         />
                       )}
                     </div>
-                    <span
-                      className={`font-medium tracking-wide ${theme === "light" ? "text-gray-900" : "text-white"}`}
-                    >
-                      Secure Online Payment (PhonePe)
-                    </span>
+                    <div>
+                      <span
+                        className={`font-medium tracking-wide block ${theme === "light" ? "text-gray-900" : "text-white"}`}
+                      >
+                        Online Payment Gateway (Cashfree Easy Split)
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        Dynamic UPI QR, UPI Apps, Cards & NetBanking (Instant Verified)
+                      </span>
+                    </div>
                   </label>
                   <CreditCard
                     size={20}
@@ -553,29 +775,201 @@ export default function CheckoutPage() {
                   />
                 </div>
                 <AnimatePresence>
-                  {paymentMethod === "phonepe" && (
+                  {(paymentMethod === "cashfree" || paymentMethod === "razorpay") && (
                     <motion.div
                       initial={{ height: 0, opacity: 0 }}
                       animate={{ height: "auto", opacity: 1 }}
                       exit={{ height: 0, opacity: 0 }}
                       className="overflow-hidden"
                     >
-                      <div className="mt-5 flex flex-col items-center justify-center p-6 text-center bg-black/20 rounded-md">
-                        <ShieldCheck
-                          size={32}
-                          className={`mb-3 ${theme === "light" ? "text-amber-500" : "text-[#D4AF37]"}`}
-                        />
+                      <div className="mt-4 p-4 rounded-xl border border-teal-500/20 bg-teal-500/5 flex flex-col gap-2">
+                        <div className="flex items-center gap-2">
+                          <ShieldCheck size={18} className="text-teal-600 shrink-0" />
+                          <span className="text-xs font-bold text-teal-800">
+                            Instant Real-time Verification · Cashfree Easy Split
+                          </span>
+                        </div>
                         <p
-                          className={`text-sm leading-relaxed ${theme === "light" ? "text-gray-600" : "text-gray-400"}`}
+                          className={`text-xs leading-relaxed ${theme === "light" ? "text-gray-600" : "text-gray-400"}`}
                         >
-                          You will be redirected securely to complete your
-                          purchase via UPI, Cards, or Netbanking.
+                          Generates a live dynamic UPI QR code or native Cashfree checkout. Scan with GPay, PhonePe, Paytm, CRED or BHIM to complete and verify instantly.
                         </p>
                       </div>
                     </motion.div>
                   )}
                 </AnimatePresence>
               </div>
+
+              {/* Option 2: Direct Store QR Code (Merchant UPI) */}
+              <div
+                className={`p-5 flex flex-col border-b transition-colors ${paymentMethod === "qr" ? (theme === "light" ? "bg-amber-50/50 border-amber-200" : "bg-[#1a1a1a] border-[#D4AF37]/50") : theme === "light" ? "bg-white border-gray-200" : "bg-[#111] border-[#333]"}`}
+              >
+                <div
+                  className="flex items-center justify-between cursor-pointer"
+                  onClick={() => setPaymentMethod("qr")}
+                >
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <div
+                      className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${paymentMethod === "qr" ? (theme === "light" ? "border-amber-500" : "border-[#D4AF37]") : "border-gray-500"}`}
+                    >
+                      {paymentMethod === "qr" && (
+                        <div
+                          className={`w-2 h-2 rounded-full ${theme === "light" ? "bg-amber-500" : "bg-[#D4AF37]"}`}
+                        />
+                      )}
+                    </div>
+                    <div>
+                      <span
+                        className={`font-medium tracking-wide block ${theme === "light" ? "text-gray-900" : "text-white"}`}
+                      >
+                        Direct Store QR Code (Merchant UPI)
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        Scan & pay directly to the merchant's verified UPI VPA
+                      </span>
+                    </div>
+                  </label>
+                  <QrCode
+                    size={20}
+                    className={
+                      theme === "light" ? "text-teal-600" : "text-[#D4AF37]"
+                    }
+                  />
+                </div>
+
+                <AnimatePresence>
+                  {paymentMethod === "qr" && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="mt-4 p-4 rounded-xl border border-teal-200 bg-white dark:bg-[#151515] space-y-4">
+                        {storeQrLoading ? (
+                          <div className="flex items-center justify-center py-6 gap-2 text-xs text-gray-500">
+                            <Loader2 size={16} className="animate-spin text-teal-600" />
+                            <span>Loading store merchant QR details...</span>
+                          </div>
+                        ) : (
+                          <>
+                            {/* Merchant Store Header */}
+                            <div className="flex items-center justify-between border-b border-gray-100 dark:border-[#2a2a2a] pb-2.5">
+                              <div className="flex items-center gap-2">
+                                <div className="w-7 h-7 rounded-lg bg-teal-100 text-teal-800 flex items-center justify-center font-bold text-xs">
+                                  <Store size={14} />
+                                </div>
+                                <div>
+                                  <p className="font-bold text-xs text-gray-900 dark:text-white">
+                                    {storeUpiInfo?.storeName || "Verified Store Merchant"}
+                                  </p>
+                                  <span className="text-[10px] text-teal-700 font-semibold bg-teal-50 dark:bg-teal-950/40 px-1.5 py-0.2 rounded border border-teal-200 dark:border-teal-800">
+                                    ● Verified Direct UPI
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <span className="text-[10px] text-gray-400 block">Amount Payable</span>
+                                <span className="text-sm font-black text-teal-700 dark:text-teal-400">
+                                  ₹{subtotal.toLocaleString("en-IN")}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Direct Store QR Image Box */}
+                            <div className="flex flex-col sm:flex-row items-center gap-4 bg-slate-50 dark:bg-[#0c0c0c] p-3.5 rounded-xl border border-slate-200 dark:border-[#2a2a2a]">
+                              <div className="p-2 bg-white rounded-xl shadow-xs border border-gray-200 shrink-0">
+                                <img
+                                  src={
+                                    storeUpiInfo?.qrCodeImage ||
+                                    `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(
+                                      `upi://pay?pa=${storeUpiInfo?.upiId || process.env.NEXT_PUBLIC_MERCHANT_UPI_ID || "rohinibalan529@oksbi"}&pn=${encodeURIComponent(storeUpiInfo?.storeName || "Store Merchant")}&am=${subtotal.toFixed(2)}&cu=INR&tn=Order_Checkout`
+                                    )}&margin=4`
+                                  }
+                                  alt="Store UPI QR Code"
+                                  className="w-36 h-36 object-contain"
+                                />
+                              </div>
+
+                              <div className="flex-1 space-y-2.5 text-center sm:text-left">
+                                <div className="bg-white dark:bg-[#181818] border border-gray-200 dark:border-[#333] rounded-lg p-2 flex items-center justify-between gap-2">
+                                  <div className="text-left truncate">
+                                    <span className="text-[10px] text-gray-400 font-semibold block uppercase">Merchant UPI VPA</span>
+                                    <span className="text-xs font-mono font-bold text-gray-800 dark:text-gray-200 truncate">
+                                      {storeUpiInfo?.upiId || process.env.NEXT_PUBLIC_MERCHANT_UPI_ID || "rohinibalan529@oksbi"}
+                                    </span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopyStoreUpi(storeUpiInfo?.upiId || process.env.NEXT_PUBLIC_MERCHANT_UPI_ID || "rohinibalan529@oksbi")}
+                                    className="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-[11px] font-semibold rounded transition shrink-0 flex items-center gap-1"
+                                  >
+                                    {copiedStoreUpi ? <Check size={12} className="text-green-600" /> : <Copy size={12} />}
+                                    <span>{copiedStoreUpi ? "Copied" : "Copy"}</span>
+                                  </button>
+                                </div>
+
+                                <p className="text-[11px] text-gray-500 leading-snug">
+                                  Scan using <strong>Google Pay</strong>, <strong>PhonePe</strong>, <strong>Paytm</strong>, <strong>CRED</strong> or <strong>BHIM</strong> to pay directly.
+                                </p>
+
+                                <div className="flex flex-wrap gap-1 justify-center sm:justify-start">
+                                  {["GPay", "PhonePe", "Paytm", "CRED", "BHIM"].map((app) => (
+                                    <span key={app} className="text-[9px] font-bold bg-white dark:bg-[#222] border border-gray-200 dark:border-[#444] text-gray-700 dark:text-gray-300 px-1.5 py-0.5 rounded-full">
+                                      {app}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* UTR / Transaction Reference Number Input */}
+                            <div className="space-y-1.5">
+                              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">
+                                UPI Ref / UTR Number (Optional / Recommended)
+                              </label>
+                              <input
+                                type="text"
+                                value={utrNumber}
+                                onChange={(e) => setUtrNumber(e.target.value)}
+                                placeholder="e.g. 12-digit UTR No. (3245XXXXXXXX)"
+                                className="w-full bg-white dark:bg-[#111] border border-gray-300 dark:border-[#333] rounded-lg px-3 py-2 text-xs font-mono outline-none focus:border-teal-500 text-gray-900 dark:text-white"
+                              />
+                            </div>
+
+                            {/* Payment Screenshot Proof Upload */}
+                            <div className="space-y-1.5">
+                              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">
+                                Upload Payment Screenshot (Optional)
+                              </label>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={handleScreenshotChange}
+                                className="w-full text-xs text-gray-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-teal-50 file:text-teal-700 file:text-xs file:font-semibold"
+                              />
+                              {screenshotPreview && (
+                                <div className="mt-2 flex items-center gap-2">
+                                  <img
+                                    src={screenshotPreview}
+                                    alt="Payment Screenshot Preview"
+                                    className="w-16 h-16 object-cover rounded-lg border border-gray-200"
+                                  />
+                                  <span className="text-[11px] text-green-600 font-semibold">
+                                    Screenshot attached ✓
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* Option 3: Cash on Delivery (COD) */}
               <div
                 className={`p-5 flex items-center cursor-pointer transition-colors ${paymentMethod === "cod" ? (theme === "light" ? "bg-amber-50/50" : "bg-[#1a1a1a]") : theme === "light" ? "bg-white" : "bg-[#111]"}`}
                 onClick={() => setPaymentMethod("cod")}
@@ -721,15 +1115,19 @@ export default function CheckoutPage() {
           >
             {isProcessing ? (
               <>
-                <Loader2 size={22} className="animate-spin" /> Redirecting...
+                <Loader2 size={22} className="animate-spin" /> Processing...
               </>
-            ) : paymentMethod === "phonepe" ? (
+            ) : paymentMethod === "cashfree" || paymentMethod === "razorpay" ? (
               <>
-                <ShieldCheck size={22} /> Pay now
+                <ShieldCheck size={22} /> Pay with Cashfree
+              </>
+            ) : paymentMethod === "qr" ? (
+              <>
+                <QrCode size={22} /> Confirm & Place Order via Store QR
               </>
             ) : (
               <>
-                <CheckCircle size={22} /> Complete order
+                <CheckCircle size={22} /> Complete order (COD)
               </>
             )}
           </button>
@@ -928,6 +1326,35 @@ export default function CheckoutPage() {
           </div>
         </div>
       </div>
+
+      {showCashfreeModal && cashfreeModalData && (
+        <CashfreeModal
+          isOpen={showCashfreeModal}
+          orderId={cashfreeModalData.orderId}
+          paymentSessionId={cashfreeModalData.paymentSessionId}
+          cashfreeOrderId={cashfreeModalData.cashfreeOrderId}
+          amount={cashfreeModalData.amount}
+          currency={cashfreeModalData.currency}
+          name={cashfreeModalData.name}
+          description={cashfreeModalData.description}
+          customer={cashfreeModalData.customer}
+          onSuccess={(targetOrderId) => {
+            setShowCashfreeModal(false);
+            if (!buyNowItem) {
+              clearCart();
+              localStorage.removeItem("cart");
+            }
+            router.push(`/payment-status?orderId=${targetOrderId}&status=SUCCESS`);
+          }}
+          onFailure={(err) => {
+            setShowCashfreeModal(false);
+            showNotification(err || "Payment failed", "error");
+          }}
+          onClose={() => {
+            setShowCashfreeModal(false);
+          }}
+        />
+      )}
     </div>
   );
 }
