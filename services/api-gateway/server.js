@@ -30,6 +30,7 @@ app.use(cors({
   origin: [
     'http://localhost:4000',
     'http://localhost:3000',
+    'https://ecom.porulontech.com',
     process.env.FRONTEND_URL || 'https://wow-frontedn-y73e.vercel.app',
   ],
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],

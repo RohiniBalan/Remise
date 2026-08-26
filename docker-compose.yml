@@ -107,6 +107,8 @@ services:
       PORT: 3003
       MONGODB_URI: ${MONGODB_PRODUCTS_URI}
       GATEWAY_URL: http://api-gateway:3000
+      ORDER_SERVICE_URL: http://order-service:3004
+      NOTIFICATION_SERVICE_URL: http://notification-service:3009
     networks:
       - wowlife-net
     healthcheck:
@@ -127,6 +129,9 @@ services:
       PORT: 3004
       MONGODB_URI: ${MONGODB_ORDERS_URI}
       GATEWAY_URL: http://api-gateway:3000
+      PRODUCT_SERVICE_URL: http://product-service:3003
+      STORE_SERVICE_URL: http://store-service:3007
+      NOTIFICATION_SERVICE_URL: http://notification-service:3009
     networks:
       - wowlife-net
     healthcheck:
@@ -217,9 +222,14 @@ services:
       PORT: 3007
       MONGODB_URI: mongodb://mongodb:27017/wowlife_stores
       GATEWAY_URL: http://api-gateway:3000
+      PAYMENT_SERVICE_URL: http://payment-service:3005
+      AUTH_SERVICE_URL: http://auth-service:3001
+      ORDER_SERVICE_URL: http://order-service:3004
+      PRODUCT_SERVICE_URL: http://product-service:3003
       OFFERS_SERVICE_URL: http://offers-service:3008
     depends_on:
       - mongodb
+      - payment-service
     networks:
       - wowlife-net
     healthcheck:

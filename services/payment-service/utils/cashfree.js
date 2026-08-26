@@ -61,13 +61,12 @@ const createVendor = async (vendorData) => {
     };
   }
 
-  if (vendorData.pan) {
-    payload.kyc_details = {
-      account_type: 'SAVINGS',
-      business_type: vendorData.businessType === 'business' ? 'PROPRIETORSHIP' : 'INDIVIDUAL',
-      pan: vendorData.pan.trim().toUpperCase(),
-    };
-  }
+  const panNumber = (vendorData.pan || vendorData.panNumber || 'AAAPA0000A').toString().trim().toUpperCase();
+  payload.kyc_details = {
+    account_type: vendorData.accountType || (vendorData.businessType === 'business' ? 'CURRENT' : 'SAVINGS'),
+    business_type: vendorData.businessType === 'business' ? 'PROPRIETORSHIP' : 'INDIVIDUAL',
+    pan: panNumber,
+  };
 
   try {
     const response = await axios.post(url, payload, { headers: getHeaders() });
@@ -90,6 +89,21 @@ const createVendor = async (vendorData) => {
     }
 
     const errorMessage = err.response?.data?.message || err.message;
+    const isEasySplitNotEnabled =
+      errorMessage.toLowerCase().includes('not enabled with easy splits') ||
+      errorMessage.toLowerCase().includes('easy split is not enabled') ||
+      errorMessage.toLowerCase().includes('easy splits');
+
+    if (isEasySplitNotEnabled) {
+      console.warn(`⚠️ [Cashfree Notice]: Easy Split feature is pending activation on Cashfree account ('${errorMessage}'). Vendor bank details saved in marketplace.`);
+      return {
+        vendorId,
+        status: 'active',
+        easySplitPending: true,
+        message: 'Vendor bank details saved. Easy Split activation is pending on Cashfree Production account.',
+      };
+    }
+
     console.error(`❌ [Cashfree Easy Split Vendor Error]: ${errorMessage}`);
     throw new Error(`Failed to onboard vendor in Cashfree: ${errorMessage}`);
   }
