@@ -42,17 +42,24 @@ export function useSpeechRecognition(onFinalResult?: (transcript: string) => voi
   const [transcript, setTranscript] = useState('');
   const [interimTranscript, setInterimTranscript] = useState('');
   const [error, setError] = useState('');
+  const [supported, setSupported] = useState(true);
 
   const recognitionRef = useRef<any>(null);
   const finalTranscriptRef = useRef('');
   const onFinalResultRef = useRef(onFinalResult);
   onFinalResultRef.current = onFinalResult;
 
-  const supported = typeof window !== 'undefined'
-    && !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+  useEffect(() => {
+    const isSupported = typeof window !== 'undefined'
+      && !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+    setSupported(isSupported);
+  }, []);
 
   const start = useCallback((lang: VoiceLanguageOption) => {
-    if (!supported) {
+    const isSupported = typeof window !== 'undefined'
+      && !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+
+    if (!isSupported) {
       setError("Voice input isn't supported in this browser — try Chrome or Edge.");
       return;
     }
