@@ -535,7 +535,7 @@ function NewOfferPageContent() {
 
       await offersApi.create(fd, token);
 
-      router.push("/store/dashboard");
+      router.push("/store/dashboard?tab=offers");
     } catch (err: any) {
       setError(err.response?.data?.message || "Failed to publish offer.");
     } finally {
@@ -570,10 +570,10 @@ function NewOfferPageContent() {
       <header className="bg-white border-b border-[#BBD5DA] sticky top-0 z-30 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
           <Link
-            href="/"
-            className="flex items-center gap-2 text-sm text-gray-500 hover:text-teal-700 transition font-medium shrink-0"
+            href="/store/dashboard?tab=offers"
+            className="flex items-center gap-1.5 sm:gap-2 text-sm text-gray-600 hover:text-teal-700 transition font-semibold shrink-0 bg-[#F5F5F5] hover:bg-[#DFF1F1] px-3 py-1.5 rounded-xl border border-[#BBD5DA]"
           >
-            <ArrowLeft size={16} /> Home
+            <ArrowLeft size={16} /> Offers
           </Link>
 
           <div className="flex items-center gap-2 min-w-0">
@@ -605,22 +605,32 @@ function NewOfferPageContent() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 py-8">
-        {/* Hero text */}
-        <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">
-              Publish New Offer
-            </h1>
-            <p className="text-gray-500 text-sm">
-              Customers near{" "}
-              <span className="font-semibold text-gray-700">{store.name}</span>{" "}
-              will be notified instantly.
-            </p>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        {/* Hero text with Back Button */}
+        <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <Link
+              href="/store/dashboard?tab=offers"
+              className="mt-0.5 w-10 h-10 rounded-xl bg-white border border-[#BBD5DA] hover:border-teal-400 hover:bg-[#DFF1F1] flex items-center justify-center text-gray-700 hover:text-teal-700 transition shadow-sm shrink-0"
+              title="Back to Offers"
+              aria-label="Back to Offers"
+            >
+              <ArrowLeft size={18} />
+            </Link>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-1">
+                Publish New Offer
+              </h1>
+              <p className="text-gray-500 text-xs sm:text-sm">
+                Customers near{" "}
+                <span className="font-semibold text-gray-700">{store.name}</span>{" "}
+                will be notified instantly.
+              </p>
+            </div>
           </div>
           <button
             onClick={() => setShowScan(true)}
-            className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition shrink-0 shadow-sm"
+            className="flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition shrink-0 shadow-sm w-full sm:w-auto"
           >
             <ScanLine size={16} /> Scan Paper to Auto-fill
           </button>

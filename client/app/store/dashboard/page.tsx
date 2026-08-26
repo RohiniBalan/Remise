@@ -5094,6 +5094,16 @@ export default function StoreDashboard() {
   const [loadError, setLoadError] = useState("");
   const [noStore, setNoStore] = useState(false);
 
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get("tab") as Tab;
+      if (tabParam && TABS.some((t) => t.id === tabParam)) {
+        setTab(tabParam);
+      }
+    }
+  }, []);
+
   const loadData = useCallback(async () => {
     if (!token) {
       router.push("/login");
