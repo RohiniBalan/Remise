@@ -332,7 +332,7 @@ function BusinessLoginPageContent() {
         </p>
 
         {/* Customer Login link & Admin Link */}
-        <div className="mt-6 border-t border-white/10 pt-4 flex flex-col items-center gap-2.5 text-center">
+        {/* <div className="mt-6 border-t border-white/10 pt-4 flex flex-col items-center gap-2.5 text-center">
           <Link
             href="/login"
             className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors"
@@ -350,7 +350,7 @@ function BusinessLoginPageContent() {
           >
             Admin Portal →
           </Link>
-        </div>
+        </div> */}
       </div>
     </>
   );

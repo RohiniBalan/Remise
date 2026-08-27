@@ -372,7 +372,7 @@ function CustomerSignupPageContent() {
         </p>
 
         {/* Business Signup link */}
-        <div className="mt-5 border-t border-white/10 pt-4 text-center">
+        {/* <div className="mt-5 border-t border-white/10 pt-4 text-center">
           <Link
             href="/business/signup"
             className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors"
@@ -383,7 +383,7 @@ function CustomerSignupPageContent() {
               Register your business <ArrowRight size={12} />
             </span>
           </Link>
-        </div>
+        </div> */}
       </div>
     </>
   );
