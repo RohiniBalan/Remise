@@ -93,7 +93,7 @@ function CustomerSignupPageContent() {
           email: email.trim(),
           mobilenumber: mobilenumber.replace(/\D/g, ""),
           password,
-          role: "customer", // Automatically register as customer
+          role: "user", // Automatically register as customer
         }),
       });
 
