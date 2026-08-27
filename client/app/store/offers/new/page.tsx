@@ -470,12 +470,12 @@ function NewOfferPageContent() {
   const discount =
     form.originalPrice && form.offerPrice
       ? Math.max(
-          0,
-          Math.round(
-            ((+form.originalPrice - +form.offerPrice) / +form.originalPrice) *
-              100,
-          ),
-        )
+        0,
+        Math.round(
+          ((+form.originalPrice - +form.offerPrice) / +form.originalPrice) *
+          100,
+        ),
+      )
       : 0;
 
   const handleImg = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -621,12 +621,12 @@ function NewOfferPageContent() {
         </div>
 
         {/* Hero text */}
-        <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-1">
+            <h1 className="text-2xl font-bold text-gray-900 mb-1">
               Publish New Offer
             </h1>
-            <p className="text-gray-500 text-xs sm:text-sm">
+            <p className="text-gray-500 text-sm">
               Customers near{" "}
               <span className="font-semibold text-gray-700">{store.name}</span>{" "}
               will be notified instantly.

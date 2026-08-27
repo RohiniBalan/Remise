@@ -561,11 +561,10 @@ function ProductModal({
                     type="button"
                     onClick={() => setVoiceLang(l)}
                     disabled={voice.listening || voiceParsing}
-                    className={`px-2.5 py-1 rounded-full text-xs font-semibold transition disabled:opacity-50 ${
-                      voiceLang.code === l.code
+                    className={`px-2.5 py-1 rounded-full text-xs font-semibold transition disabled:opacity-50 ${voiceLang.code === l.code
                         ? "bg-teal-600 text-white"
                         : "bg-white text-gray-600 border border-[#BBD5DA]"
-                    }`}
+                      }`}
                   >
                     {l.label}
                   </button>
@@ -577,11 +576,10 @@ function ProductModal({
                   voice.listening ? voice.stop() : voice.start(voiceLang)
                 }
                 disabled={voiceParsing || !voice.supported}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition disabled:opacity-50 ${
-                  voice.listening
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition disabled:opacity-50 ${voice.listening
                     ? "bg-[#FF0000] text-white"
                     : "bg-teal-600 hover:bg-teal-700 text-white"
-                }`}
+                  }`}
               >
                 {voiceParsing ? (
                   <>
@@ -2731,7 +2729,7 @@ function CategoriesTab({ categories, products, token, onRefresh }: any) {
       } else if (status === 403) {
         setError(
           msg ||
-            "Access denied. Your account role may need updating — try signing out and back in.",
+          "Access denied. Your account role may need updating — try signing out and back in.",
         );
       } else {
         setError(msg || `Failed to create category (HTTP ${status}).`);
@@ -2981,13 +2979,12 @@ function ProductsTab({ products, categories, storeId, token, onRefresh }: any) {
                   </div>
                   <div className="flex items-center gap-2 mt-1">
                     <span
-                      className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
-                        p.availability === "In Stock"
+                      className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${p.availability === "In Stock"
                           ? "bg-green-50 text-green-700 border-green-200"
                           : p.availability === "Out Of Stock"
                             ? "bg-red-50 text-[#FF0000] border-red-200"
                             : "bg-amber-50 text-amber-700 border-amber-200"
-                      }`}
+                        }`}
                     >
                       {p.availability}
                     </span>
@@ -3177,9 +3174,8 @@ function ProductsTab({ products, categories, storeId, token, onRefresh }: any) {
                           {b.brand}
                         </span>
                         <span
-                          className={`font-semibold shrink-0 ${
-                            b.stock < 5 ? "text-amber-600" : "text-gray-700"
-                          }`}
+                          className={`font-semibold shrink-0 ${b.stock < 5 ? "text-amber-600" : "text-gray-700"
+                            }`}
                         >
                           {b.stock}
                         </span>
@@ -3688,13 +3684,12 @@ function DeliveriesTab({ orders, token, onRefresh }: any) {
 
                   <div className="flex items-center gap-2">
                     <span
-                      className={`text-xs font-bold px-3 py-1 rounded-full border ${
-                        isCompleted
+                      className={`text-xs font-bold px-3 py-1 rounded-full border ${isCompleted
                           ? "bg-green-100 text-green-800 border-green-200"
                           : currentDeliveryStatus === "Out for Delivery"
-                          ? "bg-indigo-100 text-indigo-800 border-indigo-200"
-                          : "bg-teal-100 text-teal-800 border-teal-200"
-                      }`}
+                            ? "bg-indigo-100 text-indigo-800 border-indigo-200"
+                            : "bg-teal-100 text-teal-800 border-teal-200"
+                        }`}
                     >
                       {currentDeliveryStatus}
                     </span>
@@ -3713,8 +3708,8 @@ function DeliveriesTab({ orders, token, onRefresh }: any) {
                         {o.deliveryMode === "portal_delivery"
                           ? "Remise Portal Network"
                           : o.deliveryMode === "self_arrange"
-                          ? "Self-Arranged"
-                          : "Own Delivery Person"}
+                            ? "Self-Arranged"
+                            : "Own Delivery Person"}
                       </span>
                     </div>
 
@@ -4051,11 +4046,10 @@ function CustomersTab({ orders }: any) {
         </div>
         <button
           onClick={() => setOnlyRecurring((v) => !v)}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition shrink-0 ${
-            onlyRecurring
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition shrink-0 ${onlyRecurring
               ? "bg-teal-600 text-white border-teal-600"
               : "bg-white text-gray-600 border-[#BBD5DA]"
-          }`}
+            }`}
         >
           <Star size={14} /> Recurring only ({recurringCount})
         </button>
@@ -4899,19 +4893,18 @@ function SettingsTab({ store, token, onRefresh, categories }: any) {
               </p>
             </div>
             <span
-              className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${
-                store?.cashfreeVendorId || store?.razorpayAccountId
+              className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${store?.cashfreeVendorId || store?.razorpayAccountId
                   ? (store?.cashfreeVendorStatus === 'active' || store?.razorpayRouteStatus === 'active')
                     ? 'bg-green-50 text-green-700 border-green-200'
                     : 'bg-amber-50 text-amber-700 border-amber-200'
                   : 'bg-gray-100 text-gray-600 border-gray-200'
-              }`}
+                }`}
             >
               {store?.cashfreeVendorId
                 ? `Easy Split: ${store?.cashfreeVendorStatus?.toUpperCase() || 'ACTIVE'}`
                 : store?.razorpayAccountId
-                ? `Vendor: CONNECTED`
-                : 'Easy Split: NOT CONNECTED'}
+                  ? `Vendor: CONNECTED`
+                  : 'Easy Split: NOT CONNECTED'}
             </span>
           </div>
 
@@ -5017,7 +5010,7 @@ function SettingsTab({ store, token, onRefresh, categories }: any) {
         )}
       </div>
 
-            {showRazorpaySuccess && (
+      {showRazorpaySuccess && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
           onClick={() => setShowRazorpaySuccess(false)}
@@ -5073,12 +5066,12 @@ export default function StoreDashboard() {
     ctx?.user ??
     (typeof window !== "undefined"
       ? (() => {
-          try {
-            return JSON.parse(localStorage.getItem("user") || "null");
-          } catch {
-            return null;
-          }
-        })()
+        try {
+          return JSON.parse(localStorage.getItem("user") || "null");
+        } catch {
+          return null;
+        }
+      })()
       : null);
   const router = useRouter();
   const roleFixed = useRef(false);
@@ -5328,11 +5321,10 @@ export default function StoreDashboard() {
                 <button
                   key={t.id}
                   onClick={() => setTab(t.id)}
-                  className={`flex items-center gap-3 w-full px-4 py-3.5 text-sm font-semibold border-l-4 transition text-left ${
-                    tab === t.id
+                  className={`flex items-center gap-3 w-full px-4 py-3.5 text-sm font-semibold border-l-4 transition text-left ${tab === t.id
                       ? "bg-[#DFF1F1] text-teal-800 border-l-[#FF0000]"
                       : "text-gray-600 hover:bg-[#F5F5F5] border-l-transparent"
-                  }`}
+                    }`}
                 >
                   <span
                     className={
@@ -5377,9 +5369,8 @@ export default function StoreDashboard() {
                 </span>
                 <ChevronDown
                   size={16}
-                  className={`text-gray-400 shrink-0 transition-transform ${
-                    mobileMenuOpen ? "rotate-180" : ""
-                  }`}
+                  className={`text-gray-400 shrink-0 transition-transform ${mobileMenuOpen ? "rotate-180" : ""
+                    }`}
                 />
               </button>
 
@@ -5397,11 +5388,10 @@ export default function StoreDashboard() {
                           setTab(t.id);
                           setMobileMenuOpen(false);
                         }}
-                        className={`flex items-center gap-3 w-full px-4 py-3 text-sm font-semibold text-left transition ${
-                          tab === t.id
+                        className={`flex items-center gap-3 w-full px-4 py-3 text-sm font-semibold text-left transition ${tab === t.id
                             ? "bg-[#DFF1F1] text-teal-800"
                             : "text-gray-600 hover:bg-[#F5F5F5]"
-                        }`}
+                          }`}
                       >
                         <span
                           className={
