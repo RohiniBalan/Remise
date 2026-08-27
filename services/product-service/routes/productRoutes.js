@@ -27,9 +27,9 @@ router.post('/match-cart',           matchCart);
 
 
 // ── Admin or Store Owner or Sellers ──────────────────────────────────────────────────────
-router.post(  '/',    protect, authorize('admin','store_owner','wholesaler','home_business'), upload.single('image'), createProduct);
-router.put(   '/:id', protect, authorize('admin','store_owner','wholesaler','home_business'), upload.single('image'), updateProduct);
-router.delete('/:id', protect, authorize('admin','store_owner','wholesaler','home_business'), deleteProduct);
+router.post(  '/',    protect, authorize('admin','store_owner','whole_saler','home_business'), upload.single('image'), createProduct);
+router.put(   '/:id', protect, authorize('admin','store_owner','whole_saler','home_business'), upload.single('image'), updateProduct);
+router.delete('/:id', protect, authorize('admin','store_owner','whole_saler','home_business'), deleteProduct);
 
 
 module.exports = router;
