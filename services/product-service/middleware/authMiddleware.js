@@ -31,7 +31,7 @@ const verifyAdminOrStoreOwner = (req, res, next) => {
   const allowedRoles = [
     'admin',
     'store_owner',
-    'whole_saler',
+    'wholesaler',
     'home_business',
   ];
 
