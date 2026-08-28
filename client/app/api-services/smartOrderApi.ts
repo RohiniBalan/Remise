@@ -4,8 +4,8 @@ const BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 export interface CartItem { name: string; brand?: string; quantity: string }
 
 export const smartOrderApi = {
-getNearbyStores: (lat: number, lng: number, radius = 10, storeType?: string) =>
-  axios.get(`${BASE}/api/stores/nearby`, { params: { lat, lng, radius, storeType } }),
+  getNearbyStores: (lat: number, lng: number, radius = 10, storeType?: string) =>
+    axios.get(`${BASE}/api/stores/nearby`, { params: { lat, lng, radius, storeType } }),
 
   // Orders placed against a store via Smart Order Comparison (order-service),
   // for the store dashboard's Orders tab to merge alongside OfferOrder-based orders.

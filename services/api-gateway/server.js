@@ -14,14 +14,14 @@ app.set('trust proxy', 1);
 
 // ─── Service URLs ────────────────────────────────────────────────────────────
 const SERVICES = {
-  auth:         process.env.AUTH_SERVICE_URL         || 'http://localhost:3001',
-  user:         process.env.USER_SERVICE_URL         || 'http://localhost:3002',
-  product:      process.env.PRODUCT_SERVICE_URL      || 'http://localhost:3003',
-  order:        process.env.ORDER_SERVICE_URL        || 'http://localhost:3004',
-  payment:      process.env.PAYMENT_SERVICE_URL      || 'http://localhost:3005',
-  content:      process.env.CONTENT_SERVICE_URL      || 'http://localhost:3006',
-  store:        process.env.STORE_SERVICE_URL        || 'http://localhost:3007',
-  offers:       process.env.OFFERS_SERVICE_URL       || 'http://localhost:3008',
+  auth: process.env.AUTH_SERVICE_URL || 'http://localhost:3001',
+  user: process.env.USER_SERVICE_URL || 'http://localhost:3002',
+  product: process.env.PRODUCT_SERVICE_URL || 'http://localhost:3003',
+  order: process.env.ORDER_SERVICE_URL || 'http://localhost:3004',
+  payment: process.env.PAYMENT_SERVICE_URL || 'http://localhost:3005',
+  content: process.env.CONTENT_SERVICE_URL || 'http://localhost:3006',
+  store: process.env.STORE_SERVICE_URL || 'http://localhost:3007',
+  offers: process.env.OFFERS_SERVICE_URL || 'http://localhost:3008',
   notification: process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:3009',
 };
 
@@ -30,7 +30,7 @@ app.use(cors({
   origin: [
     'http://localhost:4000',
     'http://localhost:3000',
-    'https://ecom.porulontech.com',
+    'https://remise.digital',
     process.env.FRONTEND_URL || 'https://wow-frontedn-y73e.vercel.app',
   ],
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -165,9 +165,9 @@ app.use('/uploads/stores',
 app.use('/uploads/payment-proofs',
   makeProxy(SERVICES.order, '/uploads/payment-proofs')
 );
-app.use('/uploads/offers',                              
-  makeProxy(SERVICES.offers, '/uploads/offers')          
-); 
+app.use('/uploads/offers',
+  makeProxy(SERVICES.offers, '/uploads/offers')
+);
 // Static product images served by product-service
 app.use('/uploads',
   makeProxy(SERVICES.product, '/uploads')

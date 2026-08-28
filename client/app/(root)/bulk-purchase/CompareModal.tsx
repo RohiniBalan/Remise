@@ -321,8 +321,8 @@ export default function CompareModal({
       console.error("Comparison error:", err);
       setErrorMsg(
         err?.response?.data?.message ||
-          err?.message ||
-          "Could not compare nearby stores. Please try again.",
+        err?.message ||
+        "Could not compare nearby stores. Please try again.",
       );
       setStep("radius");
     }
@@ -595,8 +595,8 @@ export default function CompareModal({
       setIsPayingRazorpay(false);
       setErrorMsg(
         err.response?.data?.message ||
-          err.message ||
-          "Order failed. Please try again.",
+        err.message ||
+        "Order failed. Please try again.",
       );
       setStep("payment");
     }
@@ -651,11 +651,10 @@ export default function CompareModal({
                       setRadius(rad);
                       setCustomRadius("");
                     }}
-                    className={`px-4 py-1.5 rounded-full text-sm font-semibold transition ${
-                      radius === rad && !customRadius
+                    className={`px-4 py-1.5 rounded-full text-sm font-semibold transition ${radius === rad && !customRadius
                         ? "bg-[#DFF1F1] text-teal-700 border border-teal-400"
                         : "bg-[#F5F5F5] text-gray-500 border border-transparent hover:border-[#BBD5DA]"
-                    }`}
+                      }`}
                   >
                     {rad} km
                   </button>
@@ -725,11 +724,10 @@ export default function CompareModal({
                   {/* Card */}
                   <div className="flex-1 min-w-0">
                     <div
-                      className={`rounded-xl border p-4 ${
-                        carouselIndex === 0
+                      className={`rounded-xl border p-4 ${carouselIndex === 0
                           ? "border-teal-400 ring-2 ring-teal-100 bg-teal-50/30"
                           : "border-[#BBD5DA] bg-white"
-                      }`}
+                        }`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
@@ -776,15 +774,15 @@ export default function CompareModal({
                       )}
                       {(r.insufficientStock.length > 0 ||
                         r.unmatched.length > 0) && (
-                        <p className="mt-1.5 text-xs text-amber-600 flex items-start gap-1.5">
-                          <AlertCircle size={11} className="shrink-0 mt-0.5" />
-                          Not available:{" "}
-                          {[
-                            ...r.insufficientStock.map((i) => i.requestedName),
-                            ...r.unmatched,
-                          ].join(", ")}
-                        </p>
-                      )}
+                          <p className="mt-1.5 text-xs text-amber-600 flex items-start gap-1.5">
+                            <AlertCircle size={11} className="shrink-0 mt-0.5" />
+                            Not available:{" "}
+                            {[
+                              ...r.insufficientStock.map((i) => i.requestedName),
+                              ...r.unmatched,
+                            ].join(", ")}
+                          </p>
+                        )}
 
                       {/* View Brands toggle */}
                       <button
@@ -846,11 +844,10 @@ export default function CompareModal({
                                                 opt,
                                               )
                                             }
-                                            className={`text-left border rounded-lg px-2.5 py-1.5 text-xs transition ${
-                                              isSelected
+                                            className={`text-left border rounded-lg px-2.5 py-1.5 text-xs transition ${isSelected
                                                 ? "border-teal-500 bg-teal-50 ring-1 ring-teal-200"
                                                 : "border-[#BBD5DA] bg-white hover:border-teal-300"
-                                            }`}
+                                              }`}
                                           >
                                             <span className="font-semibold text-gray-800 block">
                                               {opt.brand || "Unbranded"}
@@ -886,11 +883,10 @@ export default function CompareModal({
                             key={i}
                             onClick={() => setCarouselIndex(i)}
                             aria-label={`Go to store ${i + 1}`}
-                            className={`h-1.5 rounded-full transition-all ${
-                              i === carouselIndex
+                            className={`h-1.5 rounded-full transition-all ${i === carouselIndex
                                 ? "w-5 bg-teal-600"
                                 : "w-1.5 bg-[#BBD5DA]"
-                            }`}
+                              }`}
                           />
                         ))}
                       </div>
@@ -1275,11 +1271,10 @@ export default function CompareModal({
                     {/* Method 1: UPI */}
                     <div
                       onClick={() => setSelectedSubMethod("upi")}
-                      className={`cursor-pointer border-2 rounded-xl p-3 transition flex items-start gap-3 ${
-                        selectedSubMethod === "upi"
+                      className={`cursor-pointer border-2 rounded-xl p-3 transition flex items-start gap-3 ${selectedSubMethod === "upi"
                           ? "border-teal-500 bg-teal-50/50 shadow-xs"
                           : "border-gray-200 bg-white hover:border-teal-300"
-                      }`}
+                        }`}
                     >
                       <div className="w-8 h-8 rounded-lg bg-teal-100 text-teal-700 flex items-center justify-center shrink-0 mt-0.5">
                         <Smartphone size={17} />
@@ -1303,11 +1298,10 @@ export default function CompareModal({
                     {/* Method 2: Cards */}
                     <div
                       onClick={() => setSelectedSubMethod("card")}
-                      className={`cursor-pointer border-2 rounded-xl p-3 transition flex items-start gap-3 ${
-                        selectedSubMethod === "card"
+                      className={`cursor-pointer border-2 rounded-xl p-3 transition flex items-start gap-3 ${selectedSubMethod === "card"
                           ? "border-teal-500 bg-teal-50/50 shadow-xs"
                           : "border-gray-200 bg-white hover:border-teal-300"
-                      }`}
+                        }`}
                     >
                       <div className="w-8 h-8 rounded-lg bg-teal-100 text-teal-700 flex items-center justify-center shrink-0 mt-0.5">
                         <CreditCard size={17} />
@@ -1330,11 +1324,10 @@ export default function CompareModal({
                     {/* Method 3: Net Banking */}
                     <div
                       onClick={() => setSelectedSubMethod("netbanking")}
-                      className={`cursor-pointer border-2 rounded-xl p-3 transition flex items-start gap-3 ${
-                        selectedSubMethod === "netbanking"
+                      className={`cursor-pointer border-2 rounded-xl p-3 transition flex items-start gap-3 ${selectedSubMethod === "netbanking"
                           ? "border-teal-500 bg-teal-50/50 shadow-xs"
                           : "border-gray-200 bg-white hover:border-teal-300"
-                      }`}
+                        }`}
                     >
                       <div className="w-8 h-8 rounded-lg bg-teal-100 text-teal-700 flex items-center justify-center shrink-0 mt-0.5">
                         <Building2 size={17} />
@@ -1358,11 +1351,10 @@ export default function CompareModal({
                     {/* Method 4: Wallets */}
                     <div
                       onClick={() => setSelectedSubMethod("wallet")}
-                      className={`cursor-pointer border-2 rounded-xl p-3 transition flex items-start gap-3 ${
-                        selectedSubMethod === "wallet"
+                      className={`cursor-pointer border-2 rounded-xl p-3 transition flex items-start gap-3 ${selectedSubMethod === "wallet"
                           ? "border-teal-500 bg-teal-50/50 shadow-xs"
                           : "border-gray-200 bg-white hover:border-teal-300"
-                      }`}
+                        }`}
                     >
                       <div className="w-8 h-8 rounded-lg bg-teal-100 text-teal-700 flex items-center justify-center shrink-0 mt-0.5">
                         <Wallet size={17} />

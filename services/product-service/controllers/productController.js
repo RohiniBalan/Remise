@@ -34,7 +34,7 @@ const fileFilter = (req, file, cb) => {
   cb(
     null,
     allowed.includes(path.extname(file.originalname).toLowerCase()) ||
-      allowedMime.includes(file.mimetype),
+    allowedMime.includes(file.mimetype),
   );
 };
 
@@ -78,7 +78,7 @@ const createProduct = async (req, res) => {
     if (typeof data.images === "string")
       try {
         data.images = JSON.parse(data.images);
-      } catch {}
+      } catch { }
     if (typeof data.bulkPricing === "string")
       try {
         data.bulkPricing = JSON.parse(data.bulkPricing);
@@ -113,7 +113,7 @@ const createProduct = async (req, res) => {
           },
         },
         { upsert: true },
-      ).catch(() => {}); // fire-and-forget, never block the response
+      ).catch(() => { }); // fire-and-forget, never block the response
     }
 
     res
@@ -327,8 +327,8 @@ const updateProduct = async (req, res) => {
     if (data.discountedPrice !== undefined) {
       data.discountedPrice =
         data.discountedPrice === "" ||
-        data.discountedPrice === null ||
-        data.discountedPrice === "null"
+          data.discountedPrice === null ||
+          data.discountedPrice === "null"
           ? null
           : Number(data.discountedPrice);
     }
@@ -341,16 +341,16 @@ const updateProduct = async (req, res) => {
     if (data.storePrice !== undefined) {
       data.storePrice =
         data.storePrice === "" ||
-        data.storePrice === null ||
-        data.storePrice === "null"
+          data.storePrice === null ||
+          data.storePrice === "null"
           ? null
           : Number(data.storePrice);
     }
     if (data.storeDiscountedPrice !== undefined) {
       data.storeDiscountedPrice =
         data.storeDiscountedPrice === "" ||
-        data.storeDiscountedPrice === null ||
-        data.storeDiscountedPrice === "null"
+          data.storeDiscountedPrice === null ||
+          data.storeDiscountedPrice === "null"
           ? null
           : Number(data.storeDiscountedPrice);
     }
@@ -372,7 +372,7 @@ const updateProduct = async (req, res) => {
     if (typeof data.images === "string") {
       try {
         data.images = JSON.parse(data.images);
-      } catch {}
+      } catch { }
     }
     if (typeof data.bulkPricing === "string") {
       try {
