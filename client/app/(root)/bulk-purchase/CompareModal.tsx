@@ -282,7 +282,7 @@ export default function CompareModal({
       }
 
       const storeIds = stores.map((s) => s._id || s.id);
-      const matchRes = await smartOrderApi.matchCart(items, storeIds);
+      const matchRes = await smartOrderApi.matchCart(items, storeIds, "store_owner");
       const ranked: any[] = matchRes?.data?.data || [];
 
       const byId: Record<string, any> = {};

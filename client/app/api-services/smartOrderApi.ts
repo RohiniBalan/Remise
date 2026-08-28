@@ -19,8 +19,8 @@ getNearbyStores: (lat: number, lng: number, radius = 10, storeType?: string) =>
       headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     }),
 
-  matchCart: (items: CartItem[], storeIds: string[]) =>
-    axios.post(`${BASE}/api/products/match-cart`, { items, storeIds }),
+  matchCart: (items: CartItem[], storeIds: string[], ownerRole?: string) =>
+    axios.post(`${BASE}/api/products/match-cart`, { items, storeIds, ownerRole }),
 
   placeOrder: (payload: {
     amount: number;

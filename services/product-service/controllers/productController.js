@@ -828,7 +828,7 @@ const deductStock = async (req, res) => {
 // item coverage first then total price (used by the Smart Nearby Store Comparison feature)
 const matchCart = async (req, res) => {
   try {
-    const { items, storeIds } = req.body;
+    const { items, storeIds, ownerRole } = req.body;
     if (!Array.isArray(items) || !items.length) {
       return res
         .status(400)
@@ -840,10 +840,26 @@ const matchCart = async (req, res) => {
         .json({ success: false, message: "storeIds array is required" });
     }
 
-    const products = await Product.find({
+    const productFilter = {
       storeId: { $in: storeIds },
       availability: { $ne: "Out Of Stock" },
-    }).lean();
+    };
+
+    // When ownerRole is specified, only match products belonging to that role.
+    // Include products with no ownerRole set (legacy data) when filtering for store_owner.
+    if (ownerRole) {
+      if (ownerRole === "store_owner") {
+        productFilter.$or = [
+          { ownerRole: "store_owner" },
+          { ownerRole: { $exists: false } },
+          { ownerRole: null },
+        ];
+      } else {
+        productFilter.ownerRole = ownerRole;
+      }
+    }
+
+    const products = await Product.find(productFilter).lean();
 
     const byStore = {};
     for (const p of products) {
