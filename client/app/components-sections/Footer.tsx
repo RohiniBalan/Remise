@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Twitter, Instagram, Facebook, Youtube, Send, Mail, MapPin, Phone, Shield, CreditCard, Truck } from 'lucide-react';
 
 const Footer = memo(({ theme }: { theme: 'dark' | 'light' }) => {
-  const [email,        setEmail]       = useState('');
+  const [email, setEmail] = useState('');
   const [currentTheme, setCurrentTheme] = useState<'dark' | 'light'>(theme);
 
   useEffect(() => {
@@ -18,9 +18,9 @@ const Footer = memo(({ theme }: { theme: 'dark' | 'light' }) => {
   const isLight = currentTheme === 'light';
 
   const FOOTER_LINKS = {
-    Company:  ['About Us', 'Careers', 'Blog & News', 'Sustainability', 'Press'],
-    Support:  ['Help Center', 'Track Order', 'Returns & Refunds', 'Privacy Policy', 'Terms of Service'],
-    Shop:     ['Best Sellers', 'New Arrivals', 'Deals & Offers', 'Gift Cards', 'Bulk Orders'],
+    Company: ['About Us', 'Careers', 'Blog & News', 'Sustainability', 'Press'],
+    Support: ['Help Center', 'Track Order', 'Returns & Refunds', 'Privacy Policy', 'Terms of Service'],
+    Shop: ['Best Sellers', 'New Arrivals', 'Deals & Offers', 'Gift Cards', 'Bulk Orders'],
   };
 
   const PAYMENT_ICONS = ['UPI', 'Visa', 'Mastercard', 'RuPay', 'Net Banking'];
@@ -71,13 +71,17 @@ const Footer = memo(({ theme }: { theme: 'dark' | 'light' }) => {
               India's favourite lifestyle destination. Groceries, cosmetics, toys & more — delivered to your door.
             </p>
 
-            {/* Contact */}
+            {/* Company + Contact */}
             <div className="space-y-2">
-              <a href="tel:+919677710045" className="flex items-center gap-2 text-xs text-gray-400 hover:text-[#D4AF37] transition">
-                <Phone size={13} className="text-[#D4AF37] shrink-0" /> +91 96777 10045
+              <p className="text-xs font-bold text-white">PORULON TECHNOLOGIES PRIVATE LIMITED</p>
+              <a href="tel:+919047099277" className="flex items-center gap-2 text-xs text-gray-400 hover:text-[#D4AF37] transition">
+                <Phone size={13} className="text-[#D4AF37] shrink-0" /> +91 90470 99277
+              </a>
+              <a href="mailto:porulontechnologies@gmail.com" className="flex items-center gap-2 text-xs text-gray-400 hover:text-[#D4AF37] transition">
+                <Mail size={13} className="text-[#D4AF37] shrink-0" /> porulontechnologies@gmail.com
               </a>
               <div className="flex items-start gap-2 text-xs text-gray-400">
-                <MapPin size={13} className="text-[#D4AF37] shrink-0 mt-0.5" /> Chennai, Tamil Nadu, India
+                <MapPin size={13} className="text-[#D4AF37] shrink-0 mt-0.5" /> Coimbatore, Tamil Nadu, India
               </div>
             </div>
 
@@ -112,10 +116,10 @@ const Footer = memo(({ theme }: { theme: 'dark' | 'light' }) => {
             <ul className="space-y-2.5">
               {[
                 { label: 'Nearby Offers', href: '/nearby' },
-                { label: 'Our Services',  href: '/services' },
-                { label: 'About Us',      href: '/about' },
-                { label: 'Testimonials',  href: '/testimonials' },
-                { label: 'My Orders',     href: '/orders' },
+                { label: 'Our Services', href: '/services' },
+                { label: 'About Us', href: '/about' },
+                { label: 'Testimonials', href: '/testimonials' },
+                { label: 'My Orders', href: '/orders' },
               ].map(item => (
                 <li key={item.label}>
                   <Link href={item.href} className="text-xs text-gray-400 hover:text-[#D4AF37] transition">{item.label}</Link>
