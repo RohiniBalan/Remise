@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import Layout from '../layout/layout'; 
 import PaginationControl from '../../components-main/PaginationControl';
+import { getSubcategories } from '../../utils/categoryAttributes';
 
 
 // Dynamically resolve backend API URL
@@ -48,6 +49,7 @@ interface ProductFormData {
   badge: string;
   type: string;
   category: string;
+  subcategory?: string;
   availability: string;
   images: string[];
   description: string;
@@ -605,7 +607,10 @@ export default function AdminProductPage() {
                                   required 
                                   name="category" 
                                   value={formData.category} 
-                                  onChange={handleChange} 
+                                  onChange={(e) => {
+                                    const newCat = e.target.value;
+                                    setFormData(prev => ({ ...prev, category: newCat, subcategory: '' }));
+                                  }} 
                                   className={inputClass}
                                 >
                                   <option value="" disabled>Select a Category</option>
@@ -619,6 +624,23 @@ export default function AdminProductPage() {
                                 </select>
                               </div>
                               <div>
+                                <label className={labelClass}>Subcategory</label>
+                                <select 
+                                  name="subcategory" 
+                                  value={formData.subcategory || ''} 
+                                  onChange={handleChange} 
+                                  disabled={!formData.category}
+                                  className={inputClass}
+                                >
+                                  <option value="">{!formData.category ? 'Select Category first' : 'Select Subcategory (Optional)'}</option>
+                                  {getSubcategories(formData.category).map((sub) => (
+                                    <option key={sub} value={sub}>{sub}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="col-span-2">
                                 <label className={labelClass}>Type</label>
                                 <input required type="text" name="type" value={formData.type} onChange={handleChange} placeholder="e.g. Toys & Games" className={inputClass} />
                               </div>

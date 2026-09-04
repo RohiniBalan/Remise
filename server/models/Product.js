@@ -14,6 +14,7 @@ const productSchema = new mongoose.Schema({
   images: [{ type: String, trim: true }],
   imageUrl: { type: String, trim: true },
   category: { type: String, trim: true },
+  subcategory: { type: String, trim: true },
   ageGroup: { type: String, trim: true },
   brand: { type: String, trim: true },
   availability: {
@@ -38,6 +39,17 @@ const productSchema = new mongoose.Schema({
       price: { type: Number, required: true },
     },
   ],
+  specifications: [
+    {
+      label: { type: String, trim: true },
+      value: { type: String, trim: true },
+    },
+  ],
+  attributes: {
+    type: Map,
+    of: mongoose.Schema.Types.Mixed,
+    default: {},
+  },
   lowStockThreshold: { type: Number, default: 5 },
   lowStockNotifiedAt: { type: Date, default: null },
   createdAt: { type: Date, default: Date.now },

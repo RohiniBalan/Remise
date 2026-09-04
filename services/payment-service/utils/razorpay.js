@@ -2,21 +2,40 @@ const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const axios = require('axios');
 
-const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_test_TRXC8nEMqsywBS';
-const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'ZkQFAlJnRc7XTlqlOddEdFC8';
-const RAZORPAY_WEBHOOK_SECRET = process.env.RAZORPAY_WEBHOOK_SECRET || 'rzp_webhook_secret_wowlife_2026';
+const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID;
+const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
+const RAZORPAY_WEBHOOK_SECRET = process.env.RAZORPAY_WEBHOOK_SECRET;
 
-// Initialize Razorpay SDK instance
-const razorpayInstance = new Razorpay({
-  key_id: RAZORPAY_KEY_ID,
-  key_secret: RAZORPAY_KEY_SECRET,
-});
+const path = require('path');
+const envPath = path.resolve(__dirname, '../.env');
+
+/**
+ * Initialize Razorpay SDK instance lazily or safely with current env vars
+ */
+const getRazorpayInstance = () => {
+  require('dotenv').config({ path: envPath, override: true });
+  const keyId = process.env.RAZORPAY_KEY_ID;
+  const keySecret = process.env.RAZORPAY_KEY_SECRET;
+  if (!keyId || !keySecret) {
+    throw new Error('Razorpay credentials (RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET) are missing in environment.');
+  }
+  return new Razorpay({
+    key_id: keyId,
+    key_secret: keySecret,
+  });
+};
 
 /**
  * Generate HTTP Basic Auth Header for Razorpay v2 API calls
  */
 const getBasicAuthHeaders = () => {
-  const token = Buffer.from(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`).toString('base64');
+  require('dotenv').config({ path: envPath });
+  const keyId = process.env.RAZORPAY_KEY_ID;
+  const keySecret = process.env.RAZORPAY_KEY_SECRET;
+  if (!keyId || !keySecret) {
+    throw new Error('Razorpay credentials (RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET) are missing.');
+  }
+  const token = Buffer.from(`${keyId}:${keySecret}`).toString('base64');
   return {
     Authorization: `Basic ${token}`,
     'Content-Type': 'application/json',
@@ -24,26 +43,66 @@ const getBasicAuthHeaders = () => {
 };
 
 /**
- * Standard State Code mapping for Razorpay Address validation
+ * Standard Indian State names formatted for Razorpay Accounts v2 API
  */
-const STATE_CODE_MAP = {
-  'tamil nadu': 'TN',
-  'karnataka': 'KA',
-  'kerala': 'KL',
-  'maharashtra': 'MH',
-  'andhra pradesh': 'AP',
-  'telangana': 'TG',
-  'delhi': 'DL',
-  'gujarat': 'GJ',
-  'rajasthan': 'RJ',
-  'west bengal': 'WB',
-  'uttar pradesh': 'UP',
+const STATE_NAME_MAP = {
+  'tn': 'Tamil Nadu',
+  'tamil nadu': 'Tamil Nadu',
+  'tamilnadu': 'Tamil Nadu',
+  'ka': 'Karnataka',
+  'karnataka': 'Karnataka',
+  'kl': 'Kerala',
+  'kerala': 'Kerala',
+  'mh': 'Maharashtra',
+  'maharashtra': 'Maharashtra',
+  'ap': 'Andhra Pradesh',
+  'andhra pradesh': 'Andhra Pradesh',
+  'tg': 'Telangana',
+  'ts': 'Telangana',
+  'telangana': 'Telangana',
+  'dl': 'Delhi',
+  'delhi': 'Delhi',
+  'gj': 'Gujarat',
+  'gujarat': 'Gujarat',
+  'rj': 'Rajasthan',
+  'rajasthan': 'Rajasthan',
+  'wb': 'West Bengal',
+  'west bengal': 'West Bengal',
+  'up': 'Uttar Pradesh',
+  'uttar pradesh': 'Uttar Pradesh',
+  'mp': 'Madhya Pradesh',
+  'madhya pradesh': 'Madhya Pradesh',
+  'hr': 'Haryana',
+  'haryana': 'Haryana',
+  'pb': 'Punjab',
+  'punjab': 'Punjab',
+  'or': 'Odisha',
+  'odisha': 'Odisha',
+  'orissa': 'Odisha',
+  'br': 'Bihar',
+  'bihar': 'Bihar',
+  'as': 'Assam',
+  'assam': 'Assam',
+  'ga': 'Goa',
+  'goa': 'Goa',
+  'jk': 'Jammu and Kashmir',
+  'jammu & kashmir': 'Jammu and Kashmir',
+  'jammu and kashmir': 'Jammu and Kashmir',
+  'uk': 'Uttarakhand',
+  'uttarakhand': 'Uttarakhand',
+  'jh': 'Jharkhand',
+  'jharkhand': 'Jharkhand',
+  'ch': 'Chandigarh',
+  'chandigarh': 'Chandigarh',
+  'py': 'Puducherry',
+  'puducherry': 'Pondicherry',
+  'pondicherry': 'Pondicherry',
 };
 
-const resolveStateCode = (stateName) => {
-  if (!stateName) return 'TN';
-  const clean = stateName.toLowerCase().trim();
-  return STATE_CODE_MAP[clean] || (stateName.length === 2 ? stateName.toUpperCase() : 'TN');
+const resolveStateName = (stateName) => {
+  if (!stateName) return 'Tamil Nadu';
+  const clean = stateName.replace(/[\u00a0\s]+/g, ' ').toLowerCase().trim();
+  return STATE_NAME_MAP[clean] || (stateName.replace(/[\u00a0\s]+/g, ' ').trim());
 };
 
 /**
@@ -56,31 +115,37 @@ const createLinkedAccount = async (vendorData) => {
   const cleanPhone = rawPhone.length === 10 ? rawPhone : '9876543210';
 
   const address = vendorData.address || {};
-  const stateCode = resolveStateCode(address.state || 'Tamil Nadu');
+  const stateName = resolveStateName(address.state || 'Tamil Nadu');
+
+  const baseEmail = vendorData.email || `vendor_${vendorData.storeId}@remise.in`;
+  const [userPart, domainPart] = baseEmail.includes('@') ? baseEmail.split('@') : [baseEmail, 'remise.in'];
+  const suffix = String(vendorData.storeId || Date.now()).slice(-6);
+  const vendorEmail = `${userPart}+v${suffix}@${domainPart}`;
 
   const payload = {
-    email: vendorData.email || `vendor_${vendorData.storeId}@marketplace.com`,
+    email: vendorEmail,
     phone: cleanPhone,
     type: 'route',
     legal_business_name: vendorData.legalBusinessName || vendorData.name || 'Store Vendor',
     business_type: vendorData.businessType || 'individual',
     contact_name: vendorData.ownerName || vendorData.name || 'Store Owner',
     profile: {
-      category: 'ecommerce',
-      subcategory: 'marketplace',
+      category: 'services',
+      subcategory: 'professional_services',
       addresses: {
         registered: {
           street1: (address.street || address.address || 'Market Street').slice(0, 50),
+          street2: (address.street2 || address.area || address.city || 'Main Road').slice(0, 50),
           city: address.city || 'Chennai',
-          state: stateCode,
+          state: stateName,
           postal_code: (address.pinCode || '600001').replace(/\D/g, '').slice(0, 6) || '600001',
           country: 'IN',
         },
       },
     },
     notes: {
-      storeId: vendorData.storeId || '',
-      ownerId: vendorData.ownerId || '',
+      storeId: vendorData.storeId ? String(vendorData.storeId) : '',
+      ownerId: vendorData.ownerId ? String(vendorData.ownerId) : '',
     },
   };
 
@@ -97,9 +162,14 @@ const createStakeholder = async (accountId, stakeholderData) => {
   const rawPhone = (stakeholderData.phone || '').replace(/\D/g, '').slice(-10);
   const cleanPhone = rawPhone.length === 10 ? rawPhone : '9876543210';
 
+  const baseEmail = stakeholderData.email || `vendor_${stakeholderData.storeId || '1'}@remise.in`;
+  const [userPart, domainPart] = baseEmail.includes('@') ? baseEmail.split('@') : [baseEmail, 'remise.in'];
+  const suffix = String(stakeholderData.storeId || Date.now()).slice(-6);
+  const stakeholderEmail = `${userPart}+v${suffix}@${domainPart}`;
+
   const payload = {
     name: stakeholderData.name || 'Store Owner',
-    email: stakeholderData.email,
+    email: stakeholderEmail,
     relationship: {
       director: false,
       executive: true,
@@ -158,69 +228,51 @@ const getAccountDetails = async (accountId) => {
  * Creates Linked Account -> Stakeholder -> Requests Route Product -> Accepts T&C
  */
 const onboardVendor = async (vendorData) => {
-  let accountId = vendorData.existingAccountId;
-  let stakeholderId = null;
+  let accountId = vendorData.existingAccountId || vendorData.razorpayAccountId;
+  let stakeholderId = vendorData.razorpayStakeholderId || null;
   let routeStatus = 'created';
   let productStatus = 'requested';
 
+  if (!accountId) {
+    const account = await createLinkedAccount(vendorData);
+    accountId = account.id;
+    routeStatus = account.status || 'created';
+  }
+
+  // Create Stakeholder
   try {
-    if (!accountId) {
-      const account = await createLinkedAccount(vendorData);
-      accountId = account.id;
-      routeStatus = account.status || 'created';
-    }
+    const stakeholder = await createStakeholder(accountId, {
+      name: vendorData.ownerName || vendorData.name,
+      email: vendorData.email,
+      phone: vendorData.phone,
+    });
+    stakeholderId = stakeholder.id;
+  } catch (stkErr) {
+    console.warn(`Stakeholder creation note for ${accountId}:`, stkErr.response?.data?.error?.description || stkErr.message);
+  }
 
-    // Create Stakeholder
-    try {
-      const stakeholder = await createStakeholder(accountId, {
-        name: vendorData.ownerName || vendorData.name,
-        email: vendorData.email,
-        phone: vendorData.phone,
-      });
-      stakeholderId = stakeholder.id;
-    } catch (stkErr) {
-      console.warn(`Stakeholder creation note for ${accountId}:`, stkErr.response?.data?.error?.description || stkErr.message);
-    }
+  // Request Route Product
+  try {
+    const product = await requestRouteProduct(accountId);
+    productStatus = product.status || 'requested';
+  } catch (prdErr) {
+    console.warn(`Route product request note for ${accountId}:`, prdErr.response?.data?.error?.description || prdErr.message);
+  }
 
-    // Request Route Product
-    try {
-      const product = await requestRouteProduct(accountId);
-      productStatus = product.status || 'requested';
-    } catch (prdErr) {
-      console.warn(`Route product request note for ${accountId}:`, prdErr.response?.data?.error?.description || prdErr.message);
-    }
+  // Accept T&C
+  try {
+    await acceptRouteTerms(accountId);
+    productStatus = 'active';
+  } catch (tncErr) {
+    console.warn(`Route T&C acceptance note for ${accountId}:`, tncErr.response?.data?.error?.description || tncErr.message);
+  }
 
-    // Accept T&C
-    try {
-      await acceptRouteTerms(accountId);
-      productStatus = 'active';
-    } catch (tncErr) {
-      console.warn(`Route T&C acceptance note for ${accountId}:`, tncErr.response?.data?.error?.description || tncErr.message);
-    }
-
-    // Fetch final status
-    try {
-      const accountInfo = await getAccountDetails(accountId);
-      routeStatus = accountInfo.status === 'activated' || accountInfo.status === 'active' ? 'active' : (accountInfo.status || routeStatus);
-    } catch (infoErr) {
-      console.warn(`Fetch account info note for ${accountId}:`, infoErr.message);
-    }
-  } catch (err) {
-    const isAuthError = err.response?.status === 401 || err.response?.data?.error?.description === 'Authentication failed';
-    if (isAuthError) {
-      console.warn('⚠️ [Razorpay Route Sandbox]: Live/Test Razorpay API credentials were not authenticated or Route is not enabled on this account.');
-      console.warn('⚠️ [Razorpay Route Sandbox]: Generating simulated Linked Account for local testing. To use live Razorpay Route, set valid RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in services/payment-service/.env.');
-      
-      const pseudoId = 'acc_' + crypto.randomBytes(7).toString('hex');
-      return {
-        accountId: pseudoId,
-        stakeholderId: 'sth_' + crypto.randomBytes(7).toString('hex'),
-        routeStatus: 'active',
-        productStatus: 'active',
-        isSandbox: true,
-      };
-    }
-    throw err;
+  // Fetch final status
+  try {
+    const accountInfo = await getAccountDetails(accountId);
+    routeStatus = accountInfo.status === 'activated' || accountInfo.status === 'active' ? 'active' : (accountInfo.status || routeStatus);
+  } catch (infoErr) {
+    console.warn(`Fetch account info note for ${accountId}:`, infoErr.message);
   }
 
   return {
@@ -236,58 +288,42 @@ const onboardVendor = async (vendorData) => {
  * POST https://api.razorpay.com/v1/orders
  *
  * @param {Object} params
- * @param {number} params.amount - Total amount in paise
+ * @param {number} params.amount - Total amount in paise (integer)
  * @param {string} params.currency - 'INR'
  * @param {string} params.receipt - Internal order ID
  * @param {Array} params.transfers - Array of transfer configs for linked accounts
  * @param {Object} params.notes - Metadata notes
  */
 const createMarketplaceOrder = async ({ amount, currency = 'INR', receipt, transfers = [], notes = {} }) => {
+  const instance = getRazorpayInstance();
+
   const payload = {
-    amount,
+    amount: Math.round(amount),
     currency,
     receipt,
     notes,
   };
 
-  // Only attach transfers if valid transfer entries exist
-  if (transfers && transfers.length > 0) {
-    payload.transfers = transfers.map((t) => ({
-      account: t.account,
-      amount: t.amount, // in paise
-      currency: t.currency || 'INR',
-      notes: t.notes || {},
-      linked_account_notes: t.linked_account_notes || ['storeId', 'orderId'],
-      on_hold: t.on_hold !== undefined ? t.on_hold : 0,
-    }));
+  // Only attach transfers if valid transfer entries exist with valid account IDs
+  if (transfers && Array.isArray(transfers) && transfers.length > 0) {
+    const validTransfers = transfers
+      .filter((t) => t.account && t.amount > 0)
+      .map((t) => ({
+        account: t.account,
+        amount: Math.round(t.amount), // in paise
+        currency: t.currency || 'INR',
+        notes: t.notes || {},
+        linked_account_notes: t.linked_account_notes || ['storeId', 'orderId'],
+        on_hold: t.on_hold !== undefined ? t.on_hold : 0,
+      }));
+
+    if (validTransfers.length > 0) {
+      payload.transfers = validTransfers;
+    }
   }
 
-  try {
-    const order = await razorpayInstance.orders.create(payload);
-    return {
-      ...order,
-      isSandbox: false,
-    };
-  } catch (err) {
-    const isAuthError = err.statusCode === 401 || err.error?.description === 'Authentication failed' || err.message?.includes('Authentication failed');
-    console.warn(`⚠️ [Razorpay Order Notice]: ${err.error?.description || err.message}. Using sandbox mode for local order.`);
-    return {
-      id: `order_mock_${crypto.randomBytes(8).toString('hex')}`,
-      entity: 'order',
-      amount,
-      amount_paid: 0,
-      amount_due: amount,
-      currency,
-      receipt,
-      status: 'created',
-      attempts: 0,
-      notes,
-      transfers: payload.transfers || [],
-      created_at: Math.floor(Date.now() / 1000),
-      isSandbox: true,
-      isMock: true,
-    };
-  }
+  const order = await instance.orders.create(payload);
+  return order;
 };
 
 /**
@@ -299,7 +335,7 @@ const createPaymentTransfers = async (paymentId, transfers) => {
   const payload = {
     transfers: transfers.map((t) => ({
       account: t.account,
-      amount: t.amount, // in paise
+      amount: Math.round(t.amount), // in paise
       currency: t.currency || 'INR',
       notes: t.notes || {},
       on_hold: t.on_hold || 0,
@@ -311,20 +347,39 @@ const createPaymentTransfers = async (paymentId, transfers) => {
 };
 
 /**
- * 8. Verify Razorpay Payment Signature
+ * 8. Reverse Route Transfer (For refunds / order cancellations)
+ * POST https://api.razorpay.com/v1/transfers/:transferId/reversals
+ */
+const reverseTransfer = async ({ transferId, amount, currency = 'INR', notes = {} }) => {
+  const url = `https://api.razorpay.com/v1/transfers/${transferId}/reversals`;
+  const payload = {};
+  if (amount) payload.amount = Math.round(amount);
+  if (currency) payload.currency = currency;
+  if (notes) payload.notes = notes;
+
+  const response = await axios.post(url, payload, { headers: getBasicAuthHeaders() });
+  return response.data;
+};
+
+/**
+ * 9. Fetch Transfer Details
+ * GET https://api.razorpay.com/v1/transfers/:transferId
+ */
+const getTransferDetails = async (transferId) => {
+  const url = `https://api.razorpay.com/v1/transfers/${transferId}`;
+  const response = await axios.get(url, { headers: getBasicAuthHeaders() });
+  return response.data;
+};
+
+/**
+ * 10. Verify Razorpay Payment Signature
  * HMAC-SHA256(order_id + "|" + payment_id, secret) == signature
  */
-const verifyPaymentSignature = ({ orderId, paymentId, signature }) => {
-  if (!orderId || !paymentId || !signature) return false;
-  if (
-    orderId.startsWith('order_mock_') ||
-    paymentId.startsWith('pay_mock_') ||
-    signature.startsWith('mock_sig_')
-  ) {
-    return true;
-  }
+const verifyPaymentSignature = ({ orderId, paymentId, signature, secret = process.env.RAZORPAY_KEY_SECRET }) => {
+  if (!orderId || !paymentId || !signature || !secret) return false;
+
   const expectedSignature = crypto
-    .createHmac('sha256', RAZORPAY_KEY_SECRET)
+    .createHmac('sha256', secret)
     .update(`${orderId}|${paymentId}`)
     .digest('hex');
 
@@ -339,11 +394,11 @@ const verifyPaymentSignature = ({ orderId, paymentId, signature }) => {
 };
 
 /**
- * 9. Verify Razorpay Webhook Signature
+ * 11. Verify Razorpay Webhook Signature
  * HMAC-SHA256(rawBody, webhookSecret) == x-razorpay-signature
  */
-const verifyWebhookSignature = ({ body, signature, secret = RAZORPAY_WEBHOOK_SECRET }) => {
-  if (!body || !signature) return false;
+const verifyWebhookSignature = ({ body, signature, secret = process.env.RAZORPAY_WEBHOOK_SECRET }) => {
+  if (!body || !signature || !secret) return false;
   const rawBodyString = typeof body === 'string' ? body : JSON.stringify(body);
   const expectedSignature = crypto
     .createHmac('sha256', secret)
@@ -361,7 +416,7 @@ const verifyWebhookSignature = ({ body, signature, secret = RAZORPAY_WEBHOOK_SEC
 };
 
 module.exports = {
-  razorpayInstance,
+  getRazorpayInstance,
   createLinkedAccount,
   createStakeholder,
   requestRouteProduct,
@@ -370,6 +425,8 @@ module.exports = {
   onboardVendor,
   createMarketplaceOrder,
   createPaymentTransfers,
+  reverseTransfer,
+  getTransferDetails,
   verifyPaymentSignature,
   verifyWebhookSignature,
   RAZORPAY_KEY_ID,

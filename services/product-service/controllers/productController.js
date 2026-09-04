@@ -149,6 +149,7 @@ const getProducts = async (req, res) => {
       search,
       storeId,
       ownerRole,
+      sort,
       page = 1,
       limit = 50,
     } = req.query;
@@ -165,12 +166,16 @@ const getProducts = async (req, res) => {
         { brand: { $regex: search, $options: "i" } },
       ];
 
+    // Real top-selling order: units actually sold (soldCount) first,
+    // newest as a tiebreaker. Default stays newest-first for everything else.
+    const sortSpec =
+      sort === "bestselling"
+        ? { soldCount: -1, createdAt: -1 }
+        : { createdAt: -1 };
+
     const skip = (Number(page) - 1) * Number(limit);
     const [products, total] = await Promise.all([
-      Product.find(filter)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(Number(limit)),
+      Product.find(filter).sort(sortSpec).skip(skip).limit(Number(limit)),
       Product.countDocuments(filter),
     ]);
 
@@ -613,9 +618,14 @@ const commitStock = async (req, res) => {
       reservation.committedAt = new Date();
       await reservation.save();
 
-      // Check low stock for reserved items
+      // Confirmed sale — count these units toward each product's real
+      // soldCount so "Best Sellers" reflects actual completed orders.
       for (const item of reservation.items) {
-        const prod = await Product.findById(item.productId);
+        const prod = await Product.findByIdAndUpdate(
+          item.productId,
+          { $inc: { soldCount: item.quantity } },
+          { new: true },
+        );
         if (prod) checkLowStock(prod);
       }
 
@@ -630,7 +640,12 @@ const commitStock = async (req, res) => {
     if (Array.isArray(items)) {
       for (const item of items) {
         const pId = item.productId || item._id || item.id;
-        const prod = await Product.findById(pId);
+        const qty = Number(item.quantity) || 1;
+        const prod = await Product.findByIdAndUpdate(
+          pId,
+          { $inc: { soldCount: qty } },
+          { new: true },
+        );
         if (prod) checkLowStock(prod);
       }
     }
@@ -1017,6 +1032,52 @@ const getGroupedSuppliers = async (req, res) => {
   }
 };
 
+// Internal: one-time / re-runnable backfill — recomputes soldCount from real
+// order history (order-service aggregates it and posts the totals here).
+// Uses $set (not $inc) so it's idempotent: safe to re-run for reconciliation.
+const backfillSoldCounts = async (req, res) => {
+  try {
+    const { counts } = req.body;
+    if (!Array.isArray(counts) || !counts.length) {
+      return res
+        .status(400)
+        .json({ success: false, message: "counts array is required" });
+    }
+
+    const ops = counts
+      .filter((c) => c.productId && Number.isFinite(Number(c.soldCount)))
+      .map((c) => ({
+        updateOne: {
+          filter: { _id: c.productId },
+          update: { $set: { soldCount: Math.max(0, Number(c.soldCount)) } },
+        },
+      }));
+
+    if (!ops.length) {
+      return res
+        .status(400)
+        .json({ success: false, message: "No valid entries to update" });
+    }
+
+    const result = await Product.bulkWrite(ops, { ordered: false });
+
+    res.status(200).json({
+      success: true,
+      message: `Backfilled soldCount for ${result.modifiedCount ?? 0} of ${ops.length} products`,
+      matched: result.matchedCount,
+      modified: result.modifiedCount,
+    });
+  } catch (error) {
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Failed to backfill sold counts",
+        error: error.message,
+      });
+  }
+};
+
 module.exports = {
   upload,
   createProduct,
@@ -1033,5 +1094,6 @@ module.exports = {
   deductStock,
   matchCart,
   getGroupedSuppliers,
+  backfillSoldCounts
 };
 

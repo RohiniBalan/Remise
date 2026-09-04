@@ -54,7 +54,7 @@ import {
   Phone,
   ExternalLink,
 } from "lucide-react";
-
+import { SellerProductModal as ProductModal } from "../../components-seller/SellerProductModal";
 import {
   LineChart,
   Line,
@@ -374,398 +374,6 @@ function Select({
       >
         {children}
       </select>
-    </div>
-  );
-}
-
-// ── Product Modal ─────────────────────────────────────────────────────────────
-function ProductModal({
-  product,
-  categories,
-  storeId,
-  token,
-  onClose,
-  onSaved,
-  initialTitle,
-  initialCategory,
-}: {
-  product?: any;
-  categories: any[];
-  storeId: string;
-  token: string;
-  onClose: () => void;
-  onSaved: (p: any) => void;
-  initialTitle?: string;
-  initialCategory?: string;
-}) {
-  const isEdit = !!product;
-  const [form, setForm] = useState({
-    title: product?.title || initialTitle || "",
-    description: product?.description || "",
-    price: product?.price || "",
-    discountedPrice: product?.discountedPrice || "",
-    category: product?.category || initialCategory || "",
-    brand: product?.brand || "",
-    totalStock: product?.totalStock || "",
-    availability: product?.availability || "In Stock",
-    tags: product?.tags?.join(", ") || "",
-    imageUrl: product?.imageUrl || "",
-  });
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string>(
-    product?.imageUrl ? `${API}${product.imageUrl}` : "",
-  );
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [voiceLang, setVoiceLang] = useState<VoiceLanguageOption>(
-    VOICE_LANGUAGES[0],
-  );
-  const [voiceParsing, setVoiceParsing] = useState(false);
-  const [voiceError, setVoiceError] = useState("");
-
-  const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
-
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    setImageFile(f);
-    setPreview(URL.createObjectURL(f));
-  };
-
-  // Speak-to-fill: transcript → /api/voice-product-parse (translates via the
-  // same indicTranslate() IndicTrans2 pipeline every OCR route uses, then
-  // Claude-parses fields, then getProductImage()) → bulk-fills this SAME
-  // form state. A returned image is almost always a data: URI (see
-  // getProductImage/imageResultToUrl), so route it through the existing
-  // `imageFile` upload path — exactly like a data-URI scan result already
-  // does in `createOneProduct` — rather than stuffing a huge base64 string
-  // into the `imageUrl` text field, which `handleSubmit` sends as a plain
-  // form value. `handleSubmit` itself is untouched either way.
-  const handleVoiceResult = useCallback(
-    async (text: string) => {
-      setVoiceParsing(true);
-      setVoiceError("");
-      try {
-        const res = await fetch("/api/voice-product-parse", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text, sourceLang: voiceLang.short }),
-        });
-        const data = await res.json();
-        if (!data.success)
-          throw new Error(data.message || "Could not understand that.");
-        const x = data.extracted;
-
-        setForm((f) => ({
-          ...f,
-          title: x.productName || f.title,
-          category: x.category || f.category,
-          price: x.price ? String(x.price) : f.price,
-          discountedPrice: x.discountedPrice
-            ? String(x.discountedPrice)
-            : f.discountedPrice,
-          totalStock: x.totalStock ? String(x.totalStock) : f.totalStock,
-          description: x.description || f.description,
-          brand: x.brand || f.brand,
-        }));
-
-        if (x.imageUrl?.startsWith("data:")) {
-          const blob = await fetch(x.imageUrl).then((r) => r.blob());
-          const ext =
-            blob.type === "image/svg+xml"
-              ? "svg"
-              : blob.type === "image/png"
-                ? "png"
-                : "jpg";
-          setImageFile(new File([blob], `product.${ext}`, { type: blob.type }));
-          setPreview(x.imageUrl);
-        } else if (x.imageUrl) {
-          setImageFile(null);
-          set("imageUrl", x.imageUrl);
-          setPreview(x.imageUrl);
-        }
-      } catch (err: any) {
-        setVoiceError(err.message || "Could not understand that.");
-      } finally {
-        setVoiceParsing(false);
-      }
-    },
-    [voiceLang],
-  );
-
-  const voice = useSpeechRecognition(handleVoiceResult);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.title || !form.price) {
-      setError("Title and price are required.");
-      return;
-    }
-    setSaving(true);
-    setError("");
-    try {
-      const fd = new FormData();
-      Object.entries(form).forEach(([k, v]) => {
-        if (v !== "") fd.append(k, String(v));
-      });
-      fd.append("storeId", storeId);
-      if (imageFile) fd.append("image", imageFile);
-
-      const res = isEdit
-        ? await productApi.update(product._id, fd, token)
-        : await productApi.create(fd, token);
-      onSaved(res.data.data);
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to save product.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <div
-        className="bg-white rounded-2xl border border-[#BBD5DA] w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="sticky top-0 bg-white border-b border-[#BBD5DA] px-6 py-4 flex items-center justify-between z-10">
-          <h2 className="text-base font-bold text-gray-900">
-            {isEdit ? "Edit Product" : "Add New Product"}
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-700"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {error && (
-            <p className="text-sm text-[#FF0000] bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-center gap-2">
-              <AlertCircle size={14} />
-              {error}
-            </p>
-          )}
-
-          {/* Voice entry */}
-          <div className="bg-[#F5F5F5] border border-[#BBD5DA] rounded-xl p-3 space-y-2">
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div className="flex items-center gap-2 flex-wrap">
-                {VOICE_LANGUAGES.map((l) => (
-                  <button
-                    key={l.code}
-                    type="button"
-                    onClick={() => setVoiceLang(l)}
-                    disabled={voice.listening || voiceParsing}
-                    className={`px-2.5 py-1 rounded-full text-xs font-semibold transition disabled:opacity-50 ${voiceLang.code === l.code
-                        ? "bg-teal-600 text-white"
-                        : "bg-white text-gray-600 border border-[#BBD5DA]"
-                      }`}
-                  >
-                    {l.label}
-                  </button>
-                ))}
-              </div>
-              <button
-                type="button"
-                onClick={() =>
-                  voice.listening ? voice.stop() : voice.start(voiceLang)
-                }
-                disabled={voiceParsing || !voice.supported}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition disabled:opacity-50 ${voice.listening
-                    ? "bg-[#FF0000] text-white"
-                    : "bg-teal-600 hover:bg-teal-700 text-white"
-                  }`}
-              >
-                {voiceParsing ? (
-                  <>
-                    <RefreshCw size={14} className="animate-spin" />{" "}
-                    Understanding…
-                  </>
-                ) : voice.listening ? (
-                  <>
-                    <MicOff size={14} /> Stop
-                  </>
-                ) : (
-                  <>
-                    <Mic size={14} /> Speak product details
-                  </>
-                )}
-              </button>
-            </div>
-            {!voice.supported && (
-              <p className="text-xs text-gray-400">
-                Voice input isn't supported in this browser — try Chrome or
-                Edge.
-              </p>
-            )}
-            {voice.listening && (
-              <p className="text-xs text-teal-700">
-                Listening… "{voice.interimTranscript || voice.transcript || "…"}
-                "
-              </p>
-            )}
-            {(voice.error || voiceError) && (
-              <p className="text-xs text-[#FF0000] flex items-center gap-1">
-                <AlertCircle size={11} />
-                {voice.error || voiceError}
-              </p>
-            )}
-          </div>
-
-          {/* Image upload */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
-              Product Image
-            </label>
-            <div className="flex items-start gap-4">
-              <div className="w-24 h-24 rounded-xl border-2 border-dashed border-[#BBD5DA] bg-[#F5F5F5] flex items-center justify-center overflow-hidden shrink-0">
-                {preview ? (
-                  <img
-                    src={preview}
-                    alt="preview"
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <ImageIcon size={24} className="text-gray-300" />
-                )}
-              </div>
-              <div className="flex-1 space-y-2">
-                <label className="flex items-center gap-2 cursor-pointer px-4 py-2.5 bg-white border border-[#BBD5DA] rounded-xl text-sm text-gray-700 hover:bg-[#F5F5F5] transition w-fit">
-                  <ImageIcon size={14} /> Upload Image
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFile}
-                    className="hidden"
-                  />
-                </label>
-                <Input
-                  label=""
-                  placeholder="Or paste image URL"
-                  value={form.imageUrl}
-                  onChange={(e) => {
-                    set("imageUrl", e.target.value);
-                    if (!imageFile) setPreview(e.target.value);
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div className="sm:col-span-2">
-              <Input
-                label="Product Title *"
-                placeholder="e.g. Organic Face Moisturizer"
-                value={form.title}
-                onChange={(e) => set("title", e.target.value)}
-                required
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <TextArea
-                label="Description"
-                placeholder="Describe the product…"
-                rows={3}
-                value={form.description}
-                onChange={(e) => set("description", e.target.value)}
-              />
-            </div>
-            <Input
-              label="Price (₹) *"
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="0.00"
-              value={form.price}
-              onChange={(e) => set("price", e.target.value)}
-              required
-            />
-            <Input
-              label="Discounted Price (₹)"
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="0.00"
-              value={form.discountedPrice}
-              onChange={(e) => set("discountedPrice", e.target.value)}
-            />
-            <Select
-              label="Category"
-              value={form.category}
-              onChange={(e) => set("category", e.target.value)}
-            >
-              <option value="">Select category</option>
-              {categories.map((c: any) => (
-                <option key={c._id} value={c.name}>
-                  {c.name}
-                </option>
-              ))}
-            </Select>
-            <Input
-              label="Brand"
-              placeholder="e.g. Nivea"
-              value={form.brand}
-              onChange={(e) => set("brand", e.target.value)}
-            />
-            <Input
-              label="Stock Quantity"
-              type="number"
-              min="0"
-              placeholder="0"
-              value={form.totalStock}
-              onChange={(e) => set("totalStock", e.target.value)}
-            />
-            <Select
-              label="Availability"
-              value={form.availability}
-              onChange={(e) => set("availability", e.target.value)}
-            >
-              <option value="In Stock">In Stock</option>
-              <option value="Out Of Stock">Out Of Stock</option>
-              <option value="Pre Order">Pre Order</option>
-            </Select>
-            <div className="sm:col-span-2">
-              <Input
-                label="Tags (comma-separated)"
-                placeholder="e.g. skincare, organic, moisturizer"
-                value={form.tags}
-                onChange={(e) => set("tags", e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="flex gap-3 pt-2">
-            <button
-              type="submit"
-              disabled={saving}
-              className="flex-1 flex items-center justify-center gap-2 py-3 bg-[#FF0000] hover:bg-[#e00000] disabled:opacity-50 text-white font-semibold rounded-xl text-sm transition"
-            >
-              {saving ? (
-                <>
-                  <RefreshCw size={14} className="animate-spin" /> Saving…
-                </>
-              ) : (
-                <>
-                  <Save size={14} /> {isEdit ? "Save Changes" : "Add Product"}
-                </>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-6 py-3 border border-[#BBD5DA] text-gray-700 hover:bg-[#F5F5F5] font-semibold rounded-xl text-sm transition"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      </div>
     </div>
   );
 }
@@ -4881,46 +4489,14 @@ function SettingsTab({ store, token, onRefresh, categories }: any) {
           </Select>
         </div>
 
-        {/* Cashfree Easy Split Vendor Account Setup */}
+        {/* Bank & Settlement Details */}
         <div className="pt-4 border-t border-[#F5F5F5]">
-          <div className="flex items-center justify-between mb-2">
-            <div>
-              <p className="text-sm font-semibold text-gray-800">
-                Cashfree Easy Split Marketplace Payments
-              </p>
-              <p className="text-xs text-gray-400">
-                Connect your Cashfree Vendor Account to automatically receive customer payments directly into your bank account.
-              </p>
-            </div>
-            <span
-              className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${store?.cashfreeVendorId || store?.razorpayAccountId
-                  ? (store?.cashfreeVendorStatus === 'active' || store?.razorpayRouteStatus === 'active')
-                    ? 'bg-green-50 text-green-700 border-green-200'
-                    : 'bg-amber-50 text-amber-700 border-amber-200'
-                  : 'bg-gray-100 text-gray-600 border-gray-200'
-                }`}
-            >
-              {store?.cashfreeVendorId
-                ? `Easy Split: ${store?.cashfreeVendorStatus?.toUpperCase() || 'ACTIVE'}`
-                : store?.razorpayAccountId
-                  ? `Vendor: CONNECTED`
-                  : 'Easy Split: NOT CONNECTED'}
-            </span>
-          </div>
-
-          {(store?.cashfreeVendorId || store?.razorpayAccountId) && (
-            <div className="mb-3 p-3 bg-[#DFF1F1]/50 border border-[#BBD5DA] rounded-xl text-xs text-gray-700 flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <span className="font-semibold text-teal-800">Cashfree Vendor ID:</span>{' '}
-                <code className="font-mono bg-white px-2 py-0.5 rounded border border-[#BBD5DA]">{store.cashfreeVendorId || `vendor_${store._id}`}</code>
-              </div>
-              <div>
-                <span className="font-semibold text-teal-800">Platform Commission:</span>{' '}
-                <span className="font-bold text-teal-900">{store.commissionPercentage ?? 10}%</span>
-              </div>
-            </div>
-          )}
-
+          <p className="text-sm font-semibold text-gray-800 mb-1">
+            Settlement Bank Account Details
+          </p>
+          <p className="text-xs text-gray-400 mb-3">
+            Used for automated payouts via Razorpay Route and Cashfree Easy Split.
+          </p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Input
               label="Legal Business / Entity Name"
@@ -4941,15 +4517,63 @@ function SettingsTab({ store, token, onRefresh, categories }: any) {
               onChange={(e) => set("bankIfsc", e.target.value.toUpperCase())}
             />
           </div>
+        </div>
 
-          <div className="mt-3 flex justify-end">
+        {/* Razorpay Route Marketplace Account Setup */}
+        <div className="pt-4 border-t border-[#F5F5F5] bg-blue-50/30 p-4 rounded-xl border border-blue-100">
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <p className="text-sm font-bold text-gray-900">
+                Razorpay Route Marketplace Account
+              </p>
+              <p className="text-xs text-gray-500">
+                Mandatory to accept online Razorpay payments. Customer payments are split directly to your linked account.
+              </p>
+            </div>
+            <span
+              className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${
+                store?.razorpayRouteStatus === 'active'
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  : store?.razorpayRouteStatus === 'under_review' || store?.razorpayRouteStatus === 'created'
+                  ? 'bg-amber-50 text-amber-700 border-amber-200'
+                  : 'bg-rose-50 text-rose-700 border-rose-200'
+              }`}
+            >
+              {store?.razorpayRouteStatus === 'active'
+                ? 'Razorpay: ACTIVE'
+                : store?.razorpayRouteStatus === 'under_review'
+                ? 'Razorpay: UNDER REVIEW'
+                : store?.razorpayRouteStatus === 'created'
+                ? 'Razorpay: PENDING KYC'
+                : 'Razorpay: NOT CONNECTED'}
+            </span>
+          </div>
+
+          {store?.razorpayAccountId ? (
+            <div className="mb-3 p-3 bg-white border border-blue-200 rounded-lg text-xs text-gray-700 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <span className="font-semibold text-blue-900">Razorpay Linked Account ID:</span>{' '}
+                <code className="font-mono bg-blue-50 px-2 py-0.5 rounded border border-blue-200">{store.razorpayAccountId}</code>
+              </div>
+              <div>
+                <span className="font-semibold text-blue-900">Route Status:</span>{' '}
+                <span className="font-bold text-emerald-700 uppercase">{store.razorpayRouteStatus || 'active'}</span>
+              </div>
+            </div>
+          ) : (
+            <div className="mb-3 p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
+              ⚠️ Complete Razorpay payment onboarding to accept online Razorpay payments.
+            </div>
+          )}
+
+          <div className="flex justify-end">
             <button
               type="button"
               onClick={handleRazorpayOnboard}
               disabled={onboardingRoute}
-              className="px-4 py-2 bg-teal-700 hover:bg-teal-800 disabled:opacity-50 text-white text-xs font-semibold rounded-xl transition shadow-sm"
+              className="px-4 py-2 bg-[#0C2340] hover:bg-[#1E3A5F] disabled:opacity-50 text-white text-xs font-semibold rounded-xl transition shadow-sm"
             >
-              {onboardingRoute ? "Connecting…" : store?.cashfreeVendorId ? "Sync / Update Cashfree Vendor" : "Connect Cashfree Easy Split"}
+              {onboardingRoute ? "Connecting…" : store?.razorpayAccountId ? "Sync / Update Razorpay Account" : "Connect Razorpay Route Account"}
             </button>
           </div>
         </div>

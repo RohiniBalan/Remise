@@ -38,6 +38,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/admin/categories', categoryRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/product-images', productImageRoutes);
+app.use('/api/shopbycategory', require('./routes/shopByCategoryRoutes'));
 
 app.get('/health', (req, res) => res.json({ success: true, service: 'product-service' }));
 

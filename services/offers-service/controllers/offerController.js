@@ -63,6 +63,20 @@ const createOffer = async (req, res) => {
       targetCustomerName: targetCustomerName || null,
     });
 
+    // Notify the seller (store owner) that their offer is live
+    if (req.user?.id) {
+      axios.post(`${NOTIFICATION_SERVICE}/api/notifications/internal/create`, {
+        userId:  req.user.id,
+        offerId: offer._id.toString(),
+        storeId,
+        type:    'offer',
+        title:   `🏷️ Offer Published: ${title}`,
+        body:    `Your offer is now live with ${discount}% discount until ${new Date(validUntil).toLocaleDateString()}`,
+        image:   offer.image,
+        url:     `/nearby?offer=${offer._id}`,
+      }).catch(err => console.error('[Offers] Seller confirmation notification failed:', err.message));
+    }
+
     // Fire-and-forget: notify either the one targeted customer, or everyone nearby
     if (targetCustomerId) {
       axios.post(`${NOTIFICATION_SERVICE}/api/notifications/internal/create`, {

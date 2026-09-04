@@ -1,6 +1,10 @@
+const axios      = require('axios');
 const OfferOrder = require('../models/OfferOrder');
 const Offer      = require('../models/Offer');
 const { isStoreOwnedBy } = require('../utils/verifyStoreOwner');
+
+const NOTIFICATION_SERVICE = process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:3009';
+const STORE_SERVICE        = process.env.STORE_SERVICE_URL        || 'http://localhost:3007';
 
 // ─── POST /api/offers/:id/order ──────────────────────────────────────────────
 const placeOfferOrder = async (req, res) => {
@@ -13,29 +17,87 @@ const placeOfferOrder = async (req, res) => {
       return res.status(400).json({ success: false, message: 'This offer has expired.' });
     }
 
-    const { customerName, customerPhone, customerEmail, deliveryAddress, quantity = 1, notes } = req.body;
+    const {
+      customerName,
+      customerPhone,
+      customerEmail,
+      deliveryAddress,
+      city,
+      state,
+      pinCode,
+      deliveryMethod = 'delivery',
+      paymentMethod = 'cod',
+      utrNumber,
+      screenshot,
+      quantity = 1,
+      notes
+    } = req.body;
 
     const total = offer.offerPrice * parseInt(quantity);
+    const userId = req.headers['x-user-id'] || req.user?.id || null;
 
     const order = await OfferOrder.create({
       offerId:         offer._id.toString(),
       storeId:         offer.storeId,
       storeName:       offer.storeName,
-      userId:          req.headers['x-user-id'] || null,
+      userId,
       customerName,
       customerPhone,
       customerEmail,
-      deliveryAddress,
-      offerTitle:  offer.title,
-      offerImage:  offer.image,
-      unitPrice:   offer.offerPrice,
-      quantity:    parseInt(quantity),
-      totalAmount: total,
-      notes
+      deliveryAddress: deliveryAddress || '',
+      city:            city || '',
+      state:           state || '',
+      pinCode:         pinCode || '',
+      deliveryMethod:  deliveryMethod === 'pickup' ? 'pickup' : 'delivery',
+      paymentMethod:   paymentMethod || 'cod',
+      paymentStatus:   (paymentMethod === 'online' || paymentMethod === 'razorpay') ? 'Completed' : 'Pending',
+      utrNumber:       utrNumber || '',
+      screenshot:      screenshot || '',
+      offerTitle:      offer.title,
+      offerImage:      offer.image,
+      unitPrice:       offer.offerPrice,
+      quantity:        parseInt(quantity),
+      totalAmount:     total,
+      notes:           notes || ''
     });
 
     // Increment order counter on offer
     await Offer.findByIdAndUpdate(req.params.id, { $inc: { orderCount: 1 } });
+
+    // 1) Send notification to Store Owner (Seller)
+    try {
+      const storeRes = await axios.get(`${STORE_SERVICE}/api/stores/internal/${offer.storeId}`).catch(() => null);
+      const store = storeRes?.data?.data;
+      if (store?.ownerId) {
+        const methodLabel = (paymentMethod || 'cod').toUpperCase();
+        const deliveryLabel = deliveryMethod === 'pickup' ? 'Store Pickup' : 'Home Delivery';
+        axios.post(`${NOTIFICATION_SERVICE}/api/notifications/internal/create`, {
+          userId:  store.ownerId,
+          title:   `🛒 New Offer Order: ${offer.title}`,
+          body:    `Order from ${customerName} (${parseInt(quantity)} pcs) · ₹${total} · ${deliveryLabel} (${methodLabel})`,
+          url:     '/store/dashboard',
+          storeId: offer.storeId,
+          offerId: offer._id.toString(),
+          type:    'order',
+        }).catch(err => console.error('[Offer Order] Store owner notification failed:', err.message));
+      }
+    } catch (err) {
+      console.error('[Offer Order] Store lookup notification error:', err.message);
+    }
+
+    // 2) Send notification to Customer if logged in
+    if (userId) {
+      const deliveryLabel = deliveryMethod === 'pickup' ? 'Store Pickup' : 'Home Delivery';
+      axios.post(`${NOTIFICATION_SERVICE}/api/notifications/internal/create`, {
+        userId,
+        title:   `Order Placed: ${offer.title}`,
+        body:    `Your order with ${offer.storeName || 'the store'} is confirmed. Total: ₹${total} (${deliveryLabel})`,
+        url:     '/nearby',
+        storeId: offer.storeId,
+        offerId: offer._id.toString(),
+        type:    'order',
+      }).catch(err => console.error('[Offer Order] Customer notification failed:', err.message));
+    }
 
     res.status(201).json({ success: true, message: 'Order placed! The store will confirm shortly.', data: order });
   } catch (err) {

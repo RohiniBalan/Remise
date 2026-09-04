@@ -1,11 +1,34 @@
 const Product = require('../models/Product');
 
+const parseBodyPayload = (body) => {
+  const payload = { ...body };
+  if (typeof payload.bulkPricing === 'string') {
+    try { payload.bulkPricing = JSON.parse(payload.bulkPricing); } catch (e) {}
+  }
+  if (typeof payload.specifications === 'string') {
+    try { payload.specifications = JSON.parse(payload.specifications); } catch (e) {}
+  }
+  if (typeof payload.attributes === 'string') {
+    try { payload.attributes = JSON.parse(payload.attributes); } catch (e) {}
+  }
+  if (typeof payload.images === 'string') {
+    try { payload.images = JSON.parse(payload.images); } catch (e) {}
+  }
+  if (typeof payload.tags === 'string') {
+    try { payload.tags = JSON.parse(payload.tags); } catch (e) {
+      payload.tags = payload.tags.split(',').map(t => t.trim()).filter(Boolean);
+    }
+  }
+  return payload;
+};
+
 // @desc    Create a new product
 // @route   POST /api/admin/products
 // @access  Private/Admin
 const createProduct = async (req, res) => {
   try {
-    const product = await Product.create(req.body);
+    const payload = parseBodyPayload(req.body);
+    const product = await Product.create(payload);
 
     res.status(201).json({
       success: true,
@@ -96,11 +119,12 @@ const updateProduct = async (req, res) => {
       });
     }
 
+    const payload = parseBodyPayload(req.body);
     product = await Product.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true, runValidators: true }
-    );
+       req.params.id,
+       payload,
+       { new: true, runValidators: true }
+     );
 
     res.status(200).json({
       success: true,

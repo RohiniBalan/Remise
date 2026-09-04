@@ -48,6 +48,8 @@ const productSchema = new mongoose.Schema(
     lowStockThreshold: { type: Number, default: 5 },
     lowStockNotifiedAt: { type: Date, default: null },
 
+    soldCount: { type: Number, default: 0, min: 0 },
+
     createdAt: { type: Date, default: Date.now },
   },
   { timestamps: true },
@@ -57,5 +59,6 @@ productSchema.index({ category: 1 });
 productSchema.index({ availability: 1 });
 productSchema.index({ featured: 1 });
 productSchema.index({ createdAt: -1 });
+productSchema.index({ soldCount: -1 });
 
 module.exports = mongoose.model("Product", productSchema);

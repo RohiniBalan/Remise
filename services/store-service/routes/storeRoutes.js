@@ -7,7 +7,7 @@ const {
   registerStore, getMyStore, getStoreById,
   updateStore, getAllStores, verifyStore, syncOwnerRole,
   getNearbyStores, getStoreInternal, getStoresByIds, getStoresByOwnerIds,
-  enrollDeliveryPortal, onboardStoreCashfree, getStoreCashfreeStatus, updateStoreCashfreeInternal,
+  enrollDeliveryPortal,
   onboardStoreRazorpay, getStoreRazorpayStatus, updateStoreRazorpayInternal
 } = require('../controllers/storeController');
 
@@ -34,9 +34,6 @@ const upload = multer({
 router.get('/me/my-store',         protect, getMyStore);
 router.post('/me/sync-role',        protect, syncOwnerRole);
 router.patch('/delivery-portal/enroll', protect, enrollDeliveryPortal);
-router.post('/me/cashfree-onboard', protect, onboardStoreCashfree);
-router.get('/me/cashfree-status',   protect, getStoreCashfreeStatus);
-// Backwards-compatible aliases
 router.post('/me/razorpay-onboard', protect, onboardStoreRazorpay);
 router.get('/me/razorpay-status',   protect, getStoreRazorpayStatus);
 router.post('/',                   protect, upload.single('logo'), registerStore);
@@ -50,7 +47,6 @@ router.get('/nearby',     getNearbyStores);
 
 // Internal — service-to-service only (not exposed via gateway)
 router.get('/internal/:id', getStoreInternal);
-router.patch('/internal/:id/cashfree-status', updateStoreCashfreeInternal);
 router.patch('/internal/:id/razorpay-status', updateStoreRazorpayInternal);
 
 // Admin — full store listing (includes ownerId/phone/email, so it must not be public)

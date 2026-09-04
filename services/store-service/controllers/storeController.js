@@ -45,6 +45,11 @@ const registerStore = async (req, res) => {
       storeType,
       pan,
       gstin,
+      fssai,
+      fssaiNumber,
+      legalBusinessName,
+      businessType,
+      bankAccount,
     } = req.body;
 
     // PAN validation (Mandatory)
@@ -62,6 +67,29 @@ const registerStore = async (req, res) => {
         success: false,
         message: "Invalid PAN format (expected 10 characters e.g. ABCDE1234F).",
       });
+    }
+
+    // FSSAI validation (Mandatory for Food & Beverages)
+    const rawFssai = (fssaiNumber || fssai || "").trim();
+    let trimmedFssai = null;
+    const isFoodCategory = (category || "").toLowerCase().includes("food");
+    if (isFoodCategory) {
+      if (!rawFssai) {
+        return res.status(400).json({
+          success: false,
+          message: "FSSAI License Number is mandatory for Food & Beverages category.",
+        });
+      }
+      const FSSAI_REGEX = /^[0-9]{14}$/;
+      if (!FSSAI_REGEX.test(rawFssai)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid FSSAI License Number (expected 14-digit numeric code e.g. 10012345678901).",
+        });
+      }
+      trimmedFssai = rawFssai;
+    } else if (rawFssai) {
+      trimmedFssai = rawFssai;
     }
 
     // GSTIN validation (Optional)
@@ -95,6 +123,11 @@ const registerStore = async (req, res) => {
       });
     }
 
+    let parsedBankAccount = null;
+    if (bankAccount) {
+      parsedBankAccount = typeof bankAccount === "string" ? JSON.parse(bankAccount) : bankAccount;
+    }
+
     let qrCodeImage = null;
     if (upiId) {
       if (!isValidUpiId(upiId)) {
@@ -109,6 +142,7 @@ const registerStore = async (req, res) => {
     }
 
     const logoPath = req.file ? `/uploads/stores/${req.file.filename}` : null;
+    const parsedAddress = typeof address === "string" ? JSON.parse(address) : address || {};
 
     const store = await Store.create({
       ownerId,
@@ -118,17 +152,23 @@ const registerStore = async (req, res) => {
       phone,
       email,
       category,
+      fssai: trimmedFssai,
       storeType: storeType || "store",
       pan: trimmedPan,
       gstin: trimmedGstin,
       businessDetails: {
-        legalBusinessName: ownerName || name,
-        businessType: "individual",
+        legalBusinessName: legalBusinessName || ownerName || name,
+        businessType: businessType || "individual",
         pan: trimmedPan,
         gstin: trimmedGstin,
+        fssaiNumber: trimmedFssai,
+        bankAccount: parsedBankAccount ? {
+          accountNumber: parsedBankAccount.accountNumber || null,
+          ifscCode: (parsedBankAccount.ifscCode || "").toUpperCase(),
+          beneficiaryName: parsedBankAccount.beneficiaryName || legalBusinessName || ownerName || name,
+        } : {},
       },
-      address:
-        typeof address === "string" ? JSON.parse(address) : address || {},
+      address: parsedAddress,
       location: {
         type: "Point",
         coordinates: [lng, lat],
@@ -137,6 +177,38 @@ const registerStore = async (req, res) => {
       upiId: upiId ? upiId.trim() : null,
       qrCodeImage,
     });
+
+    // Attempt automatic Razorpay Route vendor onboarding if bank details provided
+    if (parsedBankAccount?.accountNumber && parsedBankAccount?.ifscCode) {
+      try {
+        const paymentServiceUrl = process.env.PAYMENT_SERVICE_URL || 'http://localhost:3005';
+        const onboardPayload = {
+          storeId: store._id.toString(),
+          ownerId: store.ownerId,
+          ownerName: ownerName || store.ownerName || req.user.name,
+          name: store.name,
+          email: store.email,
+          phone: store.phone,
+          legalBusinessName: legalBusinessName || store.businessDetails?.legalBusinessName || store.name,
+          businessType: businessType || store.businessDetails?.businessType || 'individual',
+          pan: trimmedPan,
+          gstin: trimmedGstin,
+          bankAccount: store.businessDetails.bankAccount,
+          address: store.address || {},
+        };
+        const onboardRes = await axios.post(`${paymentServiceUrl}/api/payment/razorpay/vendor/onboard`, onboardPayload);
+        if (onboardRes.data?.success && onboardRes.data?.data) {
+          const { accountId, stakeholderId, routeStatus, productStatus } = onboardRes.data.data;
+          if (accountId) store.razorpayAccountId = accountId;
+          if (stakeholderId) store.razorpayStakeholderId = stakeholderId;
+          if (routeStatus) store.razorpayRouteStatus = routeStatus.toLowerCase();
+          if (productStatus) store.razorpayRouteProductStatus = productStatus.toLowerCase();
+          await store.save();
+        }
+      } catch (onboardErr) {
+        console.warn("Initial Razorpay onboarding note:", onboardErr.response?.data?.message || onboardErr.message);
+      }
+    }
 
     // Upgrade user's role to store_owner and get a fresh token
     let newToken = null;
@@ -614,8 +686,8 @@ const enrollDeliveryPortal = async (req, res) => {
   }
 };
 
-// Store Owner: Onboard / Link to Cashfree Easy Split
-const onboardStoreCashfree = async (req, res) => {
+// Store Owner: Configure / Onboard Razorpay Route Linked Account
+const onboardStoreRazorpay = async (req, res) => {
   try {
     const store = await Store.findOne({ ownerId: req.user.id });
     if (!store) {
@@ -624,15 +696,14 @@ const onboardStoreCashfree = async (req, res) => {
 
     const {
       legalBusinessName,
-      businessType = 'individual',
+      businessType,
       pan,
       gstin,
       bankAccount,
-      contactName
+      contactName,
     } = req.body;
 
-    // Update business details on store
-    store.businessDetails = store.businessDetails || {};
+    if (!store.businessDetails) store.businessDetails = {};
     if (legalBusinessName) store.businessDetails.legalBusinessName = legalBusinessName;
     if (businessType) store.businessDetails.businessType = businessType;
     if (pan) {
@@ -651,12 +722,10 @@ const onboardStoreCashfree = async (req, res) => {
       };
     }
 
-    // Call payment-service to create or sync Cashfree Easy Split Vendor
     const paymentServiceUrl = process.env.PAYMENT_SERVICE_URL || 'http://localhost:3005';
     try {
       const onboardPayload = {
         storeId: store._id.toString(),
-        vendorId: store.cashfreeVendorId || `vendor_${store._id}`,
         ownerId: store.ownerId,
         ownerName: contactName || store.ownerName || req.user.name,
         name: store.name,
@@ -668,23 +737,29 @@ const onboardStoreCashfree = async (req, res) => {
         gstin: gstin || store.businessDetails.gstin || store.gstin,
         bankAccount: bankAccount || store.businessDetails.bankAccount,
         address: store.address || {},
+        existingAccountId: store.razorpayAccountId || null,
+        razorpayAccountId: store.razorpayAccountId || null,
+        razorpayStakeholderId: store.razorpayStakeholderId || null,
       };
 
-      const onboardRes = await axios.post(`${paymentServiceUrl}/api/payment/vendor/onboard`, onboardPayload);
+      const onboardRes = await axios.post(`${paymentServiceUrl}/api/payment/razorpay/vendor/onboard`, onboardPayload);
       if (onboardRes.data.success && onboardRes.data.data) {
-        const { vendorId, status, kycStatus } = onboardRes.data.data;
-        if (vendorId) store.cashfreeVendorId = vendorId;
-        if (status) store.cashfreeVendorStatus = status.toLowerCase();
-        if (kycStatus) store.cashfreeKycStatus = kycStatus;
+        const { accountId, stakeholderId, routeStatus, productStatus } = onboardRes.data.data;
+        if (accountId) store.razorpayAccountId = accountId;
+        if (stakeholderId) store.razorpayStakeholderId = stakeholderId;
+        if (routeStatus) store.razorpayRouteStatus = routeStatus.toLowerCase();
+        if (productStatus) store.razorpayRouteProductStatus = productStatus.toLowerCase();
       }
     } catch (onboardErr) {
-      console.warn('Payment gateway sync note:', onboardErr.response?.data?.message || onboardErr.message);
-      store.cashfreeVendorId = store.cashfreeVendorId || `vendor_${store._id}`;
-      store.cashfreeVendorStatus = store.cashfreeVendorStatus || 'active';
+      console.warn('Razorpay Route sync warning:', onboardErr.response?.data?.message || onboardErr.message);
+      // If Razorpay onboarding fails, save error status without generating fake account ID
+      if (!store.razorpayAccountId) {
+        store.razorpayRouteStatus = 'not_created';
+      }
       await store.save();
-      return res.json({
-        success: true,
-        message: 'Store profile & bank details saved successfully.',
+      return res.status(400).json({
+        success: false,
+        message: onboardErr.response?.data?.message || onboardErr.message || 'Failed to connect Razorpay Route account.',
         data: store,
       });
     }
@@ -693,17 +768,17 @@ const onboardStoreCashfree = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Store profile & bank details saved successfully.',
+      message: 'Razorpay Route account configured successfully.',
       data: store,
     });
   } catch (err) {
-    console.error('onboardStoreCashfree error:', err);
+    console.error('onboardStoreRazorpay error:', err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// Store Owner: Get Cashfree Easy Split Status
-const getStoreCashfreeStatus = async (req, res) => {
+// Store Owner: Get Razorpay Route Status
+const getStoreRazorpayStatus = async (req, res) => {
   try {
     const store = await Store.findOne({ ownerId: req.user.id });
     if (!store) {
@@ -715,11 +790,11 @@ const getStoreCashfreeStatus = async (req, res) => {
       data: {
         storeId: store._id,
         storeName: store.name,
-        cashfreeVendorId: store.cashfreeVendorId,
-        cashfreeVendorStatus: store.cashfreeVendorStatus || 'not_created',
-        cashfreeKycStatus: store.cashfreeKycStatus,
-        razorpayAccountId: store.razorpayAccountId, // Preserved for historical reference
-        commissionPercentage: store.commissionPercentage || 10,
+        razorpayAccountId: store.razorpayAccountId,
+        razorpayStakeholderId: store.razorpayStakeholderId,
+        razorpayRouteStatus: store.razorpayRouteStatus || 'not_created',
+        razorpayRouteProductStatus: store.razorpayRouteProductStatus,
+        commissionPercentage: store.commissionPercentage || 0,
         businessDetails: store.businessDetails || {},
       },
     });
@@ -728,18 +803,24 @@ const getStoreCashfreeStatus = async (req, res) => {
   }
 };
 
-// Internal: update store Cashfree status from payment-service / webhook
-const updateStoreCashfreeInternal = async (req, res) => {
+// Internal: update store Razorpay status from payment-service / webhook
+const updateStoreRazorpayInternal = async (req, res) => {
   try {
     const { id } = req.params;
-    const { cashfreeVendorId, cashfreeVendorStatus, cashfreeKycStatus } = req.body;
+    const {
+      razorpayAccountId,
+      razorpayStakeholderId,
+      razorpayRouteStatus,
+      razorpayRouteProductStatus,
+    } = req.body;
 
     const store = await Store.findById(id);
     if (!store) return res.status(404).json({ success: false, message: 'Store not found.' });
 
-    if (cashfreeVendorId) store.cashfreeVendorId = cashfreeVendorId;
-    if (cashfreeVendorStatus) store.cashfreeVendorStatus = cashfreeVendorStatus;
-    if (cashfreeKycStatus) store.cashfreeKycStatus = cashfreeKycStatus;
+    if (razorpayAccountId !== undefined) store.razorpayAccountId = razorpayAccountId;
+    if (razorpayStakeholderId !== undefined) store.razorpayStakeholderId = razorpayStakeholderId;
+    if (razorpayRouteStatus) store.razorpayRouteStatus = razorpayRouteStatus;
+    if (razorpayRouteProductStatus) store.razorpayRouteProductStatus = razorpayRouteProductStatus;
 
     await store.save();
     res.json({ success: true, data: store });
@@ -761,13 +842,9 @@ module.exports = {
   getStoresByIds,
   getStoresByOwnerIds,
   enrollDeliveryPortal,
-  onboardStoreCashfree,
-  getStoreCashfreeStatus,
-  updateStoreCashfreeInternal,
-  // Backwards-compatible aliases
-  onboardStoreRazorpay: onboardStoreCashfree,
-  getStoreRazorpayStatus: getStoreCashfreeStatus,
-  updateStoreRazorpayInternal: updateStoreCashfreeInternal,
+  onboardStoreRazorpay,
+  getStoreRazorpayStatus,
+  updateStoreRazorpayInternal,
 };
 
 

@@ -5,7 +5,7 @@ const {
   createProduct, getProducts, getProductById, getProductsByStore,
   getProductsByIds, updateProduct, deleteProduct, deductStock,
   reserveStock, commitStock, releaseStock, expireReservations,
-  matchCart, getGroupedSuppliers
+  matchCart, getGroupedSuppliers, backfillSoldCounts
 } = require('../controllers/productController');
 const { protect, authorize, verifyAdmin, verifyAdminOrStoreOwner } = require('../middleware/authMiddleware');
 
@@ -24,6 +24,7 @@ router.post('/release-stock',        releaseStock);
 router.post('/expire-reservations',  expireReservations);
 router.post('/deduct-stock',         deductStock);
 router.post('/match-cart',           matchCart);
+router.post('/backfill-sold-counts', backfillSoldCounts);
 
 
 // ── Admin or Store Owner or Sellers ──────────────────────────────────────────────────────

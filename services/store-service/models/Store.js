@@ -107,6 +107,7 @@ const storeSchema = new mongoose.Schema({
     businessType: { type: String, default: 'individual' },
     pan: { type: String, default: null },
     gstin: { type: String, default: null },
+    fssaiNumber: { type: String, default: null },
     bankAccount: {
       accountNumber: { type: String, default: null },
       ifscCode: { type: String, default: null },

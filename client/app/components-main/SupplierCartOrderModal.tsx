@@ -681,14 +681,14 @@ export default function SupplierCartOrderModal({ groups, prefill, token, onCompl
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="font-bold text-gray-900 text-sm">
-                          Online Payment (Cashfree Easy Split)
+                          Razorpay Gateway (Route Split · Cards, UPI, NetBanking)
                         </p>
                         <span className="bg-teal-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
                           Instant · 100% Secure
                         </span>
                       </div>
                       <p className="text-xs text-gray-600 mt-1">
-                        Pay instantly using <strong>UPI</strong>, <strong>Cards</strong>, <strong>Net Banking</strong>, or <strong>Wallets</strong>.
+                        Pay securely via <strong>Razorpay</strong> using <strong>UPI</strong>, <strong>Cards</strong>, <strong>Net Banking</strong>, or <strong>Wallets</strong>.
                       </p>
                       <div className="flex items-center gap-2 mt-2 flex-wrap">
                         <span className="text-[11px] font-semibold bg-white border border-teal-200 text-teal-800 px-2 py-0.5 rounded-md">
@@ -757,20 +757,20 @@ export default function SupplierCartOrderModal({ groups, prefill, token, onCompl
                 </>
               )}
 
-              {/* ── Cashfree Payment Sub-methods Breakdown ── */}
+              {/* ── Online Payment Sub-methods Breakdown ── */}
               {paymentMethod === "razorpay" && (
                 <div className="space-y-3.5">
                   <div className="flex items-center justify-between border-b border-gray-100 pb-2">
                     <div>
                       <h3 className="text-sm font-bold text-gray-900">
-                        Available Cashfree Payment Methods
+                        Available Payment Methods
                       </h3>
                       <p className="text-xs text-gray-500">
                         Select a method to pay <strong>₹{chosen.totalAmount.toLocaleString("en-IN")}</strong>:
                       </p>
                     </div>
                     <span className="text-[10px] font-bold text-teal-700 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-full">
-                      Cashfree Easy Split
+                      Razorpay Route
                     </span>
                   </div>
 
@@ -887,7 +887,7 @@ export default function SupplierCartOrderModal({ groups, prefill, token, onCompl
                   <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 text-slate-700 rounded-xl px-3 py-2 text-xs">
                     <ShieldCheck size={16} className="text-teal-600 shrink-0" />
                     <span>
-                      256-bit SSL encrypted · Verified by Cashfree Easy Split · Instant invoice generation
+                      256-bit SSL encrypted · Verified by Razorpay · Instant invoice generation
                     </span>
                   </div>
 
@@ -908,11 +908,11 @@ export default function SupplierCartOrderModal({ groups, prefill, token, onCompl
                     >
                       {isPayingRazorpay ? (
                         <>
-                          <RefreshCw size={16} className="animate-spin" /> Opening Cashfree…
+                          <RefreshCw size={16} className="animate-spin" /> Opening Razorpay…
                         </>
                       ) : (
                         <>
-                          <Lock size={16} /> Proceed to Pay ₹{chosen.totalAmount.toLocaleString("en-IN")} via Cashfree
+                          <Lock size={16} /> Proceed to Pay ₹{chosen.totalAmount.toLocaleString("en-IN")} via Razorpay
                         </>
                       )}
                     </button>

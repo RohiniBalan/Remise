@@ -2662,6 +2662,38 @@ export default function SellerDashboard() {
   const [storeNameByOwnerId, setStoreNameByOwnerId] = useState<
     Record<string, string>
   >({});
+  const [seenIds, setSeenIds] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set<string>();
+    try {
+      const raw = localStorage.getItem("seller_seen_order_ids");
+      return new Set<string>(raw ? JSON.parse(raw) : []);
+    } catch { return new Set<string>(); }
+  });
+
+  // Mark orders as seen when visiting the orders tab
+  const markOrdersAsSeen = (orderIds: string[]) => {
+    if (typeof window === "undefined") return;
+    try {
+      const existing = (() => {
+        try { const raw = localStorage.getItem("seller_seen_order_ids"); return new Set<string>(raw ? JSON.parse(raw) : []); } catch { return new Set<string>(); }
+      })();
+      orderIds.forEach((id) => existing.add(id));
+      localStorage.setItem("seller_seen_order_ids", JSON.stringify([...existing]));
+    } catch { /* non-fatal */ }
+  };
+
+  const handleTabChange = (newTab: Tab) => {
+    setTab(newTab);
+    if (newTab === "orders") {
+      const allIds = orders.map((o: any) => o._id || o.id).filter(Boolean);
+      markOrdersAsSeen(allIds);
+      try {
+        const raw = localStorage.getItem("seller_seen_order_ids");
+        setSeenIds(new Set<string>(raw ? JSON.parse(raw) : []));
+      } catch { /* */ }
+    }
+    setMobileMenuOpen(false);
+  };
 
   // Role guard — only wholesaler / home_business belong here
   useEffect(() => {
@@ -2793,8 +2825,11 @@ export default function SellerDashboard() {
       </div>
     );
 
-  const pendingCount = orders.filter(
+  const processingOrders = orders.filter(
     (o) => o.orderStatus === "Processing",
+  );
+  const newOrderCount = processingOrders.filter(
+    (o: any) => !seenIds.has(o._id || o.id)
   ).length;
 
   return (
@@ -2844,7 +2879,7 @@ export default function SellerDashboard() {
               {TABS.map((t) => (
                 <button
                   key={t.id}
-                  onClick={() => setTab(t.id)}
+                  onClick={() => handleTabChange(t.id)}
                   className={`flex items-center gap-3 w-full px-4 py-3.5 text-sm font-semibold border-l-4 transition text-left ${tab === t.id
                       ? "bg-[#DFF1F1] text-teal-800 border-l-[#FF0000]"
                       : "text-gray-600 hover:bg-[#F5F5F5] border-l-transparent"
@@ -2858,9 +2893,9 @@ export default function SellerDashboard() {
                     {t.icon}
                   </span>
                   {t.label}
-                  {t.id === "orders" && pendingCount > 0 && (
+                  {t.id === "orders" && newOrderCount > 0 && (
                     <span className="ml-auto bg-[#FF0000] text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                      {pendingCount}
+                      {newOrderCount}
                     </span>
                   )}
                 </button>
@@ -2901,10 +2936,7 @@ export default function SellerDashboard() {
                     {TABS.map((t) => (
                       <button
                         key={t.id}
-                        onClick={() => {
-                          setTab(t.id);
-                          setMobileMenuOpen(false);
-                        }}
+                        onClick={() => handleTabChange(t.id)}
                         className={`flex items-center gap-3 w-full px-4 py-3 text-sm font-semibold text-left transition ${tab === t.id
                             ? "bg-[#DFF1F1] text-teal-800"
                             : "text-gray-600 hover:bg-[#F5F5F5]"
@@ -2918,9 +2950,9 @@ export default function SellerDashboard() {
                           {t.icon}
                         </span>
                         {t.label}
-                        {t.id === "orders" && pendingCount > 0 && (
+                        {t.id === "orders" && newOrderCount > 0 && (
                           <span className="ml-auto bg-[#FF0000] text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                            {pendingCount}
+                            {newOrderCount}
                           </span>
                         )}
                       </button>

@@ -27,5 +27,11 @@ export const storeApi = {
     axios.get(`${BASE}/api/stores`),
 
   getByIds: (ids: string[]) =>
-  axios.post(`${BASE}/api/stores/batch`, { ids }),
+    axios.post(`${BASE}/api/stores/batch`, { ids }),
+
+  onboardRazorpay: (data: any, token: string) =>
+    axios.post(`${BASE}/api/stores/me/razorpay-onboard`, data, { headers: authHeaders(token) }),
+
+  getRazorpayStatus: (token: string) =>
+    axios.get(`${BASE}/api/stores/me/razorpay-status`, { headers: authHeaders(token) }),
 };

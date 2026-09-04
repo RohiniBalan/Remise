@@ -5,8 +5,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Trash2, Save, Eye, Edit2, Loader2, RefreshCw, AlertCircle, CheckCircle, Type, ImageIcon, Clock, MessageSquare, Star, MapPin } from 'lucide-react';
 import Layout from '../layout/layout';
 import axios from 'axios';
-// Updated to named import
-import ToyBlogLifestyle from '../../about/ToyBlogLifestyle';
+function ToyBlogLifestyle({ isPreview, previewData }: { isPreview?: boolean; previewData?: any }) {
+  return (
+    <div className="p-8 text-center text-gray-500">
+      <h3 className="text-lg font-bold text-gray-800 mb-2">Blog & Lifestyle Preview</h3>
+      <p className="text-sm">Preview mode active for {previewData?.articles?.length || 0} articles.</p>
+    </div>
+  );
+}
 
 import { API_URL } from '../../utils/api';
 const axiosInstance = axios.create({ baseURL: API_URL, headers: { 'Content-Type': 'application/json' } });

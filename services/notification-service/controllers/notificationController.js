@@ -92,11 +92,12 @@ const sendOfferNotification = async (req, res) => {
 
     console.log(`[Notification] Sending to ${subscribers.length} subscribers within ${notificationRadius}km`);
 
-    const payload = JSON.stringify({ title, body, image, url, offerId, storeId });
+    const notifiedUserIds = new Set();
 
     const results = await Promise.allSettled(
       subscribers.map(async (sub) => {
         try {
+          notifiedUserIds.add(sub.userId);
           await webpush.sendNotification(sub.subscription, payload);
 
           // Store in-app notification
@@ -107,7 +108,8 @@ const sendOfferNotification = async (req, res) => {
             title,
             body,
             image,
-            url
+            url,
+            type: 'offer'
           });
         } catch (err) {
           // Subscription expired / invalid — deactivate it
@@ -118,6 +120,28 @@ const sendOfferNotification = async (req, res) => {
         }
       })
     );
+
+    // Also ensure other active users receive in-app notification
+    try {
+      const allUserIds = await PushSubscription.distinct('userId');
+      const extraUserIds = allUserIds.filter(uid => uid && !notifiedUserIds.has(uid));
+      await Promise.allSettled(
+        extraUserIds.map(uid =>
+          Notification.create({
+            userId:  uid,
+            offerId,
+            storeId,
+            title,
+            body,
+            image,
+            url,
+            type: 'offer'
+          })
+        )
+      );
+    } catch (inAppErr) {
+      console.error('[Notification] Broadcast in-app error:', inAppErr.message);
+    }
 
     const sent   = results.filter(r => r.status === 'fulfilled').length;
     const failed = results.filter(r => r.status === 'rejected').length;

@@ -31,8 +31,7 @@ const PRODUCT_SERVICE_URL = process.env.PRODUCT_SERVICE_URL || 'http://localhost
 const axios = require('axios');
 
 app.listen(PORT, () => {
-  const cfEnv = (process.env.CASHFREE_ENVIRONMENT || 'SANDBOX').toUpperCase();
-  console.log(`✅ Payment Service running on port ${PORT} [Cashfree Mode: ${cfEnv}]`);
+  console.log(`✅ Payment Service running on port ${PORT} [Razorpay Gateway & Route Enabled]`);
 
   // Periodic expiration cleaner (runs every 60 seconds to release abandoned/timed-out stock reservations)
   setInterval(async () => {

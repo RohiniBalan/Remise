@@ -4,14 +4,15 @@ import "./globals.css";
 
 // Ensure this path exactly matches your file structure for the CartContext
 import { CartProvider } from "./components-main/CartContext";
+import { WishlistProvider } from "./components-main/WishlistContext";
 import { AuthProvider } from "./context/AuthContext";
-
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "REmise",
-  description: "Everything, Delivered — Groceries, cosmetics, fashion, electronics & more.",
+  description:
+    "Everything, Delivered — Groceries, cosmetics, fashion, electronics & more.",
 };
 
 export default function RootLayout({
@@ -28,7 +29,7 @@ export default function RootLayout({
         */}
         <AuthProvider>
           <CartProvider>
-            {children}
+            <WishlistProvider>{children}</WishlistProvider>
           </CartProvider>
         </AuthProvider>
       </body>

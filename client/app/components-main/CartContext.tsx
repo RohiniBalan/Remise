@@ -204,6 +204,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         ];
       }
 
+      showNotification("Added to cart", "success");
       syncCartToBackend(newCart);
       return newCart;
     });
@@ -289,8 +290,8 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
             }}
             className={`flex items-center gap-3 px-6 py-3.5 rounded-full shadow-2xl backdrop-blur-md font-semibold tracking-wide border ${
               theme === "light"
-                ? "bg-white/90 border-gray-200 text-gray-900 shadow-black/10"
-                : "bg-black/80 border-[#333] text-white shadow-[#D4AF37]/10"
+                ? "bg-black/80 border-[#333] text-white shadow-black/20"
+                : "bg-white/90 border-gray-200 text-gray-900 shadow-[#D4AF37]/10"
             }`}
           >
             {toast.type === "error" ? (

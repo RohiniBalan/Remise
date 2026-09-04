@@ -36,14 +36,13 @@ import RazorpayModal from "@/app/components-main/RazorpayModal";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
-// Helper: Dynamically load Cashfree checkout script
-const loadCashfreeScript = (): Promise<boolean> => {
+const loadRazorpayScript = (): Promise<boolean> => {
   return new Promise((resolve) => {
     if (typeof window === "undefined") return resolve(false);
-    if ((window as any).Cashfree) return resolve(true);
+    if ((window as any).Razorpay) return resolve(true);
 
     const script = document.createElement("script");
-    script.src = "https://sdk.cashfree.com/js/v3/cashfree.js";
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
     script.async = true;
     script.onload = () => resolve(true);
     script.onerror = () => resolve(false);
@@ -477,62 +476,43 @@ export default function CompareModal({
         token,
       );
 
-      if (paymentMethod === "razorpay" || paymentMethod === "cashfree") {
+      if (paymentMethod === "razorpay") {
         const targetOrderId = res.data.orderId || "";
-        const paymentSessionId = res.data.paymentSessionId;
-        const cashfreeOrderId = res.data.cashfreeOrderId || res.data.razorpayOrderId || targetOrderId;
+        const rzpOrderId = res.data.razorpayOrderId;
+        const keyId = res.data.keyId || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_test_TRXC8nEMqsywBS";
 
-        if (paymentSessionId) {
+        if (rzpOrderId) {
           setIsPayingRazorpay(true);
-          const isLoaded = await loadCashfreeScript();
-          if (isLoaded && (window as any).Cashfree) {
-            try {
-              const isSandbox = Boolean(
-                res.data.isSandbox ||
-                res.data.paymentSessionId?.includes("paymentpayment") ||
-                process.env.NEXT_PUBLIC_CASHFREE_MODE === "sandbox"
-              );
-              const cashfreeMode = isSandbox ? "sandbox" : "production";
-              const cashfree = (window as any).Cashfree({ mode: cashfreeMode });
-
-              // Start background polling to detect phone simulator completion
-              const pollTimer = setInterval(async () => {
-                try {
-                  const sRes = await fetch(`${API}/api/payment/status/${targetOrderId}`);
-                  const sData = await sRes.json();
-                  if (sData.success && (sData.status === "SUCCESS" || sData.paymentStatus === "SUCCESS")) {
-                    clearInterval(pollTimer);
-                    setIsPayingRazorpay(false);
-                    setOrderPlaced({ orderId: targetOrderId });
-                    setStep("success");
-                    onOrderSuccess?.();
-                  }
-                } catch (e) {
-                  // silent poll
-                }
-              }, 2000);
-
-              cashfree.checkout({
-                paymentSessionId,
-                redirectTarget: "_modal",
-              }).then(async (result: any) => {
-                setTimeout(() => clearInterval(pollTimer), 10000);
+          const isLoaded = await loadRazorpayScript();
+          if (isLoaded && (window as any).Razorpay) {
+            const rzp = new (window as any).Razorpay({
+              key: keyId,
+              amount: res.data.amountPaise || Math.round(chosen.totalAmount * 100),
+              currency: res.data.currency || "INR",
+              name: "Remise Marketplace",
+              description: `Order #${targetOrderId}`,
+              order_id: rzpOrderId,
+              prefill: {
+                name: `${form.firstName} ${form.lastName}`.trim(),
+                email: form.contactEmail,
+                contact: form.phone,
+              },
+              theme: { color: "#0d9488" },
+              handler: async (response: any) => {
                 setIsPayingRazorpay(false);
-
-                // Auto-verify on return
                 try {
                   const verifyRes = await fetch(`${API}/api/payment/verify`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                       orderId: targetOrderId,
-                      paymentSessionId,
-                      cashfree_order_id: cashfreeOrderId,
+                      razorpay_order_id: response.razorpay_order_id,
+                      razorpay_payment_id: response.razorpay_payment_id,
+                      razorpay_signature: response.razorpay_signature,
                     }),
                   });
                   const vData = await verifyRes.json();
                   if (verifyRes.ok && vData.success) {
-                    clearInterval(pollTimer);
                     setOrderPlaced({ orderId: targetOrderId });
                     setStep("success");
                     onOrderSuccess?.();
@@ -541,45 +521,39 @@ export default function CompareModal({
                 } catch (vErr) {
                   console.warn("Signature verification notice:", vErr);
                 }
+                setOrderPlaced({ orderId: targetOrderId });
+                setStep("success");
+                onOrderSuccess?.();
+              },
+              modal: {
+                ondismiss: async () => {
+                  setIsPayingRazorpay(false);
+                  try {
+                    await fetch(`${API}/api/payment/cancel`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        orderId: targetOrderId,
+                        cartItems,
+                        reason: "user_cancelled_modal",
+                      }),
+                    });
+                  } catch (e) {}
+                },
+              },
+            });
 
-                if (result?.error) {
-                  clearInterval(pollTimer);
-                  setErrorMsg(result.error.message || "Payment was cancelled or dismissed.");
-                  setStep("payment");
-                  return;
-                }
-              });
-              return;
-            } catch (sdkErr: any) {
-              console.error("Cashfree SDK initiation error:", sdkErr);
-            }
+            rzp.on("payment.failed", (failRes: any) => {
+              setIsPayingRazorpay(false);
+              setErrorMsg(failRes.error?.description || "Payment failed.");
+              setStep("payment");
+            });
+
+            rzp.open();
+            return;
           }
         }
-
-        setRazorpayModalData({
-          orderId: targetOrderId,
-          paymentSessionId,
-          cashfreeOrderId,
-          razorpayOrderId: cashfreeOrderId,
-          amount: chosen.totalAmount || res.data.amountInRupees || (res.data.amount ? res.data.amount / 100 : 0),
-          currency: res.data.currency || "INR",
-          name:
-            res.data.name || chosen.storeName || "WOW Lifestyle Marketplace",
-          description: res.data.description || `Order #${targetOrderId}`,
-          payeeVpa: storeUpiId || "remise.merchant@upi",
-          customer: {
-            name:
-              `${form.firstName} ${form.lastName}`.trim() ||
-              res.data.customer?.name,
-            email: form.contactEmail || res.data.customer?.email,
-            contact: form.phone || res.data.customer?.contact,
-          },
-          initialSubMethod: selectedSubMethod,
-        });
-        setShowRazorpayModal(true);
-        return;
       }
-
 
       const orderIdMatch = (res.data.url || "").match(/orderId=([^&]+)/);
       const orderId = orderIdMatch ? orderIdMatch[1] : res.data.orderId || "";
@@ -1155,45 +1129,39 @@ export default function CompareModal({
                     </p>
                   </div>
 
-                  {/* 1. Razorpay Online Payment Option */}
+                  {/* 1. Razorpay Payment Gateway Option */}
                   <button
                     type="button"
                     onClick={() => {
                       setPaymentMethod("razorpay");
                       setSelectedSubMethod("upi");
                     }}
-                    className="w-full text-left border-2 border-teal-500 bg-gradient-to-r from-teal-50/70 to-emerald-50/40 hover:from-teal-50 hover:to-emerald-50 rounded-xl p-4 transition shadow-sm hover:shadow-md flex items-start gap-3 group"
+                    className="w-full text-left border-2 border-amber-500 bg-gradient-to-r from-amber-50/70 to-yellow-50/40 hover:from-amber-50 hover:to-yellow-50 rounded-xl p-4 transition shadow-sm hover:shadow-md flex items-start gap-3 group"
                   >
-                    <div className="w-10 h-10 rounded-xl bg-teal-600 flex items-center justify-center text-white shrink-0 shadow-sm mt-0.5 group-hover:scale-105 transition-transform">
+                    <div className="w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center text-white shrink-0 shadow-sm mt-0.5 group-hover:scale-105 transition-transform">
                       <CreditCard size={20} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="font-bold text-gray-900 text-sm">
-                          Online Payment (Cashfree Easy Split)
+                          Razorpay Gateway (Route Split · Cards, UPI, NetBanking)
                         </p>
-                        <span className="bg-teal-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                        <span className="bg-amber-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
                           Instant · 100% Secure
                         </span>
                       </div>
                       <p className="text-xs text-gray-600 mt-1">
-                        Pay securely using <strong>UPI</strong> (Google Pay,
-                        PhonePe, Paytm), <strong>Credit/Debit Cards</strong>,{" "}
-                        <strong>Net Banking</strong>, or{" "}
-                        <strong>Wallets</strong>.
+                        Pay securely using <strong>UPI</strong> (GPay, PhonePe, Paytm), <strong>Cards</strong>, <strong>NetBanking</strong>, or <strong>Wallets</strong>.
                       </p>
                       <div className="flex items-center gap-2 mt-2 flex-wrap">
-                        <span className="text-[11px] font-semibold bg-white border border-teal-200 text-teal-800 px-2 py-0.5 rounded-md shadow-2xs">
+                        <span className="text-[11px] font-semibold bg-white border border-amber-200 text-amber-800 px-2 py-0.5 rounded-md shadow-2xs">
                           ⚡ UPI / QR
                         </span>
-                        <span className="text-[11px] font-semibold bg-white border border-teal-200 text-teal-800 px-2 py-0.5 rounded-md shadow-2xs">
+                        <span className="text-[11px] font-semibold bg-white border border-amber-200 text-amber-800 px-2 py-0.5 rounded-md shadow-2xs">
                           💳 Cards
                         </span>
-                        <span className="text-[11px] font-semibold bg-white border border-teal-200 text-teal-800 px-2 py-0.5 rounded-md shadow-2xs">
+                        <span className="text-[11px] font-semibold bg-white border border-amber-200 text-amber-800 px-2 py-0.5 rounded-md shadow-2xs">
                           🏦 Net Banking
-                        </span>
-                        <span className="text-[11px] font-semibold bg-white border border-teal-200 text-teal-800 px-2 py-0.5 rounded-md shadow-2xs">
-                          👛 Wallets
                         </span>
                       </div>
                     </div>
@@ -1219,7 +1187,7 @@ export default function CompareModal({
                     </div>
                   </button>
 
-                  {/* 3. Cash on Delivery / Pickup */}
+                  {/* 4. Cash on Delivery / Pickup */}
                   <button
                     type="button"
                     onClick={() => setPaymentMethod("cod")}
@@ -1248,8 +1216,67 @@ export default function CompareModal({
                 </>
               )}
 
-              {/* ── Cashfree Detailed Payment Methods Breakdown ── */}
+              {/* ── Razorpay Gateway Breakdown ── */}
               {paymentMethod === "razorpay" && (
+                <div className="space-y-3.5">
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                    <div>
+                      <h3 className="text-sm font-bold text-gray-900">
+                        Pay via Razorpay Payment Gateway
+                      </h3>
+                      <p className="text-xs text-gray-500">
+                        Order total: <strong>₹{chosen.totalAmount.toFixed(0)}</strong>
+                      </p>
+                    </div>
+                    <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                      Razorpay Route Split
+                    </span>
+                  </div>
+
+                  <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/40 text-xs text-gray-700 space-y-2">
+                    <div className="flex items-center gap-2 font-bold text-amber-900">
+                      <ShieldCheck size={18} className="text-amber-600 shrink-0" />
+                      <span>Instant Verification · GPay, PhonePe, Cards, NetBanking</span>
+                    </div>
+                    <p className="text-gray-600 leading-relaxed">
+                      Click below to open the official Razorpay Checkout modal and complete payment using test UPI (<code>success@razorpay</code>) or test cards.
+                    </p>
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod(null)}
+                      disabled={isPayingRazorpay}
+                      className="px-4 py-3 rounded-xl text-sm font-semibold text-gray-600 bg-[#F5F5F5] border border-[#BBD5DA] hover:bg-white transition"
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handlePlaceOrder}
+                      disabled={isPayingRazorpay}
+                      className="flex-1 bg-amber-600 hover:bg-amber-700 disabled:opacity-60 text-white font-bold py-3 rounded-xl transition flex items-center justify-center gap-2 shadow-sm"
+                    >
+                      {isPayingRazorpay ? (
+                        <>
+                          <RefreshCw size={16} className="animate-spin" />{" "}
+                          Opening Razorpay…
+                        </>
+                      ) : (
+                        <>
+                          <Lock size={16} /> Open Razorpay Checkout — ₹
+                          {chosen.totalAmount.toFixed(0)}
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Cashfree Detailed Payment Methods Breakdown ── */}
+              {paymentMethod === "cashfree" && (
                 <div className="space-y-3.5">
                   <div className="flex items-center justify-between border-b border-gray-100 pb-2">
                     <div>

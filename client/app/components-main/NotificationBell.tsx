@@ -93,7 +93,7 @@ const markAll = async () => {
               <p className="text-center text-gray-500 py-8 text-sm">No notifications yet</p>
             )}
             {notifications.map(n => (
-              <Link href={n.url || '/nearby'} key={n._id}
+              <Link href="/orders" key={n._id}
                 onClick={() => markRead(n._id)}
                 className={`flex gap-3 px-4 py-3 hover:bg-gray-800 transition border-b border-gray-800/50 ${!n.isRead ? 'bg-purple-900/20' : ''}`}>
                 {n.image
@@ -110,9 +110,9 @@ const markAll = async () => {
             ))}
           </div>
 
-          <Link href="/nearby" onClick={() => setOpen(false)}
+          <Link href="/orders" onClick={() => setOpen(false)}
             className="block text-center text-purple-400 text-xs py-3 hover:bg-gray-800 transition border-t border-gray-800">
-            View all nearby offers →
+            View all orders →
           </Link>
         </div>
       )}

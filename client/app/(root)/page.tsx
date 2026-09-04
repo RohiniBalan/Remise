@@ -11,16 +11,17 @@ import HeroSection from '../components-sections/HeroSection';
 import BestSellersSection from '../components-sections/BestSellersSection';
 import ShopByCategorySection from '../components-sections/ShopByCategorySection';
 import ShopByOffersNearbySection from '../components-sections/ShopByOffersNearbySection';
+import NewArrivalsSection from '../components-sections/NewArrivalsSection';
 
 // ── Promotional Banner Strip ─────────────────────────────────────────────────
 function DealStrip({ theme }: { theme: 'dark' | 'light' }) {
   const isLight = theme === 'light';
 
   const DEALS = [
-    { icon: <Percent size={16} />,        title: 'Up to 50% Off',       sub: 'On select products',      color: 'bg-[#FF0000]',   link: '/category' },
-    { icon: <MapPin size={16} />,         title: 'Nearby Offers',       sub: 'Deals around you',        color: 'bg-[#0FA3B1]',   link: '/nearby' },
-    { icon: <ShoppingBasket size={16} />, title: 'Monthly / Bulk Buy',  sub: 'Scan your purchase list', color: 'bg-teal-600',    link: '/bulk-purchase' },
-    { icon: <Clock size={16} />,          title: 'Flash Sales',         sub: 'Limited time deals',      color: 'bg-purple-600',  link: '/category' },
+    { icon: <Percent size={16} />, title: 'Up to 50% Off', sub: 'On select products', color: 'bg-[#FF0000]', link: '/category' },
+    { icon: <MapPin size={16} />, title: 'Nearby Offers', sub: 'Deals around you', color: 'bg-[#0FA3B1]', link: '/nearby' },
+    { icon: <ShoppingBasket size={16} />, title: 'Monthly / Bulk Buy', sub: 'Scan your purchase list', color: 'bg-teal-600', link: '/bulk-purchase' },
+    { icon: <Clock size={16} />, title: 'Flash Sales', sub: 'Limited time deals', color: 'bg-purple-600', link: '/category' },
   ];
 
   return (
@@ -57,15 +58,15 @@ function SectionDivider({ theme }: { theme: 'dark' | 'light' }) {
 
 // ── Home Page ────────────────────────────────────────────────────────────────
 export default function Home() {
-  const [isLoading,    setIsLoading]    = useState(true);
-  const [theme,        setTheme]        = useState<'dark' | 'light'>('light');
-  const [isMobile,     setIsMobile]     = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [theme, setTheme] = useState<'dark' | 'light'>('light');
+  const [isMobile, setIsMobile] = useState(false);
   const [isContactOpen, setIsContactOpen] = useState(false);
 
-  const mainRef          = useRef<HTMLDivElement>(null);
+  const mainRef = useRef<HTMLDivElement>(null);
   const shopByCategoryRef = useRef<HTMLDivElement>(null);
 
-  const phoneNumber    = '+919677710045';
+  const phoneNumber = '+919677710045';
   const whatsappNumber = '9677710045';
 
   useEffect(() => {
@@ -151,6 +152,10 @@ export default function Home() {
             {/* ── Best Sellers ────────────────────────────────────────── */}
             <SectionDivider theme={theme} />
             <BestSellersSection theme={theme} />
+
+            {/* ── New Arrivals ────────────────────────────────────────── */}
+            <SectionDivider theme={theme} />
+            <NewArrivalsSection theme={theme} />
 
             {/* ── Floating Contact Button ─────────────────────────────── */}
             <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">

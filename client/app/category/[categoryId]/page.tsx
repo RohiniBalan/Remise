@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useContext } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import {
   Filter,
   ShoppingCart,
@@ -13,8 +13,10 @@ import {
   X,
   Zap,
   Package,
+  Tag,
 } from "lucide-react";
 import { useCart } from "@/app/components-main/CartContext";
+import { useWishlist } from "@/app/components-main/WishlistContext";
 import NavbarHome from "@/app/components-main/NavbarHome";
 import { isAuthenticated, redirectToLogin } from "@/app/utils/authGuard";
 import { AuthContext } from "@/app/context/AuthContext";
@@ -23,7 +25,24 @@ import { AuthContext } from "@/app/context/AuthContext";
 const STORE_OWNER_ROLES = ["store_owner", "whole_saler", "home_business"];
 
 // Define your backend API URL here
-const API_URL = "https://wow-lifebackend.onrender.com/api";
+const API_URL = "http://localhost:3003/api";
+
+// Same default category list used on the Store Dashboard (Categories/Products
+// tabs) — kept in sync so the pool of possible categories matches what an
+// owner could pick there. Categories from this list are still only shown on
+// this page once they have at least one real product (see visibleCategoryCards).
+const DEFAULT_STORE_CATEGORIES = [
+  "Food & Beverages",
+  "Grocery",
+  "Fashion",
+  "Electronics",
+  "Pharmacy",
+  "Toys",
+  "Home & Living",
+  "Beauty",
+  "Sports",
+  "Other",
+];
 
 /* ─────────────────────────────────────────────
    SUB-COMPONENTS
@@ -39,7 +58,7 @@ const FilterSection = ({
   const isDark = theme === "dark";
   const gold = "#C9A84C";
   const border = isDark ? "#1C1C1C" : "#EAEAEA";
-  const textGold = isDark ? gold : "#B8860B";
+  const textGold = isDark ? gold : "#CC0000";
   const textSec = isDark ? "#7A7060" : "#6B7280";
 
   return (
@@ -132,15 +151,120 @@ const CategoryItem = ({ label, active, theme, onClick }: any) => {
   );
 };
 
+const CategoryCardMini = ({ item, active, theme, onClick }: any) => {
+  const isDark = theme === "dark";
+  const gold = "#FF0000";
+  const textPri = isDark ? "#F0EAD6" : "#111827";
+  const textSec = isDark ? "#9A8E7A" : "#6B7280";
+
+  return (
+    <button
+      onClick={onClick}
+      className="w-full flex items-center gap-3 p-2 rounded-lg text-left transition-all duration-150"
+      style={{
+        background: active
+          ? isDark
+            ? `${gold}18`
+            : `${gold}12`
+          : "transparent",
+        border: `1px solid ${active ? gold : "transparent"}`,
+      }}
+    >
+      <div
+        className="w-9 h-9 rounded-md flex items-center justify-center flex-shrink-0 overflow-hidden"
+        style={{
+          background: isDark ? "#1A1A1A" : "#F0F0F0",
+          color: active ? gold : textSec,
+        }}
+      >
+        {item.img ? (
+          <img
+            src={item.img}
+            alt={item.name}
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = "none";
+            }}
+          />
+        ) : (
+          <Tag size={15} />
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p
+          className="text-[11px] font-semibold truncate"
+          style={{ color: active ? gold : textPri }}
+        >
+          {item.name}
+        </p>
+        <p className="text-[10px]" style={{ color: textSec }}>
+          {item.count} items
+        </p>
+      </div>
+    </button>
+  );
+};
+
+const CategoryBrowseCard = ({ item, theme, onClick }: any) => {
+  const isDark = theme === "dark";
+  const gold = "#C9A84C";
+  const goldHi = "#E2BE6A";
+  const surface = isDark ? "#0D0D0D" : "#FFFFFF";
+  const border = isDark ? "#1C1C1C" : "#EAEAEA";
+  const textPri = isDark ? "#F0EAD6" : "#111827";
+  const textSec = isDark ? "#9A8E7A" : "#6B7280";
+
+  return (
+    <motion.button
+      whileHover={{ y: -3 }}
+      onClick={onClick}
+      className="flex flex-col items-center justify-center gap-3 p-6 rounded-xl text-center transition-colors"
+      style={{ background: surface, border: `1px solid ${border}` }}
+    >
+      <div
+        className="w-14 h-14 rounded-full flex items-center justify-center overflow-hidden"
+        style={{
+          background: `linear-gradient(135deg, ${gold}, ${goldHi})`,
+          color: "#000",
+        }}
+      >
+        {item.img ? (
+          <img
+            src={item.img}
+            alt={item.name}
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = "none";
+            }}
+          />
+        ) : (
+          <Tag size={22} />
+        )}
+      </div>
+      <div>
+        <p className="text-[13px] font-semibold" style={{ color: textPri }}>
+          {item.name}
+        </p>
+        <p className="text-[11px] mt-0.5" style={{ color: textSec }}>
+          {item.count} product{item.count !== 1 ? "s" : ""}
+        </p>
+      </div>
+    </motion.button>
+  );
+};
+
 /* ─────────────────────────────────────────────
    MAIN PAGE
 ───────────────────────────────────────────── */
 export default function CategoryPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const urlCategoryId = params?.categoryId as string | undefined;
+  const searchQuery = searchParams.get("search")?.trim() || "";
 
   const { addToCart, setBuyNowItem } = useCart() as any;
+  const { isWishlisted, toggleWishlist } = useWishlist();
 
   const ctx = useContext(AuthContext) as any;
   const isStoreOwner = STORE_OWNER_ROLES.includes(ctx?.user?.role);
@@ -151,9 +275,6 @@ export default function CategoryPage() {
   const [priceRange, setPriceRange] = useState({ min: 0, max: 10000 });
   const [sortBy, setSortBy] = useState("Best selling");
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
-  const [showToast, setShowToast] = useState(false);
-  const [toastProduct, setToastProduct] = useState("");
-  const [wishlist, setWishlist] = useState<string[]>([]);
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [selectedCats, setSelectedCats] = useState<string[]>([]);
   const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
@@ -161,6 +282,7 @@ export default function CategoryPage() {
     string[]
   >([]);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [categoryCards, setCategoryCards] = useState<any[]>([]);
 
   /* ── Design tokens ── */
   const isDark = theme === "dark";
@@ -171,8 +293,8 @@ export default function CategoryPage() {
   const textPri = isDark ? "#F0EAD6" : "#111827";
   const textSec = isDark ? "#9A8E7A" : "#6B7280";
   const textMid = isDark ? "#C8BCA8" : "#374151";
-  const gold = "#C9A84C";
-  const goldHi = "#E2BE6A";
+  const gold = "#FF0000";
+  const goldHi = "#FF4040";
 
   /* ── Data fetch ── */
   useEffect(() => {
@@ -183,11 +305,16 @@ export default function CategoryPage() {
         const token = rawToken ? rawToken.replace(/['"]+/g, "") : null;
         const ts = new Date().getTime();
 
-        // Updated fetch URL
-        const res = await fetch(`${API_URL}/admin/products?t=${ts}`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-          cache: "no-store",
-        });
+        // Updated fetch URL — explicit high limit so we get every product,
+        // not just the backend's default page size of 50 (which was
+        // silently truncating category counts/listings).
+        const res = await fetch(
+          `${API_URL}/products?t=${ts}&ownerRole=store_owner&limit=10000`,
+          {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+            cache: "no-store",
+          },
+        );
         const data = await res.json();
         const arr = Array.isArray(data)
           ? data
@@ -220,6 +347,20 @@ export default function CategoryPage() {
     fetchProducts();
   }, []);
 
+  /* ── Category cards fetch ── */
+  useEffect(() => {
+    const fetchCategoryCards = async () => {
+      try {
+        const res = await fetch(`${API_URL}/categories`);
+        const r = await res.json();
+        if (r.success && r.data?.length > 0) setCategoryCards(r.data);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    fetchCategoryCards();
+  }, []);
+
   /* ── Theme listener ── */
   useEffect(() => {
     const handler = (e: CustomEvent) => {
@@ -242,7 +383,7 @@ export default function CategoryPage() {
   };
 
   /* ── Cart / buy handlers ── */
-  const handleAddToCart = (e: React.MouseEvent, product: any) => {
+    const handleAddToCart = (e: React.MouseEvent, product: any) => {
     e.stopPropagation();
     if (product.totalStock <= 0) return; // Prevent adding if out of stock
     if (!isAuthenticated()) {
@@ -258,9 +399,6 @@ export default function CategoryPage() {
       image: img,
       totalStock: product.totalStock,
     });
-    setToastProduct(product.title);
-    setShowToast(true);
-    setTimeout(() => setShowToast(false), 3000);
   };
 
   const handleBuyNow = (e: React.MouseEvent, product: any) => {
@@ -296,13 +434,6 @@ export default function CategoryPage() {
       prev.includes(value) ? prev.filter((i) => i !== value) : [...prev, value],
     );
 
-  const toggleWishlist = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    setWishlist((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
-    );
-  };
-
   const clearAllFilters = () => {
     setActiveCategory(null);
     setSelectedTypes([]);
@@ -313,20 +444,74 @@ export default function CategoryPage() {
   };
 
   /* ── Derived data ── */
-  const getUnique = (key: string) =>
-    Array.from(new Set(products.map((p) => p[key]).filter(Boolean)));
-  const getCount = (key: string, val: string) =>
-    products.filter((p) => p[key] === val).length;
+  const getUnique = (key: string, dataset: any[] = products) =>
+    Array.from(new Set(dataset.map((p) => p[key]).filter(Boolean)));
+  const getCount = (key: string, val: string, dataset: any[] = products) =>
+    dataset.filter((p) => p[key] === val).length;
+
+  // Products scoped to the selected category (falls back to all products
+  // when no category is active), so Brand/Availability only list what's
+  // actually available within the chosen category.
+  const categoryScopedProducts = activeCategory
+    ? products.filter((p) => p.category === activeCategory)
+    : products;
 
   const CATEGORIES = getUnique("category");
-  const BRANDS = getUnique("brand").map((v) => ({
+
+  // Build the full candidate list — admin-added categories (/api/categories),
+  // the fixed default list also used on the Store Dashboard, and any
+  // category that only exists on a product — then attach a real product
+  // count and a real product photo to each. Categories with zero products
+  // are filtered out below (visibleCategoryCards) so only categories that
+  // actually have inventory are ever shown on this page.
+  const mergedCategoryCards = useMemo(() => {
+    const seen = new Set<string>();
+    const names: { name: string; id: string }[] = [];
+
+    const addIfNew = (name: string, id: string) => {
+      const key = name.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      names.push({ name, id });
+    };
+
+    categoryCards.forEach((c) => addIfNew(c.name, c._id));
+    DEFAULT_STORE_CATEGORIES.forEach((name) =>
+      addIfNew(name, `default-${name}`),
+    );
+    CATEGORIES.forEach((name: string) => addIfNew(name, `derived-${name}`));
+
+    return names.map(({ name, id }) => {
+      const catProducts = products.filter(
+        (p) => (p.category || "").toLowerCase() === name.toLowerCase(),
+      );
+      // Real photo from one of this category's own products.
+      const withImage = catProducts.find(
+        (p) => (p.images && p.images[0]) || p.imageUrl,
+      );
+      const img = withImage
+        ? withImage.images?.[0] || withImage.imageUrl
+        : "";
+      return { _id: id, name, count: catProducts.length, img };
+    });
+  }, [categoryCards, DEFAULT_STORE_CATEGORIES, CATEGORIES, products]);
+
+  // Only show categories that actually have at least one product.
+  const visibleCategoryCards = useMemo(
+    () => mergedCategoryCards.filter((c) => c.count > 0),
+    [mergedCategoryCards],
+  );
+
+  const BRANDS = getUnique("brand", categoryScopedProducts).map((v) => ({
     label: String(v),
-    count: getCount("brand", String(v)),
+    count: getCount("brand", String(v), categoryScopedProducts),
   }));
-  const AVAILABILITIES = getUnique("availability").map((v) => ({
-    label: String(v),
-    count: getCount("availability", String(v)),
-  }));
+  const AVAILABILITIES = getUnique("availability", categoryScopedProducts).map(
+    (v) => ({
+      label: String(v),
+      count: getCount("availability", String(v), categoryScopedProducts),
+    }),
+  );
 
   // Store-owner buyers see storePrice/storeDiscountedPrice (falling back to
   // the regular customer price if the seller didn't set a store price).
@@ -342,8 +527,16 @@ export default function CategoryPage() {
   }, [products, isStoreOwner]);
 
   const filteredProducts = useMemo(() => {
+    const q = searchQuery.toLowerCase();
     return displayProducts
       .filter((p) => {
+        if (
+          q &&
+          !`${p.title || ""} ${p.brand || ""} ${p.category || ""}`
+            .toLowerCase()
+            .includes(q)
+        )
+          return false;
         if (activeCategory && p.category !== activeCategory) return false;
         if (p.price < priceRange.min || p.price > priceRange.max) return false;
         if (selectedTypes.length > 0 && !selectedTypes.includes(p.type))
@@ -373,6 +566,7 @@ export default function CategoryPage() {
     selectedBrands,
     selectedAvailabilities,
     sortBy,
+    searchQuery,
   ]);
 
   const hasActiveFilters =
@@ -382,6 +576,9 @@ export default function CategoryPage() {
     selectedBrands.length > 0 ||
     selectedAvailabilities.length > 0 ||
     priceRange.min > 0;
+
+  const isBrowseAll =
+    urlCategoryId === "all" && !activeCategory && !searchQuery;
 
   /* ── Sidebar ── */
   const SidebarContent = () => (
@@ -472,18 +669,20 @@ export default function CategoryPage() {
         theme={theme}
         activeCount={activeCategory ? 1 : 0}
       >
-        <div className="flex flex-col gap-0.5">
-          {CATEGORIES.map((cat: any, i) => (
-            <CategoryItem
-              key={i}
-              label={cat}
-              active={activeCategory === cat}
-              theme={theme}
-              onClick={() =>
-                setActiveCategory(cat === activeCategory ? null : cat)
-              }
-            />
-          ))}
+        <div className="flex flex-col gap-1.5">
+          {visibleCategoryCards.map((item) => {
+            const isActive = activeCategory === item.name;
+
+            return (
+              <CategoryCardMini
+                key={item._id}
+                item={item}
+                active={isActive}
+                theme={theme}
+                onClick={() => setActiveCategory(isActive ? null : item.name)}
+              />
+            );
+          })}
         </div>
       </FilterSection>
 
@@ -621,33 +820,6 @@ export default function CategoryPage() {
           }}
         />
 
-        {/* Toast */}
-        <AnimatePresence>
-          {showToast && (
-            <motion.div
-              initial={{ opacity: 0, y: 60 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 40 }}
-              className="fixed bottom-8 right-8 z-[300] flex items-center gap-3 px-5 py-3.5 shadow-2xl rounded-xl"
-              style={{
-                background: gold,
-                color: "#000",
-                boxShadow: `0 8px 32px ${gold}55`,
-              }}
-            >
-              <CheckCircle size={15} strokeWidth={2.5} />
-              <div>
-                <p className="font-semibold text-xs leading-none mb-0.5 tracking-wide">
-                  Added to Cart
-                </p>
-                <p className="text-[10px] opacity-70 max-w-[180px] truncate">
-                  {toastProduct}
-                </p>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         {/* Mobile drawer */}
         <AnimatePresence>
           {isMobileFilterOpen && (
@@ -784,18 +956,33 @@ export default function CategoryPage() {
                   in <span style={{ color: textPri }}>{activeCategory}</span>
                 </span>
               )}
+              {searchQuery && (
+                <span style={{ color: textSec }}>
+                  {" "}
+                  for <span style={{ color: textPri }}>"{searchQuery}"</span>
+                </span>
+              )}
             </p>
           </div>
 
           {/* ── Main layout ── */}
-          <div className="flex gap-6 lg:gap-10">
-            {/* Desktop sidebar */}
-            <aside className="hidden lg:block w-56 flex-shrink-0 sticky top-[100px] self-start max-h-[calc(100vh-120px)] overflow-y-auto">
-              <SidebarContent />
-            </aside>
+          {isBrowseAll ? (
+            <div className="pt-2">
+              <div className="mb-6">
+                <p
+                  className="text-[10px] font-bold tracking-[0.35em] uppercase mb-1"
+                  style={{ color: gold }}
+                >
+                  Browse
+                </p>
+                <h1
+                  className="text-2xl md:text-3xl font-black"
+                  style={{ color: textPri }}
+                >
+                  Shop by Category
+                </h1>
+              </div>
 
-            {/* Product grid */}
-            <div className="flex-1 min-w-0">
               {isLoading ? (
                 <div className="flex flex-col items-center justify-center py-24">
                   <div className="relative w-12 h-12 mb-5">
@@ -810,222 +997,276 @@ export default function CategoryPage() {
                     className="text-[10px] tracking-[0.4em] uppercase"
                     style={{ color: textSec }}
                   >
-                    Loading Products
+                    Loading Categories
                   </p>
                 </div>
-              ) : filteredProducts.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-24 text-center">
-                  <Filter
-                    size={36}
-                    className="mb-4 opacity-20"
-                    style={{ color: textSec }}
-                  />
-                  <h3
-                    className="text-base font-semibold mb-1"
-                    style={{ color: textPri }}
-                  >
-                    No products found
-                  </h3>
-                  <p className="text-xs mb-6" style={{ color: textSec }}>
-                    Try adjusting your filters.
-                  </p>
-                  <button
-                    onClick={clearAllFilters}
-                    className="px-6 py-2 text-[10px] font-bold tracking-[0.3em] uppercase transition-opacity hover:opacity-70 rounded-md"
-                    style={{ border: `1px solid ${gold}`, color: gold }}
-                  >
-                    Clear Filters
-                  </button>
-                </div>
+              ) : visibleCategoryCards.length === 0 ? (
+                <p
+                  className="text-sm py-16 text-center"
+                  style={{ color: textSec }}
+                >
+                  No categories found.
+                </p>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
-                  {filteredProducts.map((product, index) => {
-                    const productId = product._id || product.id;
-                    const isWished = wishlist.includes(productId);
-                    const displayImg =
-                      product.images?.length > 0
-                        ? product.images[0]
-                        : product.imageUrl;
-                    const discount =
-                      product.originalPrice > product.price
-                        ? Math.round(
-                            ((product.originalPrice - product.price) /
-                              product.originalPrice) *
-                              100,
-                          )
-                        : 0;
-
-                    const isOutOfStock = product.totalStock <= 0;
-
-                    return (
-                      <motion.div
-                        key={productId}
-                        initial={{ opacity: 0, y: 16 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.04, duration: 0.3 }}
-                        onClick={() => router.push(`/product/${productId}`)}
-                        className="product-card group flex flex-col cursor-pointer relative overflow-hidden rounded-xl"
-                        style={{
-                          background: surface,
-                          border: `1px solid ${border}`,
-                        }}
-                        onMouseEnter={(e) => {
-                          (
-                            e.currentTarget as HTMLDivElement
-                          ).style.borderColor = `${gold}60`;
-                        }}
-                        onMouseLeave={(e) => {
-                          (
-                            e.currentTarget as HTMLDivElement
-                          ).style.borderColor = border;
-                        }}
-                      >
-                        {/* Image block */}
-                        <div
-                          className="card-img-wrap relative overflow-hidden"
-                          style={{ background: surface2, aspectRatio: "1/1" }}
-                        >
-                          {/* Discount badge */}
-                          {discount > 0 && (
-                            <div
-                              className="absolute top-2.5 left-2.5 z-10 px-1.5 md:px-2 py-0.5 text-[8px] md:text-[9px] font-bold tracking-widest rounded-sm"
-                              style={{ background: gold, color: "#000" }}
-                            >
-                              −{discount}%
-                            </div>
-                          )}
-
-                          {/* Product badge */}
-                          {product.badge && !isWished && (
-                            <div
-                              className="absolute top-2.5 right-2.5 z-10 px-1.5 md:px-2 py-0.5 text-[8px] md:text-[9px] font-bold tracking-wider rounded-sm"
-                              style={{
-                                background: isDark ? `${gold}22` : `${gold}15`,
-                                border: `1px solid ${gold}60`,
-                                color: isDark ? gold : "#B8860B",
-                              }}
-                            >
-                              {product.badge}
-                            </div>
-                          )}
-
-                          {/* Edge to Edge Image */}
-                          <img
-                            src={displayImg}
-                            alt={product.title}
-                            className={`w-full h-full object-cover ${isOutOfStock ? "opacity-50 grayscale" : ""}`}
-                          />
-
-                          {/* Wishlist btn */}
-                          <button
-                            onClick={(e) => toggleWishlist(e, productId)}
-                            className="absolute top-2.5 right-2.5 z-20 w-7 h-7 flex items-center justify-center transition-all duration-200 rounded-full backdrop-blur-md"
-                            style={{
-                              background: isWished
-                                ? gold
-                                : isDark
-                                  ? "rgba(13,13,13,0.5)"
-                                  : "rgba(255,255,255,0.8)",
-                              border: `1px solid ${isWished ? gold : border}`,
-                            }}
-                          >
-                            <Heart
-                              size={12}
-                              style={{ color: isWished ? "#000" : textSec }}
-                              fill={isWished ? "#000" : "none"}
-                            />
-                          </button>
-                        </div>
-
-                        {/* Info + action buttons */}
-                        <div
-                          className="flex flex-col"
-                          style={{ borderTop: `1px solid ${border}` }}
-                        >
-                          {/* Text */}
-                          <div className="px-3 pt-3 pb-2.5 flex flex-col gap-1">
-                            <span
-                              className="text-[9px] font-bold tracking-[0.3em] uppercase"
-                              style={{ color: isDark ? gold : "#B8860B" }}
-                            >
-                              {product.brand}
-                            </span>
-                            <h3
-                              className={`text-[12px] font-medium leading-snug line-clamp-2 ${isOutOfStock ? "opacity-50" : ""}`}
-                              style={{ color: textPri }}
-                            >
-                              {product.title}
-                            </h3>
-                            <div className="flex items-center gap-1.5 md:gap-2 mt-0.5">
-                              <span
-                                className="cat-serif text-[15px] font-semibold"
-                                style={{ color: textPri }}
-                              >
-                                ₹{product.price?.toLocaleString()}
-                              </span>
-                              {product.originalPrice > product.price && (
-                                <span
-                                  className="text-[11px] line-through font-medium"
-                                  style={{ color: textSec }}
-                                >
-                                  ₹{product.originalPrice?.toLocaleString()}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* CTA buttons */}
-                          <div
-                            className="flex flex-col lg:flex-row"
-                            style={{ borderTop: `1px solid ${border}` }}
-                          >
-                            {isOutOfStock ? (
-                              <button
-                                disabled
-                                className="w-full py-2.5 lg:py-3 text-[9px] font-bold tracking-[0.2em] uppercase cursor-not-allowed opacity-50"
-                                style={{
-                                  color: textSec,
-                                  background: "transparent",
-                                }}
-                              >
-                                Out of Stock
-                              </button>
-                            ) : (
-                              <>
-                                <button
-                                  onClick={(e) => handleAddToCart(e, product)}
-                                  className="btn-cart-hover w-full lg:flex-1 flex items-center justify-center gap-1.5 py-2.5 lg:py-3 text-[9px] font-bold tracking-[0.2em] uppercase transition-all duration-200 border-b lg:border-b-0 lg:border-r"
-                                  style={{
-                                    color: textSec,
-                                    borderColor: border,
-                                    background: "transparent",
-                                  }}
-                                >
-                                  <ShoppingCart size={11} />
-                                  Cart
-                                </button>
-                                <button
-                                  onClick={(e) => handleBuyNow(e, product)}
-                                  className="w-full lg:flex-1 flex items-center justify-center gap-1.5 py-2.5 lg:py-3 text-[9px] font-bold tracking-[0.2em] uppercase hover:opacity-85 transition-opacity"
-                                  style={{
-                                    background: `linear-gradient(135deg, ${gold}, ${goldHi})`,
-                                    color: "#000",
-                                  }}
-                                >
-                                  <Zap size={11} />
-                                  Buy Now
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </motion.div>
-                    );
-                  })}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {visibleCategoryCards.map((item) => (
+                    <CategoryBrowseCard
+                      key={item._id}
+                      item={item}
+                      theme={theme}
+                      onClick={() => setActiveCategory(item.name)}
+                    />
+                  ))}
                 </div>
               )}
             </div>
-          </div>
+          ) : (
+            <div className="flex gap-6 lg:gap-10">
+              {/* Desktop sidebar */}
+              <aside className="hidden lg:block w-56 flex-shrink-0 sticky top-[100px] self-start max-h-[calc(100vh-120px)] overflow-y-auto">
+                <SidebarContent />
+              </aside>
+
+              {/* Product grid */}
+              <div className="flex-1 min-w-0">
+                {isLoading ? (
+                  <div className="flex flex-col items-center justify-center py-24">
+                    <div className="relative w-12 h-12 mb-5">
+                      <div className="absolute inset-0 rounded-full border border-[#C9A84C]/20 border-t-[#C9A84C] animate-spin" />
+                      <Package
+                        size={18}
+                        className="absolute inset-0 m-auto"
+                        style={{ color: gold }}
+                      />
+                    </div>
+                    <p
+                      className="text-[10px] tracking-[0.4em] uppercase"
+                      style={{ color: textSec }}
+                    >
+                      Loading Products
+                    </p>
+                  </div>
+                ) : filteredProducts.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-24 text-center">
+                    <Filter
+                      size={36}
+                      className="mb-4 opacity-20"
+                      style={{ color: textSec }}
+                    />
+                    <h3
+                      className="text-base font-semibold mb-1"
+                      style={{ color: textPri }}
+                    >
+                      No products found
+                    </h3>
+                    <p className="text-xs mb-6" style={{ color: textSec }}>
+                      Try adjusting your filters.
+                    </p>
+                    <button
+                      onClick={clearAllFilters}
+                      className="px-6 py-2 text-[10px] font-bold tracking-[0.3em] uppercase transition-opacity hover:opacity-70 rounded-md"
+                      style={{ border: `1px solid ${gold}`, color: gold }}
+                    >
+                      Clear Filters
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
+                    {filteredProducts.map((product, index) => {
+                      const productId = product._id || product.id;
+                      const isWished = isWishlisted(productId);
+                      const displayImg =
+                        product.images?.length > 0
+                          ? product.images[0]
+                          : product.imageUrl;
+                      const discount =
+                        product.originalPrice > product.price
+                          ? Math.round(
+                              ((product.originalPrice - product.price) /
+                                product.originalPrice) *
+                                100,
+                            )
+                          : 0;
+
+                      const isOutOfStock = product.totalStock <= 0;
+
+                      return (
+                        <motion.div
+                          key={productId}
+                          initial={{ opacity: 0, y: 16 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: index * 0.04, duration: 0.3 }}
+                          onClick={() => router.push(`/product/${productId}`)}
+                          className="product-card group flex flex-col cursor-pointer relative overflow-hidden rounded-xl"
+                          style={{
+                            background: surface,
+                            border: `1px solid ${border}`,
+                          }}
+                          onMouseEnter={(e) => {
+                            (
+                              e.currentTarget as HTMLDivElement
+                            ).style.borderColor = `${gold}60`;
+                          }}
+                          onMouseLeave={(e) => {
+                            (
+                              e.currentTarget as HTMLDivElement
+                            ).style.borderColor = border;
+                          }}
+                        >
+                          {/* Image block */}
+                          <div
+                            className="card-img-wrap relative overflow-hidden"
+                            style={{ background: surface2, aspectRatio: "1/1" }}
+                          >
+                            {/* Discount badge */}
+                            {discount > 0 && (
+                              <div
+                                className="absolute top-2.5 left-2.5 z-10 px-1.5 md:px-2 py-0.5 text-[8px] md:text-[9px] font-bold tracking-widest rounded-sm"
+                                style={{ background: gold, color: "#000" }}
+                              >
+                                −{discount}%
+                              </div>
+                            )}
+
+                            {/* Product badge */}
+                            {product.badge && !isWished && (
+                              <div
+                                className="absolute top-2.5 right-2.5 z-10 px-1.5 md:px-2 py-0.5 text-[8px] md:text-[9px] font-bold tracking-wider rounded-sm"
+                                style={{
+                                  background: isDark
+                                    ? `${gold}22`
+                                    : `${gold}15`,
+                                  border: `1px solid ${gold}60`,
+                                  color: isDark ? gold : "#B8860B",
+                                }}
+                              >
+                                {product.badge}
+                              </div>
+                            )}
+
+                            {/* Edge to Edge Image */}
+                            <img
+                              src={displayImg}
+                              alt={product.title}
+                              className={`w-full h-full object-cover ${isOutOfStock ? "opacity-50 grayscale" : ""}`}
+                            />
+
+                            {/* Wishlist btn */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleWishlist(product);
+                              }}
+                              className="absolute top-2.5 right-2.5 z-20 w-7 h-7 flex items-center justify-center transition-all duration-200 rounded-full backdrop-blur-md"
+                              style={{
+                                background: isWished
+                                  ? "#FFE5E5"
+                                  : isDark
+                                    ? "rgba(13,13,13,0.5)"
+                                    : "rgba(255,255,255,0.8)",
+                                border: `1px solid ${isWished ? "#FF0000" : border}`,
+                              }}
+                            >
+                              <Heart
+                                size={12}
+                                style={{
+                                  color: isWished ? "#FF0000" : textSec,
+                                }}
+                                fill={isWished ? "#FF0000" : "none"}
+                              />
+                            </button>
+                          </div>
+
+                          {/* Info + action buttons */}
+                          <div
+                            className="flex flex-col"
+                            style={{ borderTop: `1px solid ${border}` }}
+                          >
+                            {/* Text */}
+                            <div className="px-3 pt-3 pb-2.5 flex flex-col gap-1">
+                              <span
+                                className="text-[9px] font-bold tracking-[0.3em] uppercase"
+                                style={{ color: isDark ? gold : "#B8860B" }}
+                              >
+                                {product.brand}
+                              </span>
+                              <h3
+                                className={`text-[12px] font-medium leading-snug line-clamp-2 ${isOutOfStock ? "opacity-50" : ""}`}
+                                style={{ color: textPri }}
+                              >
+                                {product.title}
+                              </h3>
+                              <div className="flex items-center gap-1.5 md:gap-2 mt-0.5">
+                                <span
+                                  className="cat-serif text-[15px] font-semibold"
+                                  style={{ color: textPri }}
+                                >
+                                  ₹{product.price?.toLocaleString()}
+                                </span>
+                                {product.originalPrice > product.price && (
+                                  <span
+                                    className="text-[11px] line-through font-medium"
+                                    style={{ color: textSec }}
+                                  >
+                                    ₹{product.originalPrice?.toLocaleString()}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* CTA buttons */}
+                            <div
+                              className="flex flex-col lg:flex-row"
+                              style={{ borderTop: `1px solid ${border}` }}
+                            >
+                              {isOutOfStock ? (
+                                <button
+                                  disabled
+                                  className="w-full py-2.5 lg:py-3 text-[9px] font-bold tracking-[0.2em] uppercase cursor-not-allowed opacity-50"
+                                  style={{
+                                    color: textSec,
+                                    background: "transparent",
+                                  }}
+                                >
+                                  Out of Stock
+                                </button>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={(e) => handleAddToCart(e, product)}
+                                    className="btn-cart-hover w-full lg:flex-1 flex items-center justify-center gap-1.5 py-2.5 lg:py-3 text-[9px] font-bold tracking-[0.2em] uppercase transition-all duration-200 border-b lg:border-b-0 lg:border-r"
+                                    style={{
+                                      color: textSec,
+                                      borderColor: border,
+                                      background: "transparent",
+                                    }}
+                                  >
+                                    <ShoppingCart size={11} />
+                                    Cart
+                                  </button>
+                                  <button
+                                    onClick={(e) => handleBuyNow(e, product)}
+                                    className="w-full lg:flex-1 flex items-center justify-center gap-1.5 py-2.5 lg:py-3 text-[9px] font-bold tracking-[0.2em] uppercase hover:opacity-85 transition-opacity"
+                                    style={{
+                                      background: `linear-gradient(135deg, ${gold}, ${goldHi})`,
+                                      color: "#000",
+                                    }}
+                                  >
+                                    <Zap size={11} />
+                                    Buy Now
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </>

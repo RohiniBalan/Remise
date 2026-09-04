@@ -143,14 +143,14 @@ export default function ContactPage({ isOpen, onClose, isDarkMode, isPreview = f
           initial={{ opacity: 0, y: -20, x: '-50%' }}
           animate={{ opacity: 1, y: 0, x: '-50%' }}
           exit={{ opacity: 0, y: -20, x: '-50%' }}
-          className={`fixed top-4 md:top-8 left-1/2 z-[10005] w-[90vw] md:min-w-[320px] md:max-w-[400px] flex items-center gap-3 px-4 py-3 md:px-5 md:py-4 rounded-xl shadow-[0_0_30px_rgba(234,179,8,0.15)] backdrop-blur-xl border ${
+          className={`fixed top-4 md:top-8 left-1/2 z-[10005] w-[90vw] md:min-w-[320px] md:max-w-[400px] flex items-center gap-3 px-4 py-3 md:px-5 md:py-4 rounded-xl shadow-[0_0_30px_rgba(255,69,0,0.15)] backdrop-blur-xl border ${
             isDarkMode 
-              ? 'bg-black/90 border-yellow-500/40 text-yellow-400' 
-              : 'bg-white/95 border-yellow-400/60 text-yellow-700'
+              ? 'bg-black/90 border-red-500/40 text-orange-500' 
+              : 'bg-white/95 border-orange-400/60 text-red-700'
           }`}
         >
           {notification.type === 'success' ? (
-            <CheckCircle size={22} className={`flex-shrink-0 ${isDarkMode ? "text-yellow-400 drop-shadow-[0_0_8px_rgba(234,179,8,0.5)]" : "text-yellow-600"}`} />
+            <CheckCircle size={22} className={`flex-shrink-0 ${isDarkMode ? "text-orange-500 drop-shadow-[0_0_8px_rgba(255,69,0,0.5)]" : "text-red-700"}`} />
           ) : (
             <AlertCircle size={22} className={`flex-shrink-0 ${isDarkMode ? "text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.5)]" : "text-red-600"}`} />
           )}
@@ -162,7 +162,7 @@ export default function ContactPage({ isOpen, onClose, isDarkMode, isPreview = f
           <button 
             onClick={() => setNotification(null)} 
             className={`p-1.5 rounded-full transition-colors flex-shrink-0 ${
-              isDarkMode ? 'hover:bg-yellow-500/20 text-yellow-500/70 hover:text-yellow-400' : 'hover:bg-yellow-100 text-yellow-600/70 hover:text-yellow-800'
+              isDarkMode ? 'hover:bg-red-500/20 text-red-600/70 hover:text-orange-500' : 'hover:bg-orange-100 text-red-700/70 hover:text-red-900'
             }`}
           >
             <X size={16} />
@@ -180,15 +180,15 @@ export default function ContactPage({ isOpen, onClose, isDarkMode, isPreview = f
         animate={isPreview ? { opacity: 1, scale: 1 } : { opacity: 1, scale: 1, x: '-50%', y: '-50%' }}
         exit={isPreview ? {} : { opacity: 0, scale: 0.95, x: '-50%', y: '-50%' }}
         transition={{ type: "spring", duration: 0.5 }}
-        className={`${isPreview ? 'relative w-full' : 'fixed left-1/2 top-1/2 w-[95%] sm:w-[90%]'} max-w-4xl max-h-[90vh] md:max-h-[85vh] rounded-2xl shadow-[0_0_50px_rgba(234,179,8,0.1)] z-[10000] overflow-y-auto md:overflow-hidden flex flex-col md:flex-row border ring-1 ${
-          isDarkMode ? 'bg-black border-yellow-500/30 ring-white/5' : 'bg-white border-yellow-400/50 ring-black/5'
+        className={`${isPreview ? 'relative w-full' : 'fixed left-1/2 top-1/2 w-[95%] sm:w-[90%]'} max-w-4xl max-h-[90vh] md:max-h-[85vh] rounded-2xl shadow-[0_0_50px_rgba(255,69,0,0.1)] z-[10000] overflow-y-auto md:overflow-hidden flex flex-col md:flex-row border ring-1 ${
+          isDarkMode ? 'bg-black border-red-500/30 ring-white/5' : 'bg-white border-orange-400/50 ring-black/5'
         }`}
       >
         {!isPreview && (
           <button
             onClick={onClose}
             className={`fixed md:absolute right-4 top-4 md:right-4 md:top-4 p-2 rounded-full z-50 transition-all hover:scale-110 shadow-lg border backdrop-blur-md ${
-              isDarkMode ? 'bg-neutral-900/80 hover:bg-neutral-800 text-yellow-500 border-yellow-500/30' : 'bg-white/80 hover:bg-yellow-50 text-yellow-700 border-yellow-200'
+              isDarkMode ? 'bg-neutral-900/80 hover:bg-neutral-800 text-orange-500 border-red-500/30' : 'bg-white/80 hover:bg-orange-50 text-red-700 border-orange-200'
             }`}
           >
             <X size={20} />
@@ -197,79 +197,79 @@ export default function ContactPage({ isOpen, onClose, isDarkMode, isPreview = f
 
         {/* Left side - Contact Info */}
         <div className={`md:w-2/5 p-5 sm:p-6 md:p-8 border-b md:border-b-0 md:border-r md:overflow-y-auto no-scrollbar relative ${
-          isDarkMode ? 'bg-gradient-to-br from-neutral-950 to-neutral-900 border-yellow-500/10 text-white' : 'bg-gradient-to-br from-yellow-50 to-amber-50 border-yellow-200 text-slate-900'
+          isDarkMode ? 'bg-gradient-to-br from-neutral-950 to-neutral-900 border-red-500/10 text-white' : 'bg-gradient-to-br from-orange-50 to-red-50 border-orange-200 text-slate-900'
         }`}>
-          <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_top_left,rgba(234,179,8,0.05),transparent_50%)] pointer-events-none"></div>
+          <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_top_left,rgba(255,69,0,0.05),transparent_50%)] pointer-events-none"></div>
 
           <div className="space-y-6 md:space-y-8 relative z-10 pt-8 md:pt-0">
             <div>
               <h2 className={`text-2xl sm:text-3xl md:text-4xl font-black mb-2 sm:mb-3 text-transparent bg-clip-text drop-shadow-sm ${
-                isDarkMode ? 'bg-gradient-to-r from-yellow-200 via-yellow-400 to-yellow-600' : 'bg-gradient-to-r from-yellow-600 via-yellow-500 to-amber-700'
+                isDarkMode ? 'bg-gradient-to-r from-orange-300 via-orange-500 to-red-600' : 'bg-gradient-to-r from-orange-600 via-red-500 to-red-700'
               }`}>
                 {data.title}
               </h2>
-              <p className={`text-xs sm:text-sm md:text-base font-medium ${isDarkMode ? 'text-yellow-500/70' : 'text-yellow-700/80'}`}>{data.subtitle}</p>
+              <p className={`text-xs sm:text-sm md:text-base font-medium ${isDarkMode ? 'text-red-600/70' : 'text-red-800/80'}`}>{data.subtitle}</p>
             </div>
 
             <div className="space-y-3 sm:space-y-4">
               <div className={`flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl backdrop-blur-md transition-transform hover:scale-[1.02] group border ${
-                isDarkMode ? 'bg-yellow-500/5 border-yellow-500/10 hover:bg-yellow-500/10' : 'bg-white/60 border-yellow-400/20 hover:bg-white'
+                isDarkMode ? 'bg-red-500/5 border-red-500/10 hover:bg-red-500/10' : 'bg-white/60 border-orange-400/20 hover:bg-white'
               }`}>
                 <div className={`w-10 h-10 rounded-full flex flex-shrink-0 items-center justify-center transition-colors ${
-                  isDarkMode ? 'bg-yellow-500/10 group-hover:bg-yellow-500/20' : 'bg-yellow-100 group-hover:bg-yellow-200'
+                  isDarkMode ? 'bg-orange-500/10 group-hover:bg-orange-500/20' : 'bg-orange-100 group-hover:bg-orange-200'
                 }`}>
-                  <Mail size={18} className={isDarkMode ? 'text-yellow-400' : 'text-yellow-600'} />
+                  <Mail size={18} className={isDarkMode ? 'text-orange-500' : 'text-red-700'} />
                 </div>
                 <div className="min-w-0">
-                  <p className={`text-[10px] sm:text-xs font-bold uppercase tracking-widest ${isDarkMode ? 'text-yellow-600' : 'text-yellow-700'}`}>Email</p>
+                  <p className={`text-[10px] sm:text-xs font-bold uppercase tracking-widest ${isDarkMode ? 'text-red-700' : 'text-red-800'}`}>Email</p>
                   <p className={`font-medium text-xs sm:text-sm truncate ${isDarkMode ? 'text-gray-200' : 'text-slate-800'}`}>{data.email}</p>
                 </div>
               </div>
 
               <div className={`flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl backdrop-blur-md transition-transform hover:scale-[1.02] group border ${
-                isDarkMode ? 'bg-yellow-500/5 border-yellow-500/10 hover:bg-yellow-500/10' : 'bg-white/60 border-yellow-400/20 hover:bg-white'
+                isDarkMode ? 'bg-red-500/5 border-red-500/10 hover:bg-red-500/10' : 'bg-white/60 border-orange-400/20 hover:bg-white'
               }`}>
                 <div className={`w-10 h-10 rounded-full flex flex-shrink-0 items-center justify-center transition-colors ${
-                  isDarkMode ? 'bg-yellow-500/10 group-hover:bg-yellow-500/20' : 'bg-yellow-100 group-hover:bg-yellow-200'
+                  isDarkMode ? 'bg-orange-500/10 group-hover:bg-orange-500/20' : 'bg-orange-100 group-hover:bg-orange-200'
                 }`}>
-                  <Phone size={18} className={isDarkMode ? 'text-yellow-400' : 'text-yellow-600'} />
+                  <Phone size={18} className={isDarkMode ? 'text-orange-500' : 'text-red-700'} />
                 </div>
                 <div className="min-w-0">
-                  <p className={`text-[10px] sm:text-xs font-bold uppercase tracking-widest ${isDarkMode ? 'text-yellow-600' : 'text-yellow-700'}`}>Phone</p>
+                  <p className={`text-[10px] sm:text-xs font-bold uppercase tracking-widest ${isDarkMode ? 'text-red-700' : 'text-red-800'}`}>Phone</p>
                   <p className={`font-medium text-xs sm:text-sm truncate ${isDarkMode ? 'text-gray-200' : 'text-slate-800'}`}>{data.phone}</p>
                 </div>
               </div>
             </div>
 
             <div className={`mt-6 p-4 sm:p-5 rounded-xl backdrop-blur-md border ${
-              isDarkMode ? 'bg-yellow-500/5 border-yellow-500/10' : 'bg-white/60 border-yellow-400/20'
+              isDarkMode ? 'bg-red-500/5 border-red-500/10' : 'bg-white/60 border-orange-400/20'
             }`}>
-              <h3 className={`font-black text-base sm:text-lg mb-3 sm:mb-4 flex items-center gap-2 ${isDarkMode ? 'text-yellow-400' : 'text-yellow-700'}`}>
-                <span className="w-1.5 h-5 sm:h-6 bg-gradient-to-b from-yellow-300 to-yellow-600 rounded-full shadow-[0_0_10px_rgba(234,179,8,0.5)]"></span>
+              <h3 className={`font-black text-base sm:text-lg mb-3 sm:mb-4 flex items-center gap-2 ${isDarkMode ? 'text-orange-500' : 'text-red-700'}`}>
+                <span className="w-1.5 h-5 sm:h-6 bg-gradient-to-b from-orange-400 to-red-600 rounded-full shadow-[0_0_10px_rgba(255,69,0,0.5)]"></span>
                 Business Hours
               </h3>
               <div className="space-y-2.5 sm:space-y-3 text-xs sm:text-sm">
-                <p className={`flex justify-between items-center border-b pb-2 ${isDarkMode ? 'border-yellow-500/10' : 'border-yellow-200/50'}`}>
-                  <span className={`font-medium ${isDarkMode ? 'text-yellow-500/60' : 'text-slate-500'}`}>Mon - Fri:</span>
+                <p className={`flex justify-between items-center border-b pb-2 ${isDarkMode ? 'border-red-500/10' : 'border-orange-200/50'}`}>
+                  <span className={`font-medium ${isDarkMode ? 'text-red-600/60' : 'text-slate-500'}`}>Mon - Fri:</span>
                   <span className={`font-bold ${isDarkMode ? 'text-gray-200' : 'text-slate-800'}`}>{data.hoursWeekday}</span>
                 </p>
-                <p className={`flex justify-between items-center border-b pb-2 ${isDarkMode ? 'border-yellow-500/10' : 'border-yellow-200/50'}`}>
-                  <span className={`font-medium ${isDarkMode ? 'text-yellow-500/60' : 'text-slate-500'}`}>Saturday:</span>
+                <p className={`flex justify-between items-center border-b pb-2 ${isDarkMode ? 'border-red-500/10' : 'border-orange-200/50'}`}>
+                  <span className={`font-medium ${isDarkMode ? 'text-red-600/60' : 'text-slate-500'}`}>Saturday:</span>
                   <span className={`font-bold ${isDarkMode ? 'text-gray-200' : 'text-slate-800'}`}>{data.hoursSaturday}</span>
                 </p>
                 <p className="flex justify-between items-center">
-                  <span className={`font-medium ${isDarkMode ? 'text-yellow-500/60' : 'text-slate-500'}`}>Sunday:</span>
-                  <span className={`font-bold ${isDarkMode ? 'text-yellow-500' : 'text-yellow-600'}`}>{data.hoursSunday}</span>
+                  <span className={`font-medium ${isDarkMode ? 'text-red-600/60' : 'text-slate-500'}`}>Sunday:</span>
+                  <span className={`font-bold ${isDarkMode ? 'text-orange-500' : 'text-red-700'}`}>{data.hoursSunday}</span>
                 </p>
               </div>
             </div>
 
             <div className={`flex items-start gap-3 sm:gap-4 p-4 sm:p-5 rounded-xl backdrop-blur-md transition-colors group border ${
-              isDarkMode ? 'bg-yellow-500/5 border-yellow-500/10 hover:bg-yellow-500/10' : 'bg-white/60 border-yellow-400/20 hover:bg-white'
+              isDarkMode ? 'bg-red-500/5 border-red-500/10 hover:bg-red-500/10' : 'bg-white/60 border-orange-400/20 hover:bg-white'
             }`}>
-              <MapPin size={20} className={`flex-shrink-0 mt-0.5 ${isDarkMode ? 'text-yellow-400' : 'text-yellow-600'}`} />
+              <MapPin size={20} className={`flex-shrink-0 mt-0.5 ${isDarkMode ? 'text-orange-500' : 'text-red-700'}`} />
               <div>
-                <p className={`font-bold text-xs sm:text-sm mb-1 tracking-wide ${isDarkMode ? 'text-yellow-500' : 'text-yellow-700'}`}>VISIT US</p>
+                <p className={`font-bold text-xs sm:text-sm mb-1 tracking-wide ${isDarkMode ? 'text-orange-500' : 'text-red-700'}`}>VISIT US</p>
                 <p className={`text-xs sm:text-sm leading-relaxed ${isDarkMode ? 'text-gray-300' : 'text-slate-600'}`}>{data.address}</p>
               </div>
             </div>
@@ -280,14 +280,14 @@ export default function ContactPage({ isOpen, onClose, isDarkMode, isPreview = f
         <div className={`md:w-3/5 p-5 sm:p-6 md:p-8 md:overflow-y-auto no-scrollbar relative ${isDarkMode ? 'bg-black' : 'bg-white'}`}>
           <form onSubmit={handleSubmit} className="space-y-5 sm:space-y-6 relative z-10">
             <div>
-              <label className={`block text-[10px] sm:text-xs font-bold uppercase tracking-widest mb-1.5 sm:mb-2 ${isDarkMode ? 'text-yellow-600' : 'text-yellow-700'}`}>Your Name</label>
+              <label className={`block text-[10px] sm:text-xs font-bold uppercase tracking-widest mb-1.5 sm:mb-2 ${isDarkMode ? 'text-red-700' : 'text-red-800'}`}>Your Name</label>
               <div className="relative group">
-                <User className={`absolute left-3.5 top-3.5 transition-colors ${isDarkMode ? 'text-yellow-600/50 group-focus-within:text-yellow-400' : 'text-yellow-600/40 group-focus-within:text-yellow-600'}`} size={18} />
+                <User className={`absolute left-3.5 top-3.5 transition-colors ${isDarkMode ? 'text-red-600/50 group-focus-within:text-orange-500' : 'text-red-600/40 group-focus-within:text-red-700'}`} size={18} />
                 <input type="text" name="name" value={formData.name} onChange={handleChange} required placeholder="Enter your full name"
                   className={`w-full pl-11 pr-4 py-3 rounded-xl text-sm transition-all border outline-none ${
                     isDarkMode 
-                      ? 'bg-neutral-900 border-yellow-500/20 text-white placeholder:text-neutral-600 focus:bg-black focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400/50' 
-                      : 'bg-slate-50 border-yellow-400/40 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500/30'
+                      ? 'bg-neutral-900 border-red-500/20 text-white placeholder:text-neutral-600 focus:bg-black focus:border-orange-500 focus:ring-1 focus:ring-orange-500/50' 
+                      : 'bg-slate-50 border-orange-400/40 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-red-600 focus:ring-1 focus:ring-red-500/30'
                   }`}
                 />
               </div>
@@ -295,27 +295,27 @@ export default function ContactPage({ isOpen, onClose, isDarkMode, isPreview = f
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-6">
               <div>
-                <label className={`block text-[10px] sm:text-xs font-bold uppercase tracking-widest mb-1.5 sm:mb-2 ${isDarkMode ? 'text-yellow-600' : 'text-yellow-700'}`}>Email Address</label>
+                <label className={`block text-[10px] sm:text-xs font-bold uppercase tracking-widest mb-1.5 sm:mb-2 ${isDarkMode ? 'text-red-700' : 'text-red-800'}`}>Email Address</label>
                 <div className="relative group">
-                  <Mail className={`absolute left-3.5 top-3.5 transition-colors ${isDarkMode ? 'text-yellow-600/50 group-focus-within:text-yellow-400' : 'text-yellow-600/40 group-focus-within:text-yellow-600'}`} size={18} />
+                  <Mail className={`absolute left-3.5 top-3.5 transition-colors ${isDarkMode ? 'text-red-600/50 group-focus-within:text-orange-500' : 'text-red-600/40 group-focus-within:text-red-700'}`} size={18} />
                   <input type="email" name="email" value={formData.email} onChange={handleChange} required placeholder="VIP@email.com"
                     className={`w-full pl-11 pr-4 py-3 rounded-xl text-sm transition-all border outline-none ${
                       isDarkMode 
-                        ? 'bg-neutral-900 border-yellow-500/20 text-white placeholder:text-neutral-600 focus:bg-black focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400/50' 
-                        : 'bg-slate-50 border-yellow-400/40 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500/30'
+                        ? 'bg-neutral-900 border-red-500/20 text-white placeholder:text-neutral-600 focus:bg-black focus:border-orange-500 focus:ring-1 focus:ring-orange-500/50' 
+                        : 'bg-slate-50 border-orange-400/40 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-red-600 focus:ring-1 focus:ring-red-500/30'
                     }`}
                   />
                 </div>
               </div>
               <div>
-                <label className={`block text-[10px] sm:text-xs font-bold uppercase tracking-widest mb-1.5 sm:mb-2 ${isDarkMode ? 'text-yellow-600' : 'text-yellow-700'}`}>Phone Number</label>
+                <label className={`block text-[10px] sm:text-xs font-bold uppercase tracking-widest mb-1.5 sm:mb-2 ${isDarkMode ? 'text-red-700' : 'text-red-800'}`}>Phone Number</label>
                 <div className="relative group">
-                  <Phone className={`absolute left-3.5 top-3.5 transition-colors ${isDarkMode ? 'text-yellow-600/50 group-focus-within:text-yellow-400' : 'text-yellow-600/40 group-focus-within:text-yellow-600'}`} size={18} />
+                  <Phone className={`absolute left-3.5 top-3.5 transition-colors ${isDarkMode ? 'text-red-600/50 group-focus-within:text-orange-500' : 'text-red-600/40 group-focus-within:text-red-700'}`} size={18} />
                   <input type="tel" name="phone" value={formData.phone} onChange={handleChange} placeholder="+91 98765 43210"
                     className={`w-full pl-11 pr-4 py-3 rounded-xl text-sm transition-all border outline-none ${
                       isDarkMode 
-                        ? 'bg-neutral-900 border-yellow-500/20 text-white placeholder:text-neutral-600 focus:bg-black focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400/50' 
-                        : 'bg-slate-50 border-yellow-400/40 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500/30'
+                        ? 'bg-neutral-900 border-red-500/20 text-white placeholder:text-neutral-600 focus:bg-black focus:border-orange-500 focus:ring-1 focus:ring-orange-500/50' 
+                        : 'bg-slate-50 border-orange-400/40 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-red-600 focus:ring-1 focus:ring-red-500/30'
                     }`}
                   />
                 </div>
@@ -323,14 +323,14 @@ export default function ContactPage({ isOpen, onClose, isDarkMode, isPreview = f
             </div>
 
             <div>
-              <label className={`block text-[10px] sm:text-xs font-bold uppercase tracking-widest mb-1.5 sm:mb-2 ${isDarkMode ? 'text-yellow-600' : 'text-yellow-700'}`}>Your Message</label>
+              <label className={`block text-[10px] sm:text-xs font-bold uppercase tracking-widest mb-1.5 sm:mb-2 ${isDarkMode ? 'text-red-700' : 'text-red-800'}`}>Your Message</label>
               <div className="relative group">
-                <MessageSquare className={`absolute left-3.5 top-3.5 transition-colors ${isDarkMode ? 'text-yellow-600/50 group-focus-within:text-yellow-400' : 'text-yellow-600/40 group-focus-within:text-yellow-600'}`} size={18} />
+                <MessageSquare className={`absolute left-3.5 top-3.5 transition-colors ${isDarkMode ? 'text-red-600/50 group-focus-within:text-orange-500' : 'text-red-600/40 group-focus-within:text-red-700'}`} size={18} />
                 <textarea name="message" value={formData.message} onChange={handleChange} required rows={4} placeholder="How can we assist you today?"
                   className={`w-full pl-11 pr-4 py-3 rounded-xl text-sm transition-all border outline-none resize-none ${
                     isDarkMode 
-                      ? 'bg-neutral-900 border-yellow-500/20 text-white placeholder:text-neutral-600 focus:bg-black focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400/50' 
-                      : 'bg-slate-50 border-yellow-400/40 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500/30'
+                      ? 'bg-neutral-900 border-red-500/20 text-white placeholder:text-neutral-600 focus:bg-black focus:border-orange-500 focus:ring-1 focus:ring-orange-500/50' 
+                      : 'bg-slate-50 border-orange-400/40 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-red-600 focus:ring-1 focus:ring-red-500/30'
                   }`}
                 />
               </div>
@@ -339,12 +339,12 @@ export default function ContactPage({ isOpen, onClose, isDarkMode, isPreview = f
             <button 
               type="submit" 
               disabled={isSubmitting}
-              className="w-full py-3.5 sm:py-4 mt-2 bg-gradient-to-r from-yellow-600 via-yellow-400 to-yellow-600 bg-[length:200%_auto] hover:bg-[position:right_center] text-black font-black tracking-widest rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 text-xs sm:text-sm shadow-[0_0_20px_rgba(234,179,8,0.25)] disabled:opacity-70 disabled:hover:scale-100 uppercase"
+              className="w-full py-3.5 sm:py-4 mt-2 bg-gradient-to-r from-red-600 via-orange-500 to-red-600 bg-[length:200%_auto] hover:bg-[position:right_center] text-white font-black tracking-widest rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 text-xs sm:text-sm shadow-[0_0_20px_rgba(255,69,0,0.25)] disabled:opacity-70 disabled:hover:scale-100 uppercase"
             >
               {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />} 
               {isSubmitting ? 'Transmitting...' : 'Send Message'}
             </button>
-            <p className={`text-[10px] sm:text-xs text-center font-medium tracking-wide ${isDarkMode ? 'text-yellow-600/50' : 'text-slate-500'}`}>Our concierge will contact you within 24 hours.</p>
+            <p className={`text-[10px] sm:text-xs text-center font-medium tracking-wide ${isDarkMode ? 'text-red-600/50' : 'text-slate-500'}`}>Our concierge will contact you within 24 hours.</p>
           </form>
         </div>
       </motion.div>

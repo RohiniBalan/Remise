@@ -1,6 +1,6 @@
 // /components-seller/dashboard/SellerDashboardLayout.tsx
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { 
   ArrowLeft, 
@@ -29,6 +29,29 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "orders", label: "Incoming Orders", icon: <ShoppingBag size={15} /> },
   { id: "settings", label: "Settings", icon: <Settings size={15} /> },
 ];
+
+const SEEN_ORDERS_KEY = "seller_seen_order_ids";
+
+function getSeenOrderIds(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = localStorage.getItem(SEEN_ORDERS_KEY);
+    return new Set(raw ? JSON.parse(raw) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function markOrdersAsSeen(orderIds: string[]) {
+  if (typeof window === "undefined") return;
+  try {
+    const existing = getSeenOrderIds();
+    orderIds.forEach((id) => existing.add(id));
+    localStorage.setItem(SEEN_ORDERS_KEY, JSON.stringify([...existing]));
+  } catch {
+    // non-fatal
+  }
+}
 
 interface SellerDashboardLayoutProps {
   store: any;
@@ -63,8 +86,27 @@ export function SellerDashboardLayout({
 }: SellerDashboardLayoutProps) {
   const [tab, setTab] = useState<Tab>("overview");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [seenIds, setSeenIds] = useState<Set<string>>(() => getSeenOrderIds());
 
-  const pendingCount = orders.filter((o) => o.orderStatus === "Processing").length;
+  // Count only NEW (unseen) processing orders for the badge
+  const processingOrders = orders.filter((o) => o.orderStatus === "Processing");
+  const newOrderCount = processingOrders.filter((o) => !seenIds.has(o._id || o.id)).length;
+
+  // When the user navigates to the orders tab, mark all current orders as seen
+  const handleTabChange = (newTab: Tab) => {
+    setTab(newTab);
+    if (newTab === "orders") {
+      const allIds = orders.map((o) => o._id || o.id).filter(Boolean);
+      markOrdersAsSeen(allIds);
+      setSeenIds(getSeenOrderIds());
+    }
+    setMobileMenuOpen(false);
+  };
+
+  // When new orders arrive (orders list changes), refresh the seen set from storage
+  useEffect(() => {
+    setSeenIds(getSeenOrderIds());
+  }, [orders]);
 
   const renderTab = () => {
     const props = {
@@ -76,7 +118,7 @@ export function SellerDashboardLayout({
       store,
       storeNameByOwnerId: {},
       onRefresh: loadData,
-      onGoToSettings: () => setTab("settings"),
+      onGoToSettings: () => handleTabChange("settings"),
     };
 
     switch (tab) {
@@ -140,7 +182,7 @@ export function SellerDashboardLayout({
               {TABS.map((t) => (
                 <button
                   key={t.id}
-                  onClick={() => setTab(t.id)}
+                  onClick={() => handleTabChange(t.id)}
                   className={`flex items-center gap-3 w-full px-4 py-3.5 text-sm font-semibold border-l-4 transition text-left ${
                     tab === t.id
                       ? "bg-[#DFF1F1] text-teal-800 border-l-[#FF0000]"
@@ -151,9 +193,9 @@ export function SellerDashboardLayout({
                     {t.icon}
                   </span>
                   {t.label}
-                  {t.id === "orders" && pendingCount > 0 && (
+                  {t.id === "orders" && newOrderCount > 0 && (
                     <span className="ml-auto bg-[#FF0000] text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                      {pendingCount}
+                      {newOrderCount}
                     </span>
                   )}
                 </button>
@@ -195,10 +237,7 @@ export function SellerDashboardLayout({
                     {TABS.map((t) => (
                       <button
                         key={t.id}
-                        onClick={() => {
-                          setTab(t.id);
-                          setMobileMenuOpen(false);
-                        }}
+                        onClick={() => handleTabChange(t.id)}
                         className={`flex items-center gap-3 w-full px-4 py-3 text-sm font-semibold text-left transition ${
                           tab === t.id
                             ? "bg-[#DFF1F1] text-teal-800"
@@ -209,9 +248,9 @@ export function SellerDashboardLayout({
                           {t.icon}
                         </span>
                         {t.label}
-                        {t.id === "orders" && pendingCount > 0 && (
+                        {t.id === "orders" && newOrderCount > 0 && (
                           <span className="ml-auto bg-[#FF0000] text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                            {pendingCount}
+                            {newOrderCount}
                           </span>
                         )}
                       </button>

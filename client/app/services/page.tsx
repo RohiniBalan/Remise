@@ -788,7 +788,7 @@ function LegacyServicesPreview(props: any) {
 }
 
 /* ------------------------------------------------------------------ */
-/*  PUBLIC CUSTOMER SUPPORT PAGE                                      */
+/*  PUBLIC CUSTOMER SUPPORT PAGE — RED / ORANGE THEME                 */
 /*  This is what renders at /services (linked from the navbar as      */
 /*  "Customer Support").                                              */
 /* ------------------------------------------------------------------ */
@@ -797,12 +797,12 @@ function CustomerSupportPage() {
   const [showContact, setShowContact] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [contactInfo, setContactInfo] = useState({
-    email: "contact@wowlifestyle.com",
-    phone: "+91 98765 43210",
-    address: "123 Lifestyle Street, Mumbai, India 400001",
+    email: "porulontechnologies@gmail.com",
+    phone: "+91 90470 99277",
+    address: "Coimbatore, Tamil Nadu, India",
     hoursWeekday: "9:00 AM - 8:00 PM",
     hoursSaturday: "10:00 AM - 6:00 PM",
-    hoursSunday: "Closed",
+    hoursSunday: "Opened",
   });
 
   const isDarkMode = theme === "dark";
@@ -854,17 +854,17 @@ function CustomerSupportPage() {
     <div
       className={`relative min-h-screen flex flex-col transition-colors duration-500 overflow-x-hidden ${
         isDarkMode
-          ? "bg-black text-white selection:bg-yellow-500/30 selection:text-yellow-200"
-          : "bg-slate-50 text-slate-900 selection:bg-yellow-500/30 selection:text-yellow-900"
+          ? "bg-black text-white selection:bg-red-500/30 selection:text-orange-200"
+          : "bg-slate-50 text-slate-900 selection:bg-red-500/30 selection:text-red-900"
       }`}
     >
-      {/* Dynamic Gold Glow Background */}
+      {/* Dynamic Red/Orange Glow Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div
-          className={`absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full blur-3xl ${isDarkMode ? "bg-[radial-gradient(circle,rgba(234,179,8,0.1)_0%,transparent_70%)]" : "bg-[radial-gradient(circle,rgba(234,179,8,0.15)_0%,transparent_70%)]"}`}
+          className={`absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full blur-3xl ${isDarkMode ? "bg-[radial-gradient(circle,rgba(255,69,0,0.1)_0%,transparent_70%)]" : "bg-[radial-gradient(circle,rgba(255,69,0,0.15)_0%,transparent_70%)]"}`}
         ></div>
         <div
-          className={`absolute bottom-[-10%] right-[-5%] w-[40%] h-[60%] rounded-full blur-3xl ${isDarkMode ? "bg-[radial-gradient(circle,rgba(212,175,55,0.08)_0%,transparent_70%)]" : "bg-[radial-gradient(circle,rgba(212,175,55,0.15)_0%,transparent_70%)]"}`}
+          className={`absolute bottom-[-10%] right-[-5%] w-[40%] h-[60%] rounded-full blur-3xl ${isDarkMode ? "bg-[radial-gradient(circle,rgba(220,38,38,0.08)_0%,transparent_70%)]" : "bg-[radial-gradient(circle,rgba(220,38,38,0.15)_0%,transparent_70%)]"}`}
         ></div>
       </div>
 
@@ -875,11 +875,11 @@ function CustomerSupportPage() {
           {/* HERO */}
           <div className="text-center mb-14 sm:mb-16">
             <div className="flex justify-center items-center gap-3 mb-5">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 flex items-center justify-center shadow-[0_0_15px_rgba(234,179,8,0.4)]">
-                <LifeBuoy className="w-4 h-4 text-black" />
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center shadow-[0_0_15px_rgba(255,69,0,0.4)]">
+                <LifeBuoy className="w-4 h-4 text-white" />
               </div>
               <span
-                className={`text-[10px] sm:text-xs font-black uppercase tracking-[0.25em] ${isDarkMode ? "text-yellow-500/80" : "text-yellow-700"}`}
+                className={`text-[10px] sm:text-xs font-black uppercase tracking-[0.25em] ${isDarkMode ? "text-red-600/80" : "text-red-800"}`}
               >
                 We're Here to Help
               </span>
@@ -895,7 +895,7 @@ function CustomerSupportPage() {
                 Customer{" "}
               </span>
               <span
-                className={`bg-gradient-to-r from-[#D4AF37] via-[#FFD700] to-[#B8860B] bg-clip-text text-transparent animate-gradient ${isDarkMode ? "drop-shadow-[0_0_20px_rgba(234,179,8,0.3)]" : ""}`}
+                className={`bg-gradient-to-r from-[#FF4500] via-[#FF7A00] to-[#C1121F] bg-clip-text text-transparent animate-gradient ${isDarkMode ? "drop-shadow-[0_0_20px_rgba(255,69,0,0.3)]" : ""}`}
               >
                 Support
               </span>
@@ -909,7 +909,7 @@ function CustomerSupportPage() {
             <div className="mt-8">
               <button
                 onClick={() => setShowContact(true)}
-                className="px-8 py-3.5 rounded-xl font-black tracking-widest uppercase transition-all duration-300 inline-flex items-center justify-center gap-3 bg-gradient-to-r from-yellow-600 via-yellow-400 to-yellow-600 bg-[length:200%_auto] hover:bg-[position:right_center] text-black shadow-[0_0_20px_rgba(234,179,8,0.2)] hover:scale-105 hover:shadow-[0_0_30px_rgba(234,179,8,0.4)] group"
+                className="px-8 py-3.5 rounded-xl font-black tracking-widest uppercase transition-all duration-300 inline-flex items-center justify-center gap-3 bg-gradient-to-r from-red-600 via-orange-500 to-red-600 bg-[length:200%_auto] hover:bg-[position:right_center] text-white shadow-[0_0_20px_rgba(255,69,0,0.2)] hover:scale-105 hover:shadow-[0_0_30px_rgba(255,69,0,0.4)] group"
               >
                 <Phone size={18} className="group-hover:animate-bounce" />
                 <span>Contact Us</span>
@@ -922,24 +922,24 @@ function CustomerSupportPage() {
             <div
               className={`rounded-2xl p-5 sm:p-6 border backdrop-blur-xl flex items-start gap-4 ${
                 isDarkMode
-                  ? "bg-neutral-950/80 border-yellow-500/20"
-                  : "bg-white border-yellow-400/30"
+                  ? "bg-neutral-950/80 border-red-500/20"
+                  : "bg-white border-orange-400/30"
               }`}
             >
               <div
                 className={`w-11 h-11 flex-shrink-0 rounded-xl flex items-center justify-center border ${
                   isDarkMode
-                    ? "bg-yellow-500/10 border-yellow-500/20"
-                    : "bg-yellow-100 border-yellow-200"
+                    ? "bg-orange-500/10 border-orange-500/20"
+                    : "bg-orange-100 border-orange-200"
                 }`}
               >
                 <Mail
-                  className={`w-5 h-5 ${isDarkMode ? "text-yellow-400" : "text-yellow-600"}`}
+                  className={`w-5 h-5 ${isDarkMode ? "text-orange-500" : "text-red-700"}`}
                 />
               </div>
               <div className="min-w-0">
                 <p
-                  className={`text-[10px] font-black uppercase tracking-widest mb-1 ${isDarkMode ? "text-yellow-600" : "text-yellow-700"}`}
+                  className={`text-[10px] font-black uppercase tracking-widest mb-1 ${isDarkMode ? "text-red-700" : "text-red-800"}`}
                 >
                   Email Us
                 </p>
@@ -954,24 +954,24 @@ function CustomerSupportPage() {
             <div
               className={`rounded-2xl p-5 sm:p-6 border backdrop-blur-xl flex items-start gap-4 ${
                 isDarkMode
-                  ? "bg-neutral-950/80 border-yellow-500/20"
-                  : "bg-white border-yellow-400/30"
+                  ? "bg-neutral-950/80 border-red-500/20"
+                  : "bg-white border-orange-400/30"
               }`}
             >
               <div
                 className={`w-11 h-11 flex-shrink-0 rounded-xl flex items-center justify-center border ${
                   isDarkMode
-                    ? "bg-yellow-500/10 border-yellow-500/20"
-                    : "bg-yellow-100 border-yellow-200"
+                    ? "bg-orange-500/10 border-orange-500/20"
+                    : "bg-orange-100 border-orange-200"
                 }`}
               >
                 <Phone
-                  className={`w-5 h-5 ${isDarkMode ? "text-yellow-400" : "text-yellow-600"}`}
+                  className={`w-5 h-5 ${isDarkMode ? "text-orange-500" : "text-red-700"}`}
                 />
               </div>
               <div className="min-w-0">
                 <p
-                  className={`text-[10px] font-black uppercase tracking-widest mb-1 ${isDarkMode ? "text-yellow-600" : "text-yellow-700"}`}
+                  className={`text-[10px] font-black uppercase tracking-widest mb-1 ${isDarkMode ? "text-red-700" : "text-red-800"}`}
                 >
                   Call Us
                 </p>
@@ -986,24 +986,24 @@ function CustomerSupportPage() {
             <div
               className={`rounded-2xl p-5 sm:p-6 border backdrop-blur-xl flex items-start gap-4 ${
                 isDarkMode
-                  ? "bg-neutral-950/80 border-yellow-500/20"
-                  : "bg-white border-yellow-400/30"
+                  ? "bg-neutral-950/80 border-red-500/20"
+                  : "bg-white border-orange-400/30"
               }`}
             >
               <div
                 className={`w-11 h-11 flex-shrink-0 rounded-xl flex items-center justify-center border ${
                   isDarkMode
-                    ? "bg-yellow-500/10 border-yellow-500/20"
-                    : "bg-yellow-100 border-yellow-200"
+                    ? "bg-orange-500/10 border-orange-500/20"
+                    : "bg-orange-100 border-orange-200"
                 }`}
               >
                 <Clock
-                  className={`w-5 h-5 ${isDarkMode ? "text-yellow-400" : "text-yellow-600"}`}
+                  className={`w-5 h-5 ${isDarkMode ? "text-orange-500" : "text-red-700"}`}
                 />
               </div>
               <div className="min-w-0">
                 <p
-                  className={`text-[10px] font-black uppercase tracking-widest mb-1 ${isDarkMode ? "text-yellow-600" : "text-yellow-700"}`}
+                  className={`text-[10px] font-black uppercase tracking-widest mb-1 ${isDarkMode ? "text-red-700" : "text-red-800"}`}
                 >
                   Support Hours
                 </p>
@@ -1019,7 +1019,7 @@ function CustomerSupportPage() {
           {/* SUPPORT CATEGORIES */}
           <div className="mb-16 sm:mb-20">
             <div className="flex items-center gap-3 sm:gap-4 mb-8">
-              <div className="w-1.5 h-6 sm:h-8 rounded-full bg-gradient-to-b from-yellow-300 to-yellow-600 shadow-[0_0_10px_rgba(234,179,8,0.5)] flex-shrink-0" />
+              <div className="w-1.5 h-6 sm:h-8 rounded-full bg-gradient-to-b from-orange-400 to-red-600 shadow-[0_0_10px_rgba(255,69,0,0.5)] flex-shrink-0" />
               <h2 className="text-xl sm:text-2xl font-black tracking-widest uppercase">
                 How Can We Help?
               </h2>
@@ -1032,19 +1032,19 @@ function CustomerSupportPage() {
                     key={i}
                     className={`rounded-2xl p-5 sm:p-6 border backdrop-blur-xl transition-all duration-300 group ${
                       isDarkMode
-                        ? "bg-neutral-950/80 border-yellow-500/20 hover:border-yellow-500/50 hover:bg-neutral-900"
-                        : "bg-white border-yellow-400/30 hover:border-yellow-500 hover:shadow-lg"
+                        ? "bg-neutral-950/80 border-red-500/20 hover:border-red-500/50 hover:bg-neutral-900"
+                        : "bg-white border-orange-400/30 hover:border-red-500 hover:shadow-lg"
                     }`}
                   >
                     <div
                       className={`w-11 h-11 rounded-xl flex items-center justify-center border mb-4 transition-transform group-hover:scale-110 ${
                         isDarkMode
-                          ? "bg-yellow-500/10 border-yellow-500/20"
-                          : "bg-yellow-100 border-yellow-200"
+                          ? "bg-orange-500/10 border-orange-500/20"
+                          : "bg-orange-100 border-orange-200"
                       }`}
                     >
                       <Icon
-                        className={`w-5 h-5 ${isDarkMode ? "text-yellow-400" : "text-yellow-600"}`}
+                        className={`w-5 h-5 ${isDarkMode ? "text-orange-500" : "text-red-700"}`}
                       />
                     </div>
                     <h3
@@ -1066,7 +1066,7 @@ function CustomerSupportPage() {
           {/* FAQ */}
           <div className="mb-16 sm:mb-20">
             <div className="flex items-center gap-3 sm:gap-4 mb-8">
-              <div className="w-1.5 h-6 sm:h-8 rounded-full bg-gradient-to-b from-yellow-300 to-yellow-600 shadow-[0_0_10px_rgba(234,179,8,0.5)] flex-shrink-0" />
+              <div className="w-1.5 h-6 sm:h-8 rounded-full bg-gradient-to-b from-orange-400 to-red-600 shadow-[0_0_10px_rgba(255,69,0,0.5)] flex-shrink-0" />
               <h2 className="text-xl sm:text-2xl font-black tracking-widest uppercase">
                 Frequently Asked Questions
               </h2>
@@ -1074,8 +1074,8 @@ function CustomerSupportPage() {
             <div
               className={`rounded-3xl border backdrop-blur-xl divide-y overflow-hidden ${
                 isDarkMode
-                  ? "bg-neutral-950/80 border-yellow-500/20 divide-white/5"
-                  : "bg-white border-yellow-400/30 divide-slate-100"
+                  ? "bg-neutral-950/80 border-red-500/20 divide-white/5"
+                  : "bg-white border-orange-400/30 divide-slate-100"
               }`}
             >
               {FAQS.map((item, i) => {
@@ -1085,7 +1085,7 @@ function CustomerSupportPage() {
                     <button
                       onClick={() => setOpenFaq(isOpen ? null : i)}
                       className={`w-full flex items-center justify-between gap-4 text-left p-5 sm:p-6 transition-colors ${
-                        isDarkMode ? "hover:bg-white/5" : "hover:bg-yellow-50/50"
+                        isDarkMode ? "hover:bg-white/5" : "hover:bg-orange-50/50"
                       }`}
                     >
                       <span
@@ -1094,7 +1094,7 @@ function CustomerSupportPage() {
                         {item.q}
                       </span>
                       <ChevronDown
-                        className={`w-5 h-5 flex-shrink-0 transition-transform duration-300 ${isOpen ? "rotate-180" : ""} ${isDarkMode ? "text-yellow-500" : "text-yellow-600"}`}
+                        className={`w-5 h-5 flex-shrink-0 transition-transform duration-300 ${isOpen ? "rotate-180" : ""} ${isDarkMode ? "text-red-600" : "text-red-700"}`}
                       />
                     </button>
                     <AnimatePresence initial={false}>
@@ -1124,16 +1124,16 @@ function CustomerSupportPage() {
           <div
             className={`rounded-3xl p-8 sm:p-12 border relative overflow-hidden text-center ${
               isDarkMode
-                ? "bg-neutral-950 border-yellow-500/30 shadow-[0_20px_50px_rgba(0,0,0,0.5)]"
-                : "bg-white border-yellow-400/50 shadow-[0_20px_50px_rgba(234,179,8,0.15)]"
+                ? "bg-neutral-950 border-red-500/30 shadow-[0_20px_50px_rgba(0,0,0,0.5)]"
+                : "bg-white border-orange-400/50 shadow-[0_20px_50px_rgba(255,69,0,0.15)]"
             }`}
           >
             <div
-              className={`absolute top-0 right-0 w-64 h-64 rounded-full blur-[80px] ${isDarkMode ? "bg-yellow-500/10" : "bg-yellow-300/30"}`}
+              className={`absolute top-0 right-0 w-64 h-64 rounded-full blur-[80px] ${isDarkMode ? "bg-orange-500/10" : "bg-orange-300/30"}`}
             ></div>
             <div className="relative z-10">
               <Headphones
-                className={`w-10 h-10 mx-auto mb-4 ${isDarkMode ? "text-yellow-400" : "text-yellow-600"}`}
+                className={`w-10 h-10 mx-auto mb-4 ${isDarkMode ? "text-orange-500" : "text-red-700"}`}
               />
               <h3
                 className={`text-2xl sm:text-3xl font-black uppercase tracking-widest mb-3 ${isDarkMode ? "text-white" : "text-slate-900"}`}
@@ -1148,7 +1148,7 @@ function CustomerSupportPage() {
               </p>
               <button
                 onClick={() => setShowContact(true)}
-                className="px-8 py-3.5 rounded-xl font-black tracking-widest uppercase transition-all duration-300 inline-flex items-center justify-center gap-3 bg-gradient-to-r from-yellow-600 via-yellow-400 to-yellow-600 bg-[length:200%_auto] hover:bg-[position:right_center] text-black shadow-[0_0_20px_rgba(234,179,8,0.2)] hover:scale-105 hover:shadow-[0_0_30px_rgba(234,179,8,0.4)] group"
+                className="px-8 py-3.5 rounded-xl font-black tracking-widest uppercase transition-all duration-300 inline-flex items-center justify-center gap-3 bg-gradient-to-r from-red-600 via-orange-500 to-red-600 bg-[length:200%_auto] hover:bg-[position:right_center] text-white shadow-[0_0_20px_rgba(255,69,0,0.2)] hover:scale-105 hover:shadow-[0_0_30px_rgba(255,69,0,0.4)] group"
               >
                 <Phone size={18} className="group-hover:animate-bounce" />
                 <span>Contact Us</span>

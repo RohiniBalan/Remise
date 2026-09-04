@@ -32,11 +32,12 @@ Output each line on its own line, top to bottom. Do NOT translate. Do NOT descri
 
 // Used by Gemini/Claude vision (single product; they handle vision + translation in one shot).
 export const PRODUCT_VISION_PROMPT = `This image contains product details. Extract and translate ALL text into English.
+Only extract attributes that are actually visible or explicitly stated on the packaging or image. Never invent or hallucinate unknown specifications.
 Reply ONLY with a raw JSON object — no markdown, no code fences:
-{"productName":"<product name>","category":"<one of: Groceries, Dairy, Beverages, Snacks, Beauty & Skincare, Household, Electronics, Clothing, Vegetables, Fruits, Medicine, Stationery, General>","price":<MRP as number>,"discountedPrice":<sale price as number, same as price if not shown>,"validTill":"<YYYY-MM-DD or null>","description":"<2-3 sentence description in English>","brand":"<brand name or empty string>","imageKeyword":"<2-3 word English keyword>"}`;
+{"productName":"<product name>","category":"<one of: Electronics, Grocery, Beauty, Toys, Vegetables, Fruits, Household Items, Food & Beverages, General>","subcategory":"<appropriate subcategory or empty string>","price":<MRP as number>,"discountedPrice":<sale price as number, same as price if not shown>,"validTill":"<YYYY-MM-DD or null>","description":"<2-3 sentence description in English>","brand":"<brand name or empty string>","imageKeyword":"<2-3 word English keyword>","attributes":{"<attributeName>":"<attributeValue>"}}`;
 
 export const PRODUCT_CATEGORIES =
-  "Groceries, Dairy, Beverages, Snacks, Beauty & Skincare, Household, Electronics, Clothing, Vegetables, Fruits, Medicine, Stationery, General";
+  "Electronics, Grocery, Beauty, Toys, Vegetables, Fruits, Household Items, Food & Beverages, General";
 
 // ── Text-parsing helpers (no LLM) ───────────────────────────────────────────
 

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Save, ShoppingBag, Eye, Edit2, Loader2, RefreshCw, AlertCircle, CheckCircle, Palette, Image as ImageIcon, X } from 'lucide-react';
 import Layout from '../layout/layout';
 import axios from 'axios';
-import BestSellersSection, { BestSellerItem } from '../../components-sections/BestSellersSection'; 
+import BestSellersSection, { BestSellerItem } from '../../components-sections/BestSellersSection';
 
 import { API_URL } from '../../utils/api';
 const axiosInstance = axios.create({
@@ -32,7 +32,7 @@ export default function BestSellersAdminPage() {
   // Modal States
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<string | number | null>(null);
-  
+
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
 
   // Simplified Form States
@@ -105,14 +105,15 @@ export default function BestSellersAdminPage() {
   const handleAddItem = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName || !newImgUrl) return;
-    
-    setItems(prev => [...prev, { 
-      id: Date.now().toString(), 
-      name: newName, 
-      img: newImgUrl, 
-      color: newColor 
+
+    setItems(prev => [...prev, {
+      id: Date.now().toString(),
+      name: newName,
+      img: newImgUrl,
+      price: 0,
+      raw: 0
     }]);
-    
+
     setNewName(''); setNewImgUrl('');
   };
 
@@ -137,7 +138,7 @@ export default function BestSellersAdminPage() {
     setItemToDelete(null);
   };
 
-  if (isLoading) return <Layout><div className="min-h-screen flex justify-center items-center"><Loader2 className="animate-spin text-[#D4AF37]" size={40}/></div></Layout>;
+  if (isLoading) return <Layout><div className="min-h-screen flex justify-center items-center"><Loader2 className="animate-spin text-[#D4AF37]" size={40} /></div></Layout>;
 
   return (
     <Layout>
@@ -147,25 +148,25 @@ export default function BestSellersAdminPage() {
             <h1 className="text-2xl font-bold text-gray-900">Best Sellers Manager</h1>
             <p className="text-gray-500 text-sm">Manage the auto-expanding image carousel</p>
           </div>
-          
+
           <div className="flex gap-3 flex-wrap">
-            <select value={theme} onChange={(e) => setTheme(e.target.value as 'dark'|'light')} className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white outline-none">
+            <select value={theme} onChange={(e) => setTheme(e.target.value as 'dark' | 'light')} className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white outline-none">
               <option value="dark">Dark Theme</option>
               <option value="light">Light Theme</option>
             </select>
 
             <div className="flex bg-gray-200 rounded-lg p-1">
-              <button onClick={() => setActiveTab('edit')} className={`px-4 py-2 rounded-lg text-sm font-medium flex gap-2 ${activeTab === 'edit' ? 'bg-white shadow' : 'text-gray-600'}`}><Edit2 size={16}/> Edit</button>
-              <button onClick={() => setActiveTab('preview')} className={`px-4 py-2 rounded-lg text-sm font-medium flex gap-2 ${activeTab === 'preview' ? 'bg-white shadow' : 'text-gray-600'}`}><Eye size={16}/> Preview</button>
+              <button onClick={() => setActiveTab('edit')} className={`px-4 py-2 rounded-lg text-sm font-medium flex gap-2 ${activeTab === 'edit' ? 'bg-white shadow' : 'text-gray-600'}`}><Edit2 size={16} /> Edit</button>
+              <button onClick={() => setActiveTab('preview')} className={`px-4 py-2 rounded-lg text-sm font-medium flex gap-2 ${activeTab === 'preview' ? 'bg-white shadow' : 'text-gray-600'}`}><Eye size={16} /> Preview</button>
             </div>
 
             {isAuthenticated && (
               <>
                 <button onClick={handleResetClick} disabled={isResetting} className="px-4 py-2 bg-gray-500 text-white rounded-lg text-sm flex gap-2 disabled:opacity-50">
-                  {isResetting ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16}/>} Reset
+                  {isResetting ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />} Reset
                 </button>
                 <button onClick={handleSave} disabled={isSaving} className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium flex gap-2 disabled:opacity-50">
-                  {isSaving ? <Loader2 size={16} className="animate-spin"/> : <Save size={16}/>} Save Changes
+                  {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Save Changes
                 </button>
               </>
             )}
@@ -174,7 +175,7 @@ export default function BestSellersAdminPage() {
 
         {saveStatus.message && (
           <div className={`mb-6 p-4 rounded-lg flex items-center gap-3 ${saveStatus.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
-            {saveStatus.type === 'success' ? <CheckCircle size={20}/> : <AlertCircle size={20}/>}
+            {saveStatus.type === 'success' ? <CheckCircle size={20} /> : <AlertCircle size={20} />}
             <span className="font-medium text-sm">{saveStatus.message}</span>
           </div>
         )}
@@ -190,12 +191,12 @@ export default function BestSellersAdminPage() {
                 <h3 className="font-semibold text-gray-800 mb-4 pb-2 border-b flex items-center gap-2"><Plus size={18} className="text-[#D4AF37]" /> Add Item</h3>
                 <form onSubmit={handleAddItem} className="space-y-4">
                   <div>
-                    <label className="text-sm text-gray-600 mb-1 flex items-center gap-1"><ShoppingBag size={14}/> Title</label>
+                    <label className="text-sm text-gray-600 mb-1 flex items-center gap-1"><ShoppingBag size={14} /> Title</label>
                     <input type="text" value={newName} onChange={e => setNewName(e.target.value)} required className="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#D4AF37]" placeholder="e.g. Marvel Avengers Set" />
                   </div>
 
                   <div>
-                    <label className="text-sm text-gray-600 mb-1 flex items-center gap-1"><Palette size={14}/> Background Color</label>
+                    <label className="text-sm text-gray-600 mb-1 flex items-center gap-1"><Palette size={14} /> Background Color</label>
                     <div className="flex gap-2">
                       <input type="color" value={newColor} onChange={e => setNewColor(e.target.value)} className="h-10 w-12 rounded cursor-pointer border-0 p-0" />
                       <input type="text" value={newColor} onChange={e => setNewColor(e.target.value)} className="flex-1 px-3 py-2 border rounded-lg outline-none font-mono text-sm" />
@@ -203,7 +204,7 @@ export default function BestSellersAdminPage() {
                   </div>
 
                   <div>
-                    <label className="text-sm text-gray-600 mb-1 flex items-center gap-1"><ImageIcon size={14}/> Image URL</label>
+                    <label className="text-sm text-gray-600 mb-1 flex items-center gap-1"><ImageIcon size={14} /> Image URL</label>
                     <input type="text" value={newImgUrl} onChange={e => setNewImgUrl(e.target.value)} required className="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#D4AF37]" placeholder="/chars/toy.avif" />
                   </div>
 
@@ -217,11 +218,11 @@ export default function BestSellersAdminPage() {
             <div className="lg:col-span-2 space-y-4">
               {items.map((item, i) => (
                 <div key={item.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex gap-4 items-center">
-                  <div className="w-20 h-24 rounded-lg flex-shrink-0 relative overflow-hidden" style={{ backgroundColor: item.color }}>
+                  <div className="w-20 h-24 rounded-lg flex-shrink-0 relative overflow-hidden" style={{ backgroundColor: '#831843' }}>
                     <div className="absolute inset-0 bg-black/20" />
                     <img src={item.img} alt={item.name} className="w-full h-full object-cover relative z-10" />
                   </div>
-                  
+
                   <div className="flex-1">
                     <h4 className="font-bold text-gray-800 text-lg">{item.name}</h4>
                     <p className="text-xs text-gray-400 mt-2 font-mono">{item.img}</p>
@@ -242,7 +243,7 @@ export default function BestSellersAdminPage() {
         {/* Custom Delete Confirmation Modal */}
         {isDeleteModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div 
+            <div
               className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 transform transition-all animate-in fade-in zoom-in duration-200"
             >
               <div className="flex justify-between items-center mb-4">
@@ -256,21 +257,21 @@ export default function BestSellersAdminPage() {
                   <X size={24} />
                 </button>
               </div>
-              
+
               <p className="text-gray-600 mb-6 pl-2">
-                Are you sure you want to remove this item from your Best Sellers list? 
+                Are you sure you want to remove this item from your Best Sellers list?
                 This action will be saved immediately if you proceed.
               </p>
-              
+
               <div className="flex gap-3 justify-end mt-6">
-                <button 
-                  onClick={cancelDelete} 
+                <button
+                  onClick={cancelDelete}
                   className="px-5 py-2.5 rounded-xl text-gray-700 font-semibold hover:bg-gray-100 transition-colors"
                 >
                   Cancel
                 </button>
-                <button 
-                  onClick={confirmDelete} 
+                <button
+                  onClick={confirmDelete}
                   className="px-5 py-2.5 rounded-xl bg-red-600 text-white font-semibold hover:bg-red-700 transition-colors flex items-center gap-2"
                 >
                   <Trash2 size={18} /> Delete Item
@@ -283,7 +284,7 @@ export default function BestSellersAdminPage() {
         {/* Custom Reset Confirmation Modal */}
         {isResetModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div 
+            <div
               className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 transform transition-all animate-in fade-in zoom-in duration-200"
             >
               <div className="flex justify-between items-center mb-4">
@@ -297,21 +298,21 @@ export default function BestSellersAdminPage() {
                   <X size={24} />
                 </button>
               </div>
-              
+
               <p className="text-gray-600 mb-6 pl-2">
-                Are you sure you want to reset the Best Sellers list to its default items? 
+                Are you sure you want to reset the Best Sellers list to its default items?
                 All your custom additions and changes will be lost immediately.
               </p>
-              
+
               <div className="flex gap-3 justify-end mt-6">
-                <button 
-                  onClick={cancelReset} 
+                <button
+                  onClick={cancelReset}
                   className="px-5 py-2.5 rounded-xl text-gray-700 font-semibold hover:bg-gray-100 transition-colors"
                 >
                   Cancel
                 </button>
-                <button 
-                  onClick={confirmReset} 
+                <button
+                  onClick={confirmReset}
                   className="px-5 py-2.5 rounded-xl bg-amber-600 text-white font-semibold hover:bg-amber-700 transition-colors flex items-center gap-2"
                 >
                   <RefreshCw size={18} /> Reset Items

@@ -314,47 +314,14 @@ export function SellerSettingsTab({ store, token, onRefresh, categories }: any) 
           </div>
         </div>
 
-        {/* Cashfree Easy Split Vendor Account Setup */}
+        {/* Bank & Payment Accounts */}
         <div className="pt-4 border-t border-[#F5F5F5]">
-          <div className="flex items-center justify-between mb-2">
-            <div>
-              <p className="text-sm font-semibold text-gray-800">
-                Cashfree Easy Split Marketplace Payments
-              </p>
-              <p className="text-xs text-gray-400">
-                Connect your Cashfree Vendor Account to automatically receive customer payments directly into your bank account.
-              </p>
-            </div>
-            <span
-              className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${
-                store?.cashfreeVendorId || store?.razorpayAccountId
-                  ? (store?.cashfreeVendorStatus === 'active' || store?.razorpayRouteStatus === 'active')
-                    ? 'bg-green-50 text-green-700 border-green-200'
-                    : 'bg-amber-50 text-amber-700 border-amber-200'
-                  : 'bg-gray-100 text-gray-600 border-gray-200'
-              }`}
-            >
-              {store?.cashfreeVendorId
-                ? `Easy Split: ${store?.cashfreeVendorStatus?.toUpperCase() || 'ACTIVE'}`
-                : store?.razorpayAccountId
-                ? `Vendor: CONNECTED`
-                : 'Easy Split: NOT CONNECTED'}
-            </span>
-          </div>
-
-          {(store?.cashfreeVendorId || store?.razorpayAccountId) && (
-            <div className="mb-3 p-3 bg-[#DFF1F1]/50 border border-[#BBD5DA] rounded-xl text-xs text-gray-700 flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <span className="font-semibold text-teal-800">Cashfree Vendor ID:</span>{' '}
-                <code className="font-mono bg-white px-2 py-0.5 rounded border border-[#BBD5DA]">{store.cashfreeVendorId || `vendor_${store._id}`}</code>
-              </div>
-              <div>
-                <span className="font-semibold text-teal-800">Platform Commission:</span>{' '}
-                <span className="font-bold text-teal-900">{store.commissionPercentage ?? 10}%</span>
-              </div>
-            </div>
-          )}
-
+          <p className="text-sm font-semibold text-gray-800 mb-1">
+            Settlement Bank Account Details
+          </p>
+          <p className="text-xs text-gray-400 mb-3">
+            Used for automated payouts via Razorpay Route and Cashfree Easy Split.
+          </p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Input
               label="Legal Business / Entity Name"
@@ -375,8 +342,56 @@ export function SellerSettingsTab({ store, token, onRefresh, categories }: any) 
               onChange={(e) => set("bankIfsc", e.target.value.toUpperCase())}
             />
           </div>
+        </div>
 
-          <div className="mt-3 flex justify-end">
+        {/* Razorpay Route Marketplace Account Setup */}
+        <div className="pt-4 border-t border-[#F5F5F5] bg-blue-50/30 p-4 rounded-xl border border-blue-100">
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <p className="text-sm font-bold text-gray-900">
+                Razorpay Route Marketplace Account
+              </p>
+              <p className="text-xs text-gray-500">
+                Mandatory to accept online Razorpay payments. Customer payments are split directly to your linked account.
+              </p>
+            </div>
+            <span
+              className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${
+                store?.razorpayRouteStatus === 'active'
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  : store?.razorpayRouteStatus === 'under_review' || store?.razorpayRouteStatus === 'created'
+                  ? 'bg-amber-50 text-amber-700 border-amber-200'
+                  : 'bg-rose-50 text-rose-700 border-rose-200'
+              }`}
+            >
+              {store?.razorpayRouteStatus === 'active'
+                ? 'Razorpay: ACTIVE'
+                : store?.razorpayRouteStatus === 'under_review'
+                ? 'Razorpay: UNDER REVIEW'
+                : store?.razorpayRouteStatus === 'created'
+                ? 'Razorpay: PENDING KYC'
+                : 'Razorpay: NOT CONNECTED'}
+            </span>
+          </div>
+
+          {store?.razorpayAccountId ? (
+            <div className="mb-3 p-3 bg-white border border-blue-200 rounded-lg text-xs text-gray-700 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <span className="font-semibold text-blue-900">Razorpay Linked Account ID:</span>{' '}
+                <code className="font-mono bg-blue-50 px-2 py-0.5 rounded border border-blue-200">{store.razorpayAccountId}</code>
+              </div>
+              <div>
+                <span className="font-semibold text-blue-900">Route Status:</span>{' '}
+                <span className="font-bold text-emerald-700 uppercase">{store.razorpayRouteStatus || 'active'}</span>
+              </div>
+            </div>
+          ) : (
+            <div className="mb-3 p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
+              ⚠️ Complete Razorpay payment onboarding to accept online Razorpay payments.
+            </div>
+          )}
+
+          <div className="flex justify-end">
             <button
               type="button"
               onClick={async () => {
@@ -384,7 +399,7 @@ export function SellerSettingsTab({ store, token, onRefresh, categories }: any) 
                 setError("");
                 try {
                   const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
-                  const res = await fetch(`${API}/api/stores/me/cashfree-onboard`, {
+                  const res = await fetch(`${API}/api/stores/me/razorpay-onboard`, {
                     method: "POST",
                     headers: {
                       "Content-Type": "application/json",
@@ -393,6 +408,8 @@ export function SellerSettingsTab({ store, token, onRefresh, categories }: any) 
                     body: JSON.stringify({
                       legalBusinessName: form.legalBusinessName || store?.businessDetails?.legalBusinessName || form.name,
                       businessType: "individual",
+                      pan: form.pan,
+                      gstin: form.gstin,
                       bankAccount: {
                         accountNumber: form.bankAccountNumber || store?.businessDetails?.bankAccount?.accountNumber,
                         ifscCode: form.bankIfsc || store?.businessDetails?.bankAccount?.ifscCode,
@@ -405,18 +422,18 @@ export function SellerSettingsTab({ store, token, onRefresh, categories }: any) 
                     onRefresh();
                     setShowRazorpaySuccess(true);
                   } else {
-                    setError(data.message || "Failed to onboard with Cashfree Easy Split.");
+                    setError(data.message || "Failed to onboard with Razorpay Route.");
                   }
                 } catch (err: any) {
-                  setError(`Onboarding error: ${err.message}`);
+                  setError(`Razorpay Onboarding error: ${err.message}`);
                 } finally {
                   setOnboardingRoute(false);
                 }
               }}
               disabled={onboardingRoute}
-              className="px-4 py-2 bg-teal-700 hover:bg-teal-800 disabled:opacity-50 text-white text-xs font-semibold rounded-xl transition shadow-sm"
+              className="px-4 py-2 bg-[#0C2340] hover:bg-[#1E3A5F] disabled:opacity-50 text-white text-xs font-semibold rounded-xl transition shadow-sm"
             >
-              {onboardingRoute ? "Connecting…" : store?.cashfreeVendorId ? "Sync / Update Cashfree Vendor" : "Connect Cashfree Easy Split"}
+              {onboardingRoute ? "Connecting…" : store?.razorpayAccountId ? "Sync / Update Razorpay Account" : "Connect Razorpay Route Account"}
             </button>
           </div>
         </div>

@@ -1,1 +1,0 @@
-{"indexes":[{"v":{"$numberInt":"2"},"key":{"_id":{"$numberInt":"1"}},"name":"_id_"},{"v":{"$numberInt":"2"},"key":{"videoId":{"$numberInt":"1"}},"name":"videoId_1","background":true,"unique":true}],"uuid":"423a3dc13fe34696b896a0619827c173","collectionName":"studiovideos","type":"collection"}

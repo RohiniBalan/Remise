@@ -10,7 +10,15 @@ const offerOrderSchema = new mongoose.Schema({
   customerName:    { type: String, required: true },
   customerPhone:   { type: String, required: true },
   customerEmail:   { type: String, default: '' },
-  deliveryAddress: { type: String, required: true },
+  deliveryAddress: { type: String, default: '' },
+  city:            { type: String, default: '' },
+  state:           { type: String, default: '' },
+  pinCode:         { type: String, default: '' },
+  deliveryMethod:  { type: String, enum: ['delivery', 'pickup'], default: 'delivery' },
+  paymentMethod:   { type: String, enum: ['cod', 'online', 'card', 'upi', 'qr', 'razorpay'], default: 'cod' },
+  paymentStatus:   { type: String, enum: ['Pending', 'Completed', 'Failed'], default: 'Pending' },
+  utrNumber:       { type: String, default: '' },
+  screenshot:      { type: String, default: '' },
 
   // Offer snapshot
   offerTitle: { type: String, required: true },

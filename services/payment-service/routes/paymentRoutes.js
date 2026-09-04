@@ -7,21 +7,22 @@ const {
   notifyOrderParties,
 } = require('../utils/notifications');
 const {
-  createVendor,
-  getVendorDetails,
-  createEasySplitOrder,
-  getOrderDetails,
-  getOrderPayments,
-  createRefund,
-  verifyWebhookSignature,
-  getEnvConfig,
-} = require('../utils/cashfree');
+  getRazorpayInstance,
+  createMarketplaceOrder,
+  verifyPaymentSignature: verifyRazorpayPaymentSignature,
+  verifyWebhookSignature: verifyRazorpayWebhookSignature,
+  onboardVendor: onboardRazorpayVendor,
+  getAccountDetails: getRazorpayAccountDetails,
+  reverseTransfer: reverseRazorpayTransfer,
+  createPaymentTransfers: createRazorpayPaymentTransfers,
+} = require('../utils/razorpay');
 
 const ORDER_SERVICE_URL = process.env.ORDER_SERVICE_URL || 'http://localhost:3004';
 const PRODUCT_SERVICE_URL = process.env.PRODUCT_SERVICE_URL || 'http://localhost:3003';
 const STORE_SERVICE_URL = process.env.STORE_SERVICE_URL || 'http://localhost:3007';
 const GATEWAY_URL = process.env.GATEWAY_URL || 'http://localhost:3000';
-const DEFAULT_COMMISSION_PERCENT = parseFloat(process.env.PLATFORM_COMMISSION_PERCENT || '10');
+const PLATFORM_COMMISSION_ENABLED = process.env.PLATFORM_COMMISSION_ENABLED === 'true';
+const DEFAULT_COMMISSION_PERCENT = parseFloat(process.env.PLATFORM_COMMISSION_PERCENT || '0');
 
 // PhonePe credentials (for alternative flow)
 const CLIENT_ID = process.env.PHONEPE_CLIENT_ID || 'M23IOM3UNHZVS_2603051535';
@@ -63,17 +64,6 @@ const releaseStock = async (orderId, items, reason) => {
   }
 };
 
-// Helper: legacy deduct stock via product-service
-const deductStock = async (items) => {
-  try {
-    await axios.post(`${PRODUCT_SERVICE_URL}/api/products/deduct-stock`, {
-      items,
-    });
-  } catch (err) {
-    console.error('Stock deduction error:', err.message);
-  }
-};
-
 // Helper: fetch product details to verify vendor/price
 const resolveProductStore = async (productId) => {
   try {
@@ -87,7 +77,7 @@ const resolveProductStore = async (productId) => {
   return null;
 };
 
-// Helper: fetch store details (including Cashfree Vendor ID)
+// Helper: fetch store details (including Razorpay & Cashfree vendor IDs)
 const resolveStoreDetails = async (storeId) => {
   if (!storeId) return null;
   try {
@@ -102,46 +92,16 @@ const resolveStoreDetails = async (storeId) => {
 };
 
 /**
- * Helper: Ensure vendor is onboarded to Cashfree Easy Split.
- * If vendor has not yet been registered in Cashfree, automatically onboard now and save vendorId.
- */
-const ensureVendorOnboarded = async (store) => {
-  if (!store) return null;
-  const vendorId = store.cashfreeVendorId || `vendor_${store._id}`;
-
-  try {
-    const onboardResult = await createVendor({
-      vendorId,
-      storeId: store._id.toString(),
-      name: store.businessDetails?.legalBusinessName || store.name,
-      email: store.email,
-      phone: store.phone,
-      bankAccount: store.businessDetails?.bankAccount || {},
-      pan: store.businessDetails?.pan || store.pan,
-      businessType: store.businessDetails?.businessType || 'individual',
-    });
-
-    // Update store-service with Cashfree Vendor ID
-    await axios.patch(`${STORE_SERVICE_URL}/api/stores/internal/${store._id}/cashfree-status`, {
-      cashfreeVendorId: onboardResult.vendorId || vendorId,
-      cashfreeVendorStatus: 'active',
-      cashfreeKycStatus: 'COMPLETED',
-    }).catch((e) => console.warn(`Could not sync vendorId back to store ${store._id}:`, e.message));
-
-    return onboardResult.vendorId || vendorId;
-  } catch (err) {
-    console.warn(`[Auto-Onboard Note] Failed to auto-onboard store ${store._id} to Cashfree Easy Split:`, err.message);
-    return vendorId;
-  }
-};
-
-/**
  * ─────────────────────────────────────────────────────────────────────────────
  * 1. POST /api/payment/create-order (or /api/payment/initiate)
- * Marketplace Cashfree Easy Split Order Creation
+ * Marketplace Order Creation (Razorpay Route / COD / QR)
  * ─────────────────────────────────────────────────────────────────────────────
  */
+const path = require('path');
+const envPath = path.resolve(__dirname, '../.env');
+
 const handleCreateOrder = async (req, res) => {
+  require('dotenv').config({ path: envPath, override: true });
   try {
     const {
       amount,
@@ -150,7 +110,7 @@ const handleCreateOrder = async (req, res) => {
       contactEmail,
       shippingAddress,
       billingAddress,
-      paymentMethod = 'cashfree',
+      paymentMethod = 'razorpay',
       userId,
       deliveryMethod,
     } = req.body;
@@ -164,7 +124,9 @@ const handleCreateOrder = async (req, res) => {
     }
 
     const merchantOrderId = 'TXN' + Date.now() + Math.floor(Math.random() * 1000);
-    const returnUrl = redirectUrl ? `${redirectUrl}?orderId=${merchantOrderId}` : `/payment-status?orderId=${merchantOrderId}`;
+    const returnUrl = redirectUrl
+      ? `${redirectUrl}?orderId=${merchantOrderId}`
+      : `/payment-status?orderId=${merchantOrderId}`;
 
     // 1. Group items by store / vendor and verify products
     const storeGroups = {};
@@ -181,7 +143,6 @@ const handleCreateOrder = async (req, res) => {
       const pId = item.id || item._id || item.productId;
       const productInfo = await resolveProductStore(pId);
 
-      // Determine vendor/store ID (from product-service record, cart item payload, or request body)
       const storeId = item.storeId || productInfo?.storeId || bodyStoreId || null;
       let storeName = item.storeName || productInfo?.storeName || (storeId === bodyStoreId ? bodyStoreName : null);
       if (storeId && !storeName) {
@@ -220,8 +181,8 @@ const handleCreateOrder = async (req, res) => {
       storeGroups[groupKey].grossAmount += price * quantity;
     }
 
-    // 2. Compute Vendor Distribution & Cashfree Easy Splits
-    const splits = [];
+    // 2. Compute Vendor Distributions & Splits
+    const razorpayTransfers = [];
     const vendorTransfers = [];
     let calculatedTotal = 0;
 
@@ -232,32 +193,60 @@ const handleCreateOrder = async (req, res) => {
         const store = await resolveStoreDetails(group.storeId);
         const storeName = store?.name || group.storeName || 'Vendor Store';
 
-        // Auto-onboard vendor to Cashfree Easy Split if not already linked
-        const cashfreeVendorId = await ensureVendorOnboarded(store);
+        // ── MANDATORY RAZORPAY ROUTE ONBOARDING CHECK ──
+        if (paymentMethod === 'razorpay') {
+          const hasRazorpayAccount = Boolean(store?.razorpayAccountId);
+          const isRouteActive = store?.razorpayRouteStatus === 'active' || store?.razorpayRouteStatus === 'created';
 
-        const commissionPct = store?.commissionPercentage !== undefined
-          ? store.commissionPercentage
-          : DEFAULT_COMMISSION_PERCENT;
+          if (!hasRazorpayAccount || !isRouteActive) {
+            await releaseStock(merchantOrderId, processedItems, 'razorpay_vendor_unready');
+            return res.status(400).json({
+              success: false,
+              code: 'RAZORPAY_VENDOR_NOT_READY',
+              message: `The store "${storeName}" is not yet ready to accept Razorpay payments. Please complete store onboarding or choose another payment method (QR or Cash on Delivery).`,
+              details: {
+                storeId: group.storeId,
+                storeName,
+                razorpayRouteStatus: store?.razorpayRouteStatus || 'not_created',
+              },
+            });
+          }
+        }
 
-        const commissionAmount = Math.round(group.grossAmount * (commissionPct / 100) * 100) / 100;
-        const vendorAmount = Math.round((group.grossAmount - commissionAmount) * 100) / 100;
+        // Remise platform commission percentage (0% while commission is disabled)
+        const commissionPct = PLATFORM_COMMISSION_ENABLED
+          ? (store?.commissionPercentage !== undefined ? store.commissionPercentage : DEFAULT_COMMISSION_PERCENT)
+          : 0;
 
-        if (cashfreeVendorId && vendorAmount > 0) {
-          splits.push({
-            vendor_id: cashfreeVendorId,
-            amount: vendorAmount,
-            tags: {
+        // Calculate commission and vendor net amount (using integer rounding to paise)
+        const grossPaise = Math.round(group.grossAmount * 100);
+        const commissionPaise = Math.round(grossPaise * (commissionPct / 100));
+        const vendorAmountPaise = Math.max(0, grossPaise - commissionPaise);
+
+        const commissionAmount = Math.round(commissionPaise) / 100;
+        const vendorAmount = Math.round(vendorAmountPaise) / 100;
+
+        // Razorpay Route Linked Account
+        const razorpayAccountId = store?.razorpayAccountId || null;
+        if (razorpayAccountId && vendorAmountPaise > 0) {
+          razorpayTransfers.push({
+            account: razorpayAccountId,
+            amount: vendorAmountPaise, // in paise
+            currency: 'INR',
+            notes: {
               storeId: group.storeId,
               storeName,
               orderId: merchantOrderId,
             },
+            linked_account_notes: ['storeId', 'orderId'],
+            on_hold: 0,
           });
         }
 
         vendorTransfers.push({
           storeId: group.storeId,
           storeName,
-          vendorId: cashfreeVendorId,
+          razorpayAccountId: razorpayAccountId || null,
           grossAmount: group.grossAmount,
           commissionAmount,
           vendorAmount,
@@ -267,6 +256,7 @@ const handleCreateOrder = async (req, res) => {
     }
 
     const totalAmount = Math.round(calculatedTotal * 100) / 100;
+    const totalAmountPaise = Math.round(totalAmount * 100);
 
     // 3. Atomically Reserve Stock in product-service (prevents concurrent overselling)
     try {
@@ -284,8 +274,8 @@ const handleCreateOrder = async (req, res) => {
       });
     }
 
-    const primaryStoreId = bodyStoreId || processedItems.find(i => i.storeId)?.storeId || null;
-    const primaryStoreName = bodyStoreName || processedItems.find(i => i.storeName)?.storeName || (primaryStoreId ? 'Vendor Store' : null);
+    const primaryStoreId = bodyStoreId || processedItems.find((i) => i.storeId)?.storeId || null;
+    const primaryStoreName = bodyStoreName || processedItems.find((i) => i.storeName)?.storeName || (primaryStoreId ? 'Vendor Store' : null);
 
     // 4. Create MongoDB Order in order-service
     const orderPayload = {
@@ -311,7 +301,6 @@ const handleCreateOrder = async (req, res) => {
       const orderRes = await axios.post(`${ORDER_SERVICE_URL}/api/orders/internal`, orderPayload);
       newOrder = orderRes.data.data;
     } catch (orderErr) {
-      // Rollback reserved stock if order creation failed in order-service
       await releaseStock(merchantOrderId, processedItems, 'order_creation_failed');
       const detail = orderErr.response?.data?.message || orderErr.message;
       console.error('Order creation error via order-service:', detail);
@@ -356,58 +345,49 @@ const handleCreateOrder = async (req, res) => {
       });
     }
 
-    // ── CASHFREE CHECKOUT WITH EASY SPLIT (Default & Primary Online Gateway) ──
-    if (paymentMethod === 'cashfree' || paymentMethod === 'razorpay' || paymentMethod === 'online') {
+    // ── RAZORPAY PG + ROUTE FLOW ──
+    if (paymentMethod === 'razorpay') {
       try {
         const customerName = `${shippingAddress?.firstName || ''} ${shippingAddress?.lastName || ''}`.trim() || 'Customer';
         const customerPhone = shippingAddress?.phone || '';
 
-        const cfOrder = await createEasySplitOrder({
-          orderId: merchantOrderId,
-          orderAmount: totalAmount,
+        // Validate transfer sum <= total order amount
+        const totalTransfersPaise = razorpayTransfers.reduce((sum, t) => sum + t.amount, 0);
+        if (totalTransfersPaise > totalAmountPaise) {
+          throw new Error('Total vendor transfers exceed order amount.');
+        }
+
+        const rzpOrder = await createMarketplaceOrder({
+          amount: totalAmountPaise,
           currency: 'INR',
-          customer: {
-            id: userId || `cust_${Date.now()}`,
-            name: customerName,
-            email: contactEmail,
-            phone: customerPhone,
-          },
-          orderMeta: {
-            return_url: returnUrl,
-            notify_url: `${GATEWAY_URL}/api/payment/webhook`,
-          },
-          splits: splits.length > 0 ? splits : undefined,
+          receipt: merchantOrderId,
+          transfers: razorpayTransfers.length > 0 ? razorpayTransfers : undefined,
           notes: {
             orderId: merchantOrderId,
-            userId: userId || 'guest',
-            itemCount: processedItems.length.toString(),
-            vendorCount: vendorTransfers.length.toString(),
+            userId: String(userId || 'guest'),
+            itemCount: String(processedItems.length),
+            vendorCount: String(vendorTransfers.length),
           },
         });
 
-        // Save Cashfree Order details to MongoDB order
+        // Save Razorpay order details to MongoDB order
         await axios.patch(
-          `${ORDER_SERVICE_URL}/api/orders/internal/${merchantOrderId}/cashfree-details`,
+          `${ORDER_SERVICE_URL}/api/orders/internal/${merchantOrderId}/razorpay-details`,
           {
-            cashfreeOrderId: cfOrder.order_id,
-            paymentSessionId: cfOrder.payment_session_id,
+            razorpayOrderId: rzpOrder.id,
             vendorTransfers,
           }
         );
 
-        const { env: cfEnv, appId: cfAppId } = getEnvConfig();
-        const isSandbox = Boolean(cfOrder.isSandbox || cfOrder.isMock || cfEnv === 'SANDBOX');
-
         return res.status(200).json({
           success: true,
           orderId: merchantOrderId,
-          cashfreeOrderId: cfOrder.order_id,
-          paymentSessionId: cfOrder.payment_session_id,
-          cfOrderId: cfOrder.cf_order_id,
+          razorpayOrderId: rzpOrder.id,
           amount: totalAmount,
+          amountPaise: totalAmountPaise,
           currency: 'INR',
-          appId: cfAppId,
-          name: 'WOW Lifestyle Marketplace',
+          keyId: process.env.RAZORPAY_KEY_ID,
+          name: 'Remise Marketplace',
           description: `Order #${merchantOrderId}`,
           customer: {
             name: customerName,
@@ -415,13 +395,10 @@ const handleCreateOrder = async (req, res) => {
             contact: customerPhone,
           },
           vendorTransfers,
-          isSandbox,
-          isMock: isSandbox,
         });
-      } catch (cfErr) {
-        console.error('Cashfree Order Creation Error:', cfErr.message || cfErr);
-        // Release reserved stock so product is not locked
-        await releaseStock(merchantOrderId, processedItems, 'cashfree_initiation_failed');
+      } catch (rzpErr) {
+        console.error('Razorpay Order Creation Error:', rzpErr.response?.data || rzpErr.message);
+        await releaseStock(merchantOrderId, processedItems, 'razorpay_initiation_failed');
         await axios.patch(
           `${ORDER_SERVICE_URL}/api/orders/internal/${merchantOrderId}/payment-status`,
           { paymentStatus: 'FAILED', stockStatus: 'RELEASED' }
@@ -429,7 +406,7 @@ const handleCreateOrder = async (req, res) => {
 
         return res.status(500).json({
           success: false,
-          message: `Failed to create Cashfree Order: ${cfErr.response?.data?.message || cfErr.message}`,
+          message: `Failed to create Razorpay Order: ${rzpErr.error?.description || rzpErr.response?.data?.message || rzpErr.message}`,
         });
       }
     }
@@ -507,112 +484,123 @@ router.post('/initiate', handleCreateOrder);
 
 /**
  * ─────────────────────────────────────────────────────────────────────────────
- * 2. POST /api/payment/verify
- * Server-Side Order Status & Payment Verification
+ * 2. POST /api/payment/verify and /api/payment/razorpay/verify
+ * Server-Side Payment Signature & Gateway Verification
  * ─────────────────────────────────────────────────────────────────────────────
  */
-router.post('/verify', async (req, res) => {
+const handlePaymentVerification = async (req, res) => {
   try {
     const {
       orderId, // our internal merchant order ID
       cashfree_order_id,
       paymentSessionId,
       cf_payment_id,
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
     } = req.body;
 
-    const lookupId = orderId || cashfree_order_id;
-    if (!lookupId) {
+    const lookupId = orderId || cashfree_order_id || razorpay_order_id;
+    if (!lookupId && !razorpay_order_id) {
       return res.status(400).json({
         success: false,
-        message: 'orderId is required for payment verification.',
+        message: 'orderId or gateway order reference is required for payment verification.',
       });
     }
 
-    // 1. Locate internal order by orderId
+    // 1. Locate internal order
     let orderData = null;
-    try {
-      const orderRes = await axios.get(`${ORDER_SERVICE_URL}/api/orders/internal/${lookupId}`);
-      orderData = orderRes.data?.data;
-    } catch (err) {
-      console.warn(`Could not find order by orderId ${lookupId}:`, err.message);
+    if (orderId) {
+      try {
+        const orderRes = await axios.get(`${ORDER_SERVICE_URL}/api/orders/internal/${orderId}`);
+        orderData = orderRes.data?.data;
+      } catch (err) {
+        console.warn(`Could not find order by orderId ${orderId}:`, err.message);
+      }
     }
 
-    // 2. Fetch order status from Cashfree API
-    let isVerified = false;
-    let cfPaymentId = cf_payment_id || null;
-
-    try {
-      const cfOrder = await getOrderDetails(lookupId);
-      if (cfOrder.order_status === 'PAID') {
-        isVerified = true;
+    if (!orderData && lookupId) {
+      try {
+        const orderRes = await axios.get(`${ORDER_SERVICE_URL}/api/orders/internal/${lookupId}`);
+        orderData = orderRes.data?.data;
+      } catch (err) {
+        console.warn(`Could not find order by lookupId ${lookupId}:`, err.message);
       }
-      
-      if (!cfPaymentId) {
-        const payments = await getOrderPayments(lookupId);
-        const successfulPay = payments.find((p) => p.payment_status === 'SUCCESS');
-        if (successfulPay) {
-          isVerified = true;
-          cfPaymentId = successfulPay.cf_payment_id;
+    }
+
+    // ── RAZORPAY VERIFICATION ──
+    if (razorpay_payment_id && razorpay_signature && razorpay_order_id) {
+      const isSignatureValid = verifyRazorpayPaymentSignature({
+        orderId: razorpay_order_id,
+        paymentId: razorpay_payment_id,
+        signature: razorpay_signature,
+      });
+
+      if (!isSignatureValid) {
+        console.warn(`❌ [Razorpay Verification] Invalid payment signature for ${razorpay_order_id}`);
+        return res.status(400).json({
+          success: false,
+          message: 'Payment verification failed: Invalid Razorpay cryptographic signature.',
+        });
+      }
+
+      console.log(`✅ [Razorpay] Cryptographically verified payment for order ${lookupId}, payment ${razorpay_payment_id}`);
+
+      if (orderData) {
+        const updatedTransfers = (orderData.vendorTransfers || []).map((t) => ({
+          ...t,
+          transferStatus: t.transferStatus === 'processed' ? 'processed' : 'processing',
+        }));
+
+        await axios.patch(`${ORDER_SERVICE_URL}/api/orders/internal/${orderData.orderId}/razorpay-details`, {
+          paymentStatus: 'SUCCESS',
+          stockStatus: 'COMMITTED',
+          razorpayOrderId: razorpay_order_id,
+          razorpayPaymentId: razorpay_payment_id,
+          razorpaySignature: razorpay_signature,
+          vendorTransfers: updatedTransfers,
+        });
+
+        if (orderData.paymentStatus !== 'SUCCESS') {
+          await commitStock(orderData.orderId, orderData.items);
+
+          const enrichedOrder = {
+            ...orderData,
+            paymentStatus: 'SUCCESS',
+            razorpayPaymentId: razorpay_payment_id,
+            razorpayOrderId: razorpay_order_id,
+          };
+          if (enrichedOrder.shippingAddress?.phone) sendOrderConfirmationSMS(enrichedOrder);
+          if (enrichedOrder.contactEmail) sendOrderConfirmationEmail(enrichedOrder);
+          notifyOrderParties(enrichedOrder);
         }
       }
-    } catch (cfErr) {
-      console.warn(`Cashfree verification check note for ${lookupId}:`, cfErr.message);
-    }
 
-    if (!isVerified) {
-      return res.status(400).json({
-        success: false,
-        message: 'Payment verification failed: Order is not in PAID status in Cashfree.',
+      return res.status(200).json({
+        success: true,
+        message: 'Payment verification successful.',
+        orderId: orderData?.orderId || lookupId,
+        paymentId: razorpay_payment_id,
       });
     }
 
-    console.log(`✅ [Cashfree] Verified payment for order ${lookupId}, payment ${cfPaymentId}`);
-
-    // 3. Mark payment status = SUCCESS, commit stock, update transfers
-    if (orderData) {
-      const updatedTransfers = (orderData.vendorTransfers || []).map((t) => ({
-        ...t,
-        transferStatus: t.transferStatus === 'processed' ? 'processed' : 'processing',
-      }));
-
-      await axios.patch(`${ORDER_SERVICE_URL}/api/orders/internal/${orderData.orderId}/cashfree-details`, {
-        paymentStatus: 'SUCCESS',
-        stockStatus: 'COMMITTED',
-        cashfreePaymentId: cfPaymentId,
-        vendorTransfers: updatedTransfers,
-      });
-
-      // Commit stock if not already SUCCESS
-      if (orderData.paymentStatus !== 'SUCCESS') {
-        await commitStock(orderData.orderId, orderData.items);
-
-        const enrichedOrder = {
-          ...orderData,
-          paymentStatus: 'SUCCESS',
-          cashfreePaymentId: cfPaymentId,
-        };
-        if (enrichedOrder.shippingAddress?.phone) sendOrderConfirmationSMS(enrichedOrder);
-        if (enrichedOrder.contactEmail) sendOrderConfirmationEmail(enrichedOrder);
-        notifyOrderParties(enrichedOrder);
-      }
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: 'Payment verification successful.',
-      orderId: orderData?.orderId || lookupId,
-      paymentId: cfPaymentId,
+    return res.status(400).json({
+      success: false,
+      message: 'Payment verification failed: Missing or invalid payment credentials.',
     });
   } catch (error) {
     console.error('Payment Verification Error:', error);
     res.status(500).json({ success: false, message: 'Server error during payment verification.' });
   }
-});
+};
+
+router.post('/verify', handlePaymentVerification);
+router.post('/razorpay/verify', handlePaymentVerification);
 
 /**
  * ─────────────────────────────────────────────────────────────────────────────
  * 3. POST /api/payment/cancel
- * Customer Payment Cancellation / Modal Close Handler
+ * Payment Cancellation / Modal Close Handler
  * ─────────────────────────────────────────────────────────────────────────────
  */
 router.post('/cancel', async (req, res) => {
@@ -624,10 +612,8 @@ router.post('/cancel', async (req, res) => {
 
     console.log(`↩️ [Payment Cancel] Releasing reserved stock for Order ${orderId} (${reason || 'user_cancelled'})`);
 
-    // 1. Release reserved stock back to products
     await releaseStock(orderId, [], reason || 'user_cancelled');
 
-    // 2. Mark order as FAILED / Cancelled in order-service
     try {
       await axios.patch(`${ORDER_SERVICE_URL}/api/orders/internal/${orderId}/payment-status`, {
         paymentStatus: 'FAILED',
@@ -650,181 +636,187 @@ router.post('/cancel', async (req, res) => {
 
 /**
  * ─────────────────────────────────────────────────────────────────────────────
- * 4. POST /api/payment/webhook (and /api/payment/cashfree/webhook)
- * Cashfree Webhook Event Processing (Payment Captured, Split Settlement)
+ * 4. Dedicated Razorpay Webhook Handler
+ * Processes: payment.captured, order.paid, payment.failed, transfer.processed, transfer.failed
  * ─────────────────────────────────────────────────────────────────────────────
  */
-const handleWebhook = async (req, res) => {
+const handleRazorpayWebhook = async (req, res) => {
   try {
-    const signature = req.headers['x-webhook-signature'];
-    const timestamp = req.headers['x-webhook-timestamp'];
-
-    // Verify webhook signature with raw payload
+    const signature = req.headers['x-razorpay-signature'];
     const rawBody = req.rawBody || JSON.stringify(req.body);
-    const isValid = verifyWebhookSignature({
-      rawBody,
+
+    const isValid = verifyRazorpayWebhookSignature({
+      body: rawBody,
       signature,
-      timestamp,
     });
 
-    if (!isValid && signature) {
-      console.warn('❌ [Cashfree Webhook] Signature verification failed.');
-      return res.status(400).json({ success: false, message: 'Invalid webhook signature.' });
+    if (!isValid) {
+      console.warn('❌ [Razorpay Webhook] Invalid webhook signature rejected.');
+      return res.status(400).json({ success: false, message: 'Invalid Razorpay webhook signature.' });
     }
 
-    const eventType = req.body.type;
-    const eventData = req.body.data;
+    const event = req.body.event;
+    const payload = req.body.payload;
+    console.log(`📩 [Razorpay Webhook] Received Event: ${event}`);
 
-    console.log(`📩 [Cashfree Webhook] Received Event: ${eventType}`);
+    // Event: payment.captured or order.paid
+    if (event === 'payment.captured' || event === 'order.paid') {
+      const payment = payload?.payment?.entity;
+      const orderId = payment?.notes?.orderId || payment?.receipt || payment?.order_id;
+      const paymentId = payment?.id;
 
-    // Event: PAYMENT_SUCCESS_WEBHOOK
-    if (eventType === 'PAYMENT_SUCCESS_WEBHOOK' || eventType === 'ORDER_PAID') {
-      const order = eventData?.order;
-      const payment = eventData?.payment;
-      const merchantOrderId = order?.order_id;
-
-      if (merchantOrderId) {
+      if (orderId) {
         try {
-          const orderRes = await axios.get(`${ORDER_SERVICE_URL}/api/orders/internal/${merchantOrderId}`);
+          const orderRes = await axios.get(`${ORDER_SERVICE_URL}/api/orders/internal/${orderId}`);
           const existingOrder = orderRes.data?.data;
 
           if (existingOrder && existingOrder.paymentStatus !== 'SUCCESS') {
-            await axios.patch(`${ORDER_SERVICE_URL}/api/orders/internal/${merchantOrderId}/cashfree-details`, {
+            await axios.patch(`${ORDER_SERVICE_URL}/api/orders/internal/${existingOrder.orderId}/razorpay-details`, {
               paymentStatus: 'SUCCESS',
               stockStatus: 'COMMITTED',
-              cashfreePaymentId: payment?.cf_payment_id || existingOrder.cashfreePaymentId,
+              razorpayPaymentId: paymentId || existingOrder.razorpayPaymentId,
+              razorpayOrderId: payment?.order_id || existingOrder.razorpayOrderId,
             });
-            await commitStock(merchantOrderId, existingOrder.items);
-            if (existingOrder.shippingAddress?.phone) sendOrderConfirmationSMS(existingOrder);
-            if (existingOrder.contactEmail) sendOrderConfirmationEmail(existingOrder);
-            notifyOrderParties(existingOrder);
+
+            await commitStock(existingOrder.orderId, existingOrder.items);
+
+            const enrichedOrder = {
+              ...existingOrder,
+              paymentStatus: 'SUCCESS',
+              razorpayPaymentId: paymentId,
+            };
+            if (enrichedOrder.shippingAddress?.phone) sendOrderConfirmationSMS(enrichedOrder);
+            if (enrichedOrder.contactEmail) sendOrderConfirmationEmail(enrichedOrder);
+            notifyOrderParties(enrichedOrder);
           }
         } catch (err) {
-          console.warn(`Webhook update note for order ${merchantOrderId}:`, err.message);
+          console.warn(`[Razorpay Webhook] Order lookup/update error for ${orderId}:`, err.message);
         }
       }
     }
 
-    // Event: PAYMENT_FAILED_WEBHOOK or PAYMENT_USER_DROPPED_WEBHOOK
-    if (eventType === 'PAYMENT_FAILED_WEBHOOK' || eventType === 'PAYMENT_USER_DROPPED_WEBHOOK') {
-      const merchantOrderId = eventData?.order?.order_id;
-      if (merchantOrderId) {
+    // Event: payment.failed
+    if (event === 'payment.failed') {
+      const payment = payload?.payment?.entity;
+      const orderId = payment?.notes?.orderId || payment?.receipt;
+      if (orderId) {
         try {
-          await releaseStock(merchantOrderId, [], 'webhook_payment_failed');
-          await axios.patch(`${ORDER_SERVICE_URL}/api/orders/internal/${merchantOrderId}/payment-status`, {
+          await releaseStock(orderId, [], 'razorpay_webhook_payment_failed');
+          await axios.patch(`${ORDER_SERVICE_URL}/api/orders/internal/${orderId}/payment-status`, {
             paymentStatus: 'FAILED',
             stockStatus: 'RELEASED',
           });
         } catch (err) {
-          console.warn(`Webhook payment.failed note for ${merchantOrderId}:`, err.message);
+          console.warn(`[Razorpay Webhook] Payment failed processing error for ${orderId}:`, err.message);
         }
       }
     }
 
-    // Event: TRANSFER_SUCCESS / Vendor Settlement Processed
-    if (eventType === 'TRANSFER_SUCCESS') {
-      const transfer = eventData?.transfer || eventData;
-      const vendorId = transfer?.vendor_id || transfer?.vendorId;
-      const merchantOrderId = transfer?.order_id || transfer?.orderId;
-      const transferId = transfer?.transfer_id || transfer?.cf_transfer_id;
+    // Event: transfer.processed (Route Split Settled)
+    if (event === 'transfer.processed') {
+      const transfer = payload?.transfer?.entity;
+      const transferId = transfer?.id;
+      const accountId = transfer?.recipient;
+      const orderId = transfer?.notes?.orderId;
+      const storeId = transfer?.notes?.storeId;
 
-      console.log(`💰 [Cashfree Split Transfer Success] Vendor ${vendorId} for Order ${merchantOrderId}`);
+      console.log(`💰 [Razorpay Route Transfer Processed] Transfer ${transferId} to Account ${accountId}`);
 
-      if (merchantOrderId) {
+      if (orderId) {
         try {
-          await axios.patch(`${ORDER_SERVICE_URL}/api/orders/internal/${merchantOrderId}/transfer-status`, {
-            cashfreeSplitId: transferId,
-            vendorId,
+          await axios.patch(`${ORDER_SERVICE_URL}/api/orders/internal/${orderId}/transfer-status`, {
+            razorpayTransferId: transferId,
+            razorpayAccountId: accountId,
+            storeId,
             transferStatus: 'processed',
           });
         } catch (err) {
-          console.warn(`Webhook transfer success error for ${merchantOrderId}:`, err.message);
+          console.warn(`[Razorpay Webhook] Transfer status update note for ${orderId}:`, err.message);
         }
       }
     }
 
-    // Event: TRANSFER_FAILED
-    if (eventType === 'TRANSFER_FAILED') {
-      const transfer = eventData?.transfer || eventData;
-      const vendorId = transfer?.vendor_id || transfer?.vendorId;
-      const merchantOrderId = transfer?.order_id || transfer?.orderId;
-      const failureReason = transfer?.reason || 'Vendor settlement failed';
+    // Event: transfer.failed
+    if (event === 'transfer.failed') {
+      const transfer = payload?.transfer?.entity;
+      const transferId = transfer?.id;
+      const accountId = transfer?.recipient;
+      const orderId = transfer?.notes?.orderId;
+      const storeId = transfer?.notes?.storeId;
+      const failureReason = transfer?.error?.description || 'Razorpay Route transfer settlement failed';
 
-      console.warn(`⚠️ [Cashfree Split Transfer Failed] Vendor ${vendorId} for Order ${merchantOrderId}: ${failureReason}`);
+      console.warn(`⚠️ [Razorpay Route Transfer Failed] Transfer ${transferId}: ${failureReason}`);
 
-      if (merchantOrderId) {
+      if (orderId) {
         try {
-          await axios.patch(`${ORDER_SERVICE_URL}/api/orders/internal/${merchantOrderId}/transfer-status`, {
-            vendorId,
+          await axios.patch(`${ORDER_SERVICE_URL}/api/orders/internal/${orderId}/transfer-status`, {
+            razorpayTransferId: transferId,
+            razorpayAccountId: accountId,
+            storeId,
             transferStatus: 'failed',
             failureReason,
           });
         } catch (err) {
-          console.warn(`Webhook transfer failed error for ${merchantOrderId}:`, err.message);
+          console.warn(`[Razorpay Webhook] Transfer failure recording note for ${orderId}:`, err.message);
         }
       }
     }
 
-    // Respond 200 OK immediately for webhook delivery confirmation
     return res.status(200).json({ status: 'ok' });
   } catch (error) {
-    console.error('Webhook Handling Error:', error);
+    console.error('Razorpay Webhook Error:', error);
     res.status(500).json({ status: 'error', message: error.message });
   }
 };
 
-router.post('/webhook', handleWebhook);
-router.post('/cashfree/webhook', handleWebhook);
-router.post('/razorpay/webhook', handleWebhook); // Backwards-compatible webhook path
+router.post('/webhook', handleRazorpayWebhook);
+router.post('/razorpay/webhook', handleRazorpayWebhook);
 
 /**
  * ─────────────────────────────────────────────────────────────────────────────
- * 5. Vendor Easy Split Onboarding & Status Endpoints
+ * 6. Vendor Onboarding & Status (Razorpay Route)
  * ─────────────────────────────────────────────────────────────────────────────
  */
-router.post('/vendor/onboard', async (req, res) => {
+
+// Razorpay Route Vendor Onboarding
+router.post('/razorpay/vendor/onboard', async (req, res) => {
   try {
     const vendorData = req.body;
     if (!vendorData.storeId && !vendorData.email) {
       return res.status(400).json({ success: false, message: 'Vendor storeId and email are required.' });
     }
 
-    const onboardResult = await createVendor(vendorData);
+    const onboardResult = await onboardRazorpayVendor(vendorData);
 
-    // Update store-service with returned account IDs & status
     if (vendorData.storeId) {
       try {
-        await axios.patch(`${STORE_SERVICE_URL}/api/stores/internal/${vendorData.storeId}/cashfree-status`, {
-          cashfreeVendorId: onboardResult.vendorId,
-          cashfreeVendorStatus: onboardResult.status || 'active',
-          cashfreeKycStatus: 'COMPLETED',
+        await axios.patch(`${STORE_SERVICE_URL}/api/stores/internal/${vendorData.storeId}/razorpay-status`, {
+          razorpayAccountId: onboardResult.accountId,
+          razorpayStakeholderId: onboardResult.stakeholderId,
+          razorpayRouteStatus: onboardResult.routeStatus,
+          razorpayRouteProductStatus: onboardResult.productStatus,
         });
       } catch (storeUpdateErr) {
-        console.warn(`Could not sync Cashfree status back to store ${vendorData.storeId}:`, storeUpdateErr.message);
+        console.warn(`Could not sync Razorpay status back to store ${vendorData.storeId}:`, storeUpdateErr.message);
       }
     }
 
     res.status(200).json({
       success: true,
-      message: onboardResult.message || 'Cashfree Easy Split vendor configured successfully.',
+      message: 'Razorpay Route Linked Account configured successfully.',
       data: onboardResult,
     });
   } catch (error) {
-    console.warn('Vendor Easy Split Onboarding Note:', error.response?.data || error.message);
-    const detail = error.response?.data?.message || error.message;
-    res.status(200).json({
-      success: true,
-      message: `Store bank details saved locally (${detail}).`,
-      data: {
-        vendorId: req.body.vendorId || req.body.storeId || `vendor_${Date.now()}`,
-        status: 'active',
-        easySplitPending: true,
-      },
+    console.error('Razorpay Vendor Onboarding Error:', error.response?.data || error.message);
+    res.status(500).json({
+      success: false,
+      message: error.response?.data?.error?.description || error.message,
     });
   }
 });
 
-router.get('/vendor/status/:storeId', async (req, res) => {
+// Razorpay Route Vendor Status Check
+router.get('/razorpay/vendor/status/:storeId', async (req, res) => {
   try {
     const { storeId } = req.params;
     const store = await resolveStoreDetails(storeId);
@@ -832,12 +824,12 @@ router.get('/vendor/status/:storeId', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Store not found' });
     }
 
-    let vendorDetails = null;
-    if (store.cashfreeVendorId) {
+    let accountDetails = null;
+    if (store.razorpayAccountId) {
       try {
-        vendorDetails = await getVendorDetails(store.cashfreeVendorId);
+        accountDetails = await getRazorpayAccountDetails(store.razorpayAccountId);
       } catch (accErr) {
-        console.warn(`Could not fetch vendor details for ${store.cashfreeVendorId}:`, accErr.message);
+        console.warn(`Could not fetch Razorpay account details for ${store.razorpayAccountId}:`, accErr.message);
       }
     }
 
@@ -846,10 +838,12 @@ router.get('/vendor/status/:storeId', async (req, res) => {
       data: {
         storeId: store._id,
         storeName: store.name,
-        cashfreeVendorId: store.cashfreeVendorId,
-        cashfreeVendorStatus: store.cashfreeVendorStatus || 'not_created',
+        razorpayAccountId: store.razorpayAccountId,
+        razorpayStakeholderId: store.razorpayStakeholderId,
+        razorpayRouteStatus: store.razorpayRouteStatus || 'not_created',
+        razorpayRouteProductStatus: store.razorpayRouteProductStatus,
         commissionPercentage: store.commissionPercentage || 10,
-        vendorDetails,
+        accountDetails,
       },
     });
   } catch (error) {
@@ -859,25 +853,41 @@ router.get('/vendor/status/:storeId', async (req, res) => {
 
 /**
  * ─────────────────────────────────────────────────────────────────────────────
- * 6. POST /api/payment/refund
- * Refund with Easy Split Vendor Deductions
+ * 7. POST /api/payment/refund
+ * Refund with Razorpay Gateway & Transfer Reversal Handling
  * ─────────────────────────────────────────────────────────────────────────────
  */
 router.post('/refund', async (req, res) => {
   try {
-    const { orderId, refundAmount, refundNote, refundSplits } = req.body;
+    const { orderId, refundAmount, refundNote } = req.body;
     if (!orderId || !refundAmount) {
       return res.status(400).json({ success: false, message: 'orderId and refundAmount are required' });
     }
 
-    const refundResult = await createRefund({
-      orderId,
-      refundAmount,
-      refundNote,
-      refundSplits,
-    });
+    // Lookup order to determine provider
+    let order = null;
+    try {
+      const orderRes = await axios.get(`${ORDER_SERVICE_URL}/api/orders/internal/${orderId}`);
+      order = orderRes.data?.data;
+    } catch (err) {
+      console.warn(`Could not locate order ${orderId} for refund:`, err.message);
+    }
 
-    // Update order status if full refund
+    let refundResult = null;
+
+    // Razorpay Refund Flow
+    if (order && order.razorpayPaymentId) {
+      const rzp = getRazorpayInstance();
+      refundResult = await rzp.payments.refund(order.razorpayPaymentId, {
+        amount: Math.round(refundAmount * 100), // paise
+        reverse_all_transfers: 1, // Automatically reverses Route transfers back to master account
+        notes: {
+          orderId,
+          reason: refundNote || 'Customer refund',
+        },
+      });
+    }
+
     try {
       await axios.patch(`${ORDER_SERVICE_URL}/api/orders/internal/${orderId}/payment-status`, {
         paymentStatus: 'REFUNDED',
@@ -904,7 +914,7 @@ router.post('/refund', async (req, res) => {
 
 /**
  * ─────────────────────────────────────────────────────────────────────────────
- * 7. GET /api/payment/status/:orderId (Polling / Fallback Confirmation)
+ * 8. GET /api/payment/status/:orderId (Polling / Fallback Confirmation)
  * ─────────────────────────────────────────────────────────────────────────────
  */
 router.get('/status/:orderId', async (req, res) => {
@@ -916,41 +926,6 @@ router.get('/status/:orderId', async (req, res) => {
 
     if (!order) {
       return res.status(404).json({ success: false, message: 'Order not found' });
-    }
-
-    // If order is still pending, check Cashfree API directly
-    if (order.paymentStatus !== 'SUCCESS') {
-      try {
-        const cfOrder = await getOrderDetails(orderId);
-        if (cfOrder && cfOrder.order_status === 'PAID') {
-          console.log(`✅ [Cashfree Polling] Auto-confirming PAID order ${orderId}`);
-
-          const cfPayments = await getOrderPayments(orderId).catch(() => []);
-          const successfulPay = cfPayments.find((p) => p.payment_status === 'SUCCESS');
-          const cfPaymentId = successfulPay?.cf_payment_id || null;
-
-          await axios.patch(`${ORDER_SERVICE_URL}/api/orders/internal/${order.orderId}/cashfree-details`, {
-            paymentStatus: 'SUCCESS',
-            stockStatus: 'COMMITTED',
-            cashfreePaymentId: cfPaymentId,
-          });
-
-          await commitStock(order.orderId, order.items);
-
-          const enrichedOrder = {
-            ...order,
-            paymentStatus: 'SUCCESS',
-            cashfreePaymentId: cfPaymentId,
-          };
-          if (enrichedOrder.shippingAddress?.phone) sendOrderConfirmationSMS(enrichedOrder);
-          if (enrichedOrder.contactEmail) sendOrderConfirmationEmail(enrichedOrder);
-          notifyOrderParties(enrichedOrder);
-
-          order.paymentStatus = 'SUCCESS';
-        }
-      } catch (cfErr) {
-        // Cashfree status check is best-effort during polling
-      }
     }
 
     res.status(200).json({
